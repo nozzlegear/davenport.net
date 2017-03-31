@@ -1,0 +1,14 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard1.4</TargetFramework>
+    <AssemblyName>Davenport</AssemblyName>
+    <RootNamespace>Davenport</RootNamespace>
+    <VersionPrefix>0.1.0</VersionPrefix>
+    <VersionSuffix>alpha</VersionSuffix>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="flurl" Version="2.3.0" />
+    <PackageReference Include="flurl.http" Version="1.1.2" />
+    <PackageReference Include="newtonsoft.json" Version="10.0.1" />
+  </ItemGroup>
+</Project>
