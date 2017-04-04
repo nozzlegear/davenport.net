@@ -7,19 +7,19 @@ namespace Davenport.Entities
     public class FindOptions : Serializable
     {
         [JsonProperty("fields")]
-        public string fields { get; set; }
+        public string Fields { get; set; }
         
         [JsonProperty("sort")]
-        public IEnumerable<object> sort { get; set; }
+        public IEnumerable<object> Sort { get; set; }
         
         [JsonProperty("limit")]
-        public int? limit { get; set; }
+        public int? Limit { get; set; }
         
         [JsonProperty("skip")]
-        public int? skip { get; set; }
+        public int? Skip { get; set; }
         
         [JsonProperty("use_index")]
-        public object use_index { get; set; }
+        public object UseIndex { get; set; }
 
         [JsonProperty("selector")]
         internal string Selector { get; set; }
