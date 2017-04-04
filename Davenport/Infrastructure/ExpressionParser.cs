@@ -15,11 +15,6 @@ namespace Davenport.Infrastructure
 				throw new ArgumentException($"Invalid expression. Expression must be in the form of e.g. x => x.Foo == 5 and must use the document parameter passed in.");
 			}
 			
-			Console.WriteLine("Binary Expression Type: {0}", bod.NodeType);
-			Console.WriteLine("Method to be called: {0}", bod.Method);
-			Console.WriteLine("Return Type: {0}", expression.ReturnType);
-			Console.WriteLine(bod);
-
 			return ParseExpression(expression);
 		}
 		
