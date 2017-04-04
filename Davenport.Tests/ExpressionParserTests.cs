@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Davenport.Infrastructure;
 using Xunit;
 
@@ -6,8 +7,6 @@ namespace Davenport.Tests
 {
     public class ExpressionParserTests
     {
-        ExpressionParser Parser = new ExpressionParser();
-
         MyTestClass TestClass = new MyTestClass()
         {
             Foo = "test",
@@ -19,87 +18,95 @@ namespace Davenport.Tests
         [Fact(DisplayName = "Parser FromClass")]
         public void FromClass()
         { 	
-			string result = Parser.Parse<MyTestClass>(x => x.Baz == TestClass.Baz);
+			var result = ExpressionParser.Parse<MyTestClass>(x => x.Baz == TestClass.Baz);
 
-            Assert.True(result == $"\"Baz\": {{ \"$eq\": {TestClass.Baz} }}");
+            Assert.True(result.Any(kvp => kvp.Key == "Baz" && (int) kvp.Value.EqualTo == TestClass.Baz));
         }
 
         [Fact(DisplayName = "Parser FromVariable")]
         public void FromVariable()
         {
             string searchString = "test";
-            string result = Parser.Parse<MyTestClass>(x => x.Foo == searchString);
+            var result = ExpressionParser.Parse<MyTestClass>(x => x.Foo == searchString);
 
-            Assert.True(result == $"\"Foo\": {{ \"$eq\": \"{searchString}\" }}");
+            Assert.True(result.Any(kvp => kvp.Key == "Foo" && (string) kvp.Value.EqualTo == searchString));
         }
 
         [Fact(DisplayName = "Parser FromConstant")]
         public void FromConstant()
         {
-            string result = Parser.Parse<MyTestClass>(x => x.Bar == false);
+            var result = ExpressionParser.Parse<MyTestClass>(x => x.Bar == false);
 
-            Assert.True(result == $"\"Bar\": {{ \"$eq\": false }}");
+            Assert.True(result.Any(kvp => kvp.Key == "Bar" && (bool) kvp.Value.EqualTo == false));
         }
 
         [Fact(DisplayName = "Parser WithNullValue")]
         public void WithNullValue()
         {
-            string result = Parser.Parse<MyTestClass>(x => x.Bat == null);
+            var result = ExpressionParser.Parse<MyTestClass>(x => x.Bat == null);
             
-            Assert.True(result == $"\"Bat\": {{ \"$eq\": null }}");
+            Assert.True(result.Any(kvp => kvp.Key == "Bat" && kvp.Value.EqualTo == null));
         }
 
         [Fact(DisplayName = "Parser GreaterThan")]
         public void GreaterThan()
         {
-            string result = Parser.Parse<MyTestClass>(x => x.Baz > TestClass.Baz);
+            var result = ExpressionParser.Parse<MyTestClass>(x => x.Baz > TestClass.Baz);
 
-            Assert.True(result == $"\"Baz\": {{ \"$gt\": {TestClass.Baz} }}");
+            Assert.True(result.Any(kvp => kvp.Key == "Baz" && (int) kvp.Value.GreaterThan == TestClass.Baz));
         }
 
         [Fact(DisplayName = "Parser GreaterThanOrEqualTo")]
         public void GreaterThanOrEqualTo()
         {
-            string result = Parser.Parse<MyTestClass>(x => x.Baz >= TestClass.Baz);
+            var result = ExpressionParser.Parse<MyTestClass>(x => x.Baz >= TestClass.Baz);
 
-            Assert.True(result == $"\"Baz\": {{ \"$gte\": {TestClass.Baz} }}");
+            Assert.True(result.Any(kvp => kvp.Key == "Baz" && (int) kvp.Value.GreaterThanOrEqualTo == TestClass.Baz));
         }
 
         [Fact(DisplayName = "Parser LesserThan")]
         public void LesserThan()
         {
-            string result = Parser.Parse<MyTestClass>(x => x.Baz < TestClass.Baz);
+            var result = ExpressionParser.Parse<MyTestClass>(x => x.Baz < TestClass.Baz);
 
-            Assert.True(result == $"\"Baz\": {{ \"$lt\": {TestClass.Baz} }}");
+            Assert.True(result.Any(kvp => kvp.Key == "Baz" && (int) kvp.Value.LesserThan == TestClass.Baz));
         }
 
         [Fact(DisplayName = "Parser LesserThanOrEqualTo")]
         public void LesserThanOrEqualTo()
         {
-            string result = Parser.Parse<MyTestClass>(x => x.Baz <= TestClass.Baz);
+            var result = ExpressionParser.Parse<MyTestClass>(x => x.Baz <= TestClass.Baz);
 
-            Assert.True(result == $"\"Baz\": {{ \"$lte\": {TestClass.Baz} }}");
+            Assert.True(result.Any(kvp => kvp.Key == "Baz" && (int) kvp.Value.LesserThanOrEqualTo == TestClass.Baz));
         }
 
         [Fact(DisplayName = "Parser NotEqual")]
         public void NotEqual()
         {
-            string result = Parser.Parse<MyTestClass>(x => x.Baz != TestClass.Baz);
+            var result = ExpressionParser.Parse<MyTestClass>(x => x.Baz != TestClass.Baz);
 
-            Assert.True(result == $"\"Baz\": {{ \"$neq\": {TestClass.Baz} }}");
+            Assert.True(result.Any(kvp => kvp.Key == "Baz" && (int) kvp.Value.NotEqualTo == TestClass.Baz));
+        }
+
+        [Fact(DisplayName = "Parser Backwards")]
+        public void Backwards()
+        {
+            var result = ExpressionParser.Parse<MyTestClass>(x => 5 == x.Baz);
+
+            Assert.True(result.Any(kvp => kvp.Key == "Baz" && (int)kvp.Value.EqualTo == 5));
         }
     }
 
     class MyTestClass
-	{
-		public string Id { get; set; }
-		
-		public string Foo { get; set; }
-		
-		public bool Bar { get; set; }
-		
-		public int Baz { get; set; }
+    {
+        public string Id { get; set; }
 
-		public int? Bat { get; set; }
-	}
+        public string Foo { get; set; }
+
+        public bool Bar { get; set; }
+
+        public int Baz { get; set; }
+
+        public int? Bat { get; set; }
+    }
 }

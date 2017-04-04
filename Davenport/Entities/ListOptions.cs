@@ -1,12 +1,13 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using Davenport.Infrastructure;
 using Flurl;
 using Newtonsoft.Json;
 
 namespace Davenport.Entities
 {
-    public class ListOptions
+    public class ListOptions : Serializable
     {
         [JsonProperty("limit")]
         public int? Limit { get; set; }
@@ -32,44 +33,20 @@ namespace Davenport.Entities
         [JsonProperty("skip")]
         public int? Skip { get; set; }
 
-        public IEnumerable<QueryParameter> ToQueryParameters()
+        public override IEnumerable<QueryParameter> ToQueryParameters()
         {
-            var output = new List<QueryParameter>();
+            var kvps = ToDictionary();
+            string[] keys = { "keys", "key", "start_key", "end_key" };
+            var matched = kvps.Where(kvp => keys.Any(key => key == kvp.Key));
+            var allElse = kvps.Where(kvp => ! matched.Contains(kvp)).ToList();
 
-            foreach (PropertyInfo property in GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            foreach (var kvp in matched)
             {
-                object value = property.GetValue(this, null);
-                string propName = property.Name;
-
-                if (value == null)
-                {
-                    continue;
-                }
-
-                if (property.CustomAttributes.Any(att => att.AttributeType == typeof(JsonPropertyAttribute)))
-                {
-                    // Use the JsonPropertyName instead of the C# property namespace
-                    var att = property.GetCustomAttributes(typeof(JsonPropertyAttribute), false).Cast<JsonPropertyAttribute>().FirstOrDefault();
-
-                    propName = att?.PropertyName ?? property.Name;
-                }
-
-                QueryParameter param;
-
-                if (propName == "keys" || propName == "key" || propName == "start_key" || propName == "end_key")
-                {
-                    // Keys must be JSON serialized
-                    param = new QueryParameter(propName, JsonConvert.SerializeObject(value));
-                }
-                else
-                {
-                    param = new QueryParameter(propName, value);
-                }
-
-                output.Add(param);
+                // These keys must be JSON serialized
+                allElse.Add(new KeyValuePair<string, object>(kvp.Key, JsonConvert.SerializeObject(kvp.Value)));
             }
 
-            return output;
+            return allElse.Select(kvp => new QueryParameter(kvp.Key, kvp.Value));
         }
     }
 }

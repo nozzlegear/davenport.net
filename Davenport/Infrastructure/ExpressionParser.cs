@@ -1,12 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
+using Davenport.Entities;
 
 namespace Davenport.Infrastructure
 {
-	public class ExpressionParser
+	public static class ExpressionParser
 	{
-		public string Parse<DocumentType>(Expression<Func<DocumentType, bool>> expression)
+		public static Dictionary<string, FindExpression> Parse<DocumentType>(Expression<Func<DocumentType, bool>> expression)
 		{
 			var bod = expression.Body as BinaryExpression;
 
@@ -15,67 +16,70 @@ namespace Davenport.Infrastructure
 				throw new ArgumentException($"Invalid expression. Expression must be in the form of e.g. x => x.Foo == 5 and must use the document parameter passed in.");
 			}
 			
-			return ParseExpression(expression);
+			var body = expression.Body as BinaryExpression;
+
+			if (body == null)
+			{
+				throw new ArgumentException($"Expression body could not be converted to a binary expression.");
+			}
+
+			switch (body.NodeType)
+			{
+				default:
+					throw new ArgumentException($"Davenport currently only supports == expressions. Type received: {body.NodeType}.");
+
+				case ExpressionType.Or:
+				case ExpressionType.OrElse:
+					throw new ArgumentException($"CouchDB's find method does not support || expressions. We recommend constructing a view instead.");
+
+				// Supported types:
+				case ExpressionType.Equal:
+				case ExpressionType.NotEqual:
+				case ExpressionType.GreaterThan:
+				case ExpressionType.GreaterThanOrEqual:
+				case ExpressionType.LessThan:
+				case ExpressionType.LessThanOrEqual:
+					break;
+			}
+
+			var parts = GetExpressionParts(body);
+
+			return new Dictionary<string, FindExpression>()
+			{
+				{ parts.PropName, new FindExpression(body.NodeType, parts.Value) }
+			};
 		}
 		
-		string ValueToString(object memberValue)
+		static object InvokeExpression(Expression exp)
 		{
-			if (memberValue == null)
-			{
-				return $"null";
-			}
-			
-			Type t = memberValue.GetType();
-		
-			if (t == typeof(string))
-			{
-				string value = memberValue.ToString();
-				
-				return $"\"{value}\"";
-			}
-			
-			if (t == typeof(bool))
-			{
-				bool value = (bool) memberValue;
-				
-				return  value.ToString().ToLower();
-			}
-			
-			if (t == typeof(int))
-			{
-				int value = (int) memberValue;
-				
-				return value.ToString();
-			}
-			
-			throw new ArgumentException($"Value type {t} is not supported.");
+			object val = Expression.Lambda(exp).Compile().DynamicInvoke();
+
+			return val;
 		}
 		
-		string GetMemberValue(MemberExpression member)
+		static (bool IsPropName, object Value) GetMemberValue(MemberExpression member)
 		{
 			try
 			{
-				object val = Expression.Lambda(member).Compile().DynamicInvoke();
-				
-				return ValueToString(val);
+				return (false, InvokeExpression(member));
 			}
-			catch (Exception)
+			catch (Exception ex)
 			{
-				return member.Member.Name;
+				return (true, member.Member.Name);
 			}
 		}
 
-		string GetExpressionValue(Expression exp)
+		static (bool IsPropName, object Value) GetExpressionValue(Expression exp)
 		{
 			switch (exp.NodeType)
 			{
 				case ExpressionType.Constant:
 					var constVal = ((ConstantExpression) exp).Value;
 					
-					return ValueToString(constVal);
+					return (false, constVal);
 
 				case ExpressionType.MemberAccess:
-					return GetMemberValue((MemberExpression) exp);
+                    return GetMemberValue((MemberExpression)exp);
 					
 				case ExpressionType.Convert:
 					var unary = (UnaryExpression) exp;
@@ -86,64 +90,17 @@ namespace Davenport.Infrastructure
 			}
 		}
 
-		(Expression Left, Expression Right) GetBinaryExpressionParts(BinaryExpression exp)
+		static (string PropName, object Value) GetExpressionParts(BinaryExpression exp)
 		{
-			return (Left: exp.Left, Right: exp.Right);
-		}
-
-		string ParseExpression<T>(Expression<Func<T, bool>> expression)
-		{
-			var body = expression.Body as BinaryExpression;
-
-			if (body == null)
+			var leftValue = GetExpressionValue(exp.Left);
+			var rightValue  = GetExpressionValue(exp.Right);
+			
+			if (leftValue.IsPropName)
 			{
-				throw new ArgumentException($"Expression body could not be converted to a binary expression.");
+				return (leftValue.Value as string, rightValue.Value);
 			}
 
-			var leftParts = new List<Expression>();
-			var rightParts = new List<Expression>();
-
-			string operation;
-
-			switch (body.NodeType)
-			{
-				default:
-					Console.WriteLine(body);
-					throw new ArgumentException($"Davenport currently only supports == expressions. Type received: {body.NodeType}.");
-
-				case ExpressionType.Or:
-				case ExpressionType.OrElse:
-					throw new ArgumentException($"CouchDB's find method does not support || expressions. We recommend constructing a view instead.");
-
-				case ExpressionType.Equal:
-					operation = "$eq";
-					break;
-
-				case ExpressionType.NotEqual:
-					operation = "$neq";
-					break;
-					
-				case ExpressionType.GreaterThan:
-					operation = "$gt";
-					break;
-					
-				case ExpressionType.GreaterThanOrEqual:
-					operation = "$gte";
-					break;
-					
-				case ExpressionType.LessThan:
-					operation = "$lt";
-					break;
-					
-				case ExpressionType.LessThanOrEqual:
-					operation = "$lte";
-					break;
-			}
-
-			var left = GetExpressionValue(body.Left);
-			var right = GetExpressionValue(body.Right);
-
-			return $"\"{left}\": {{ \"{operation}\": {right} }}";
+			return (rightValue.Value as string, leftValue.Value);
 		}
 	}
 }

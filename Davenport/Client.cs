@@ -10,6 +10,7 @@ using Davenport.Entities;
 using System.Linq;
 using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
+using System.Linq.Expressions;
 
 namespace Davenport
 {
@@ -84,6 +85,47 @@ namespace Davenport
             var request = PrepareRequest(id, rev);
 
             return await ExecuteRequestAsync<DocumentType>(request, HttpMethod.Get);
+        }
+
+        private async Task<IEnumerable<DocumentType>> FindAsync(object selector, Dictionary<string, object> options)
+        {
+            var request = PrepareRequest("_find");
+            
+            // Make sure the selector is occupying the selector key
+            if (options.ContainsKey("selector"))
+            {
+                options.Remove("selector");
+            }
+            
+            options.Add("selector", selector);
+
+            var content = new JsonContent(options);
+
+            return await ExecuteRequestAsync<List<DocumentType>>(request, HttpMethod.Post, content);
+        }
+
+        /// <summary>
+        /// Searches for documents matching the given selector. NOTE: Davenport currently only supports simple 1 argument selectors, e.g. x => x.Foo == "value".
+        /// </summary>
+        public async Task<IEnumerable<DocumentType>> FindAsync(Expression<Func<DocumentType, bool>> expression, FindOptions options = null)
+        {
+            return await FindAsync(ExpressionParser.Parse(expression), options?.ToDictionary() ?? new Dictionary<string, object>());
+        }
+
+        /// <summary>
+        /// Searches for documents matching the given selector.
+        /// </summary>
+        public async Task<IEnumerable<DocumentType>> FindAsync(object selector, FindOptions options = null)
+        {
+            return await FindAsync(selector, options?.ToDictionary() ?? new Dictionary<string, object>());
+        }
+
+        /// <summary>
+        /// Searches for documents matching the given selector.
+        /// </summary>
+        public async Task<IEnumerable<DocumentType>> FindAsync(Dictionary<string, FindExpression> selector, FindOptions options = null)
+        {
+            return await FindAsync(selector, options?.ToDictionary() ?? new Dictionary<string, object>());
         }
 
         public async Task<ListResponse<DocumentType>> ListWithDocsAsync(ListOptions options = null)
