@@ -13,7 +13,7 @@ static void Main()
     var search = 5;
     
     //c.Find(x => x.Foo == searchString);
-    c.Find(x => x.Foo == null);
+    c.Find(x => x.Bat > myClass.Baz && x.Bat < myClass.Baz && x.Bat == myClass.Baz);
 }
 
 class Client<DocumentType>
@@ -102,35 +102,62 @@ class Client<DocumentType>
         }
     }
 
-    static string ParseExpression<T>(Expression<Func<T, bool>> expression)
-    {
-        var body = expression.Body as BinaryExpression;
+	static string ParseExpression<T>(Expression<Func<T, bool>> expression)
+	{
+		var body = expression.Body as BinaryExpression;
 
-        if (body == null)
-        {
-            throw new ArgumentException($"Expression body could not be converted to a binary expression.");
-        }
+		if (body == null)
+		{
+			throw new ArgumentException($"Expression body could not be converted to a binary expression.");
+		}
 
-        if (body.NodeType == ExpressionType.Or || body.NodeType == ExpressionType.OrElse)
-        {
-            throw new ArgumentException($"CouchDB's find method does not support || expressions. We recommend constructing a view instead.");
-        }
-        
-        if (body.NodeType != ExpressionType.Equal)
-        {
-            throw new ArgumentException($"Davenport currently only suports == expressions. Type received: {body.NodeType}.");
-        }
+		string operation;
 
-        var left = GetExpressionValue(body.Left);
-        var right = GetExpressionValue(body.Right);
+		switch (body.NodeType)
+		{
+			default:
+				Console.WriteLine(body);
+				throw new ArgumentException($"Davenport currently only supports == expressions. Type received: {body.NodeType}.");
 
-        return $"\"{left}\": {{ \"$eq\": {right} }}";
-    }
+			case ExpressionType.Or:
+			case ExpressionType.OrElse:
+				throw new ArgumentException($"CouchDB's find method does not support || expressions. We recommend constructing a view instead.");
+
+			case ExpressionType.Equal:
+				operation = "$eq";
+				break;
+
+			case ExpressionType.NotEqual:
+				operation = "$neq";
+				break;
+				
+			case ExpressionType.GreaterThan:
+				operation = "$gt";
+				break;
+				
+			case ExpressionType.GreaterThanOrEqual:
+				operation = "$gte";
+				break;
+				
+			case ExpressionType.LessThan:
+				operation = "$lt";
+				break;
+				
+			case ExpressionType.LessThanOrEqual:
+				operation = "$lte";
+				break;
+		}
+
+		var left = GetExpressionValue(body.Left);
+		var right = GetExpressionValue(body.Right);
+
+		return $"\"{left}\": {{ \"{operation}\": {right} }}";
+	}
 }
 
 class MyTestClass
 {
-    public string Id { get; set; }
+	public string Id { get; set; }
     
     public string Foo { get; set; }
     
