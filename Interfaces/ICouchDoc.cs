@@ -1,15 +1,19 @@
-﻿namespace Davenport.Interfaces
+﻿using Newtonsoft.Json;
+
+namespace Davenport.Interfaces
 {
     public interface ICouchDoc
     {
         /// <summary>
         /// The object's database id.
         /// </summary>
-        string _id { get; set; }
+        [JsonProperty("_id")]
+        string Id { get; set; }
             
         /// <summary>
         /// The object's database revision.
         /// </summary>
-        string _rev { get; set; }
+        [JsonProperty("_rev")]
+        string Rev { get; set; }
     }
 }

@@ -7,6 +7,9 @@ using System.Net.Http;
 using Davenport.Infrastructure;
 using Newtonsoft.Json;
 using Davenport.Entities;
+using System.Linq;
+using Newtonsoft.Json.Linq;
+using System.Collections.Generic;
 
 namespace Davenport
 {
@@ -83,6 +86,57 @@ namespace Davenport
             return await ExecuteRequestAsync<DocumentType>(request, HttpMethod.Get);
         }
 
+        public async Task<ListResponse<DocumentType>> ListWithDocsAsync(ListOptions options = null)
+        {
+            var request = PrepareRequest("_all_docs");
+
+            if (options != null)
+            {
+                request.Url.QueryParams.AddRange(options.ToQueryParameters());
+            }
+
+            request.Url.SetQueryParam("include_docs", true);
+
+            var result = await ExecuteRequestAsync<ListResponse<JToken>>(request, HttpMethod.Get);
+            var rows = new List<ListedRow<DocumentType>>();
+            var designDocs = new List<ListedRow<object>>();
+
+            // Will probably need to split out the DesignDocs as they won't deserialize properly.
+            foreach (var designDoc in result.Rows.Where(r => r.Id.StartsWith("_design")))
+            {
+                var row = new ListedRow<object>()
+                {
+                    Id = designDoc.Id,
+                    Key = designDoc.Key,
+                    Value = designDoc.Value,
+                    Doc = designDoc.Doc.ToObject<object>(),
+                };
+
+                designDocs.Add(row);
+            }
+
+            foreach (var doc in result.Rows.Where(r => !r.Id.StartsWith("_design")))
+            {
+                var row = new ListedRow<DocumentType>()
+                {
+                    Id = doc.Id,
+                    Key = doc.Key,
+                    Value = doc.Value,
+                    Doc = doc.Doc.ToObject<DocumentType>(),
+                };
+
+                rows.Add(row);
+            }
+
+            return new ListResponse<DocumentType>()
+            {
+                TotalRows = result.TotalRows,
+                Offset = result.Offset,
+                DesignDocs = designDocs,
+                Rows = rows,
+            };
+        }
+
         /// <summary>
         /// Creates a document and assigns a random id.
         /// </summary>
@@ -142,6 +196,21 @@ namespace Davenport
             var request = PrepareRequest(id, rev);
 
             await ExecuteRequestAsync<object>(request, HttpMethod.Delete);
+        }
+
+        /// <summary>
+        /// Executes a view with the given <paramref name="designDocName" /> and <paramref name="viewName" />
+        /// </summary>
+        public async Task<ListResponse<ReturnType>> ViewAsync<ReturnType>(string designDocName, string viewName, ViewOptions options = null)
+        {
+            var request = PrepareRequest($"_design/{designDocName}/_view/{viewName}");
+
+            if (options != null)
+            {
+                request.Url.QueryParams.AddRange(options.ToQueryParameters());
+            }
+
+            return await ExecuteRequestAsync<ListResponse<ReturnType>>(request, HttpMethod.Get);
         }
     }
 }

@@ -1,14 +1,19 @@
-﻿namespace Davenport.Entities
+﻿using Newtonsoft.Json;
+
+namespace Davenport.Entities
 {
     /// <summary>
     /// Response returned by CouchDB on POST, PUT or COPY requests.
     /// </summary>
     public class PostPutCopyResponse
     {
-        public string id { get; set; }
+        [JsonProperty("id")]
+        public string Id { get; set; }
 
-        public string rev { get; set; }
+        [JsonProperty("rev")]
+        public string Rev { get; set; }
 
-        public bool? ok { get; set; }
+        [JsonProperty("ok")]
+        public bool? Ok { get; set; }
     }
 }
