@@ -13,7 +13,7 @@ static void Main()
     var search = 5;
     
     //c.Find(x => x.Foo == searchString);
-    c.Find(x => x.Bar == false);
+    c.Find(x => x.Foo == null);
 }
 
 class Client<DocumentType>
@@ -21,6 +21,11 @@ class Client<DocumentType>
     public void Find(Expression<Func<DocumentType, bool>> expression)
     {
         var bod = expression.Body as BinaryExpression;
+
+		if (bod == null)
+		{
+			throw new ArgumentException($"Invalid expression. Expression must be in the form of e.g. x => x.Foo == 5 and must use the document parameter passed in.");
+		}
         
         Console.WriteLine("Binary Expression Type: {0}", bod.NodeType);
         Console.WriteLine("Method to be called: {0}", bod.Method);
@@ -30,7 +35,12 @@ class Client<DocumentType>
     }
     
     static string ValueToString(object memberValue)
-    {
+	{
+		if (memberValue == null)
+		{
+			return $"null";
+		}
+		
         Type t = memberValue.GetType();
     
         if (t == typeof(string))
@@ -82,7 +92,12 @@ class Client<DocumentType>
 
             case ExpressionType.MemberAccess:
                 return GetMemberValue((MemberExpression) exp);
-
+				
+			case ExpressionType.Convert:
+				var unary = (UnaryExpression) exp;
+				
+				return GetExpressionValue(unary.Operand);
+				
             default: throw new ArgumentException($"Expression type {exp.NodeType} is invalid.");
         }
     }
@@ -122,4 +137,6 @@ class MyTestClass
     public bool Bar { get; set; }
     
     public int Baz { get; set; }
+
+	public int? Bat { get; set; }
 }
