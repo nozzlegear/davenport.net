@@ -34,9 +34,9 @@ namespace Davenport.Tests
                     {
                         new View()
                         {
-                            Name = "only-foos-greater-than-10",
+                            Name = "only-bazs-greater-than-10",
                             MapFunction = @"function (doc) {
-                                if (doc.foo > 10) {
+                                if (doc.Baz > 10) {
                                     emit(doc._id, doc);
                                 }
                             }",
