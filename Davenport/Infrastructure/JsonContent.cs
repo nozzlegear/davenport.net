@@ -14,7 +14,10 @@ namespace Davenport.Infrastructure
 
         static byte[] ToBytes(object content)
         {
-            var rawData = JsonConvert.SerializeObject(content);
+            var rawData = JsonConvert.SerializeObject(content, new JsonSerializerSettings()
+            {
+                NullValueHandling = NullValueHandling.Ignore,
+            });
             
             return Encoding.UTF8.GetBytes(rawData);
         }
