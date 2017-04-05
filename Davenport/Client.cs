@@ -94,8 +94,15 @@ namespace Davenport
             options.Add("selector", selector);
 
             var content = new JsonContent(options);
+            var result = await ExecuteRequestAsync<JToken>(request, HttpMethod.Post, content);
+            var warning = result.SelectToken("warning", false);
+            
+            if (warning.HasValues)
+            {
+                Config.InvokeWarningEvent(this, warning.Value<string>());
+            }
 
-            return await ExecuteRequestAsync<List<DocumentType>>(request, HttpMethod.Post, content);
+            return result.Value<List<DocumentType>>("docs");
         }
 
         /// <summary>
