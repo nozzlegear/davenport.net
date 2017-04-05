@@ -96,17 +96,4 @@ namespace Davenport.Tests
             Assert.True(result.Any(kvp => kvp.Key == "Baz" && (int)kvp.Value.EqualTo == 5));
         }
     }
-
-    class MyTestClass
-    {
-        public string Id { get; set; }
-
-        public string Foo { get; set; }
-
-        public bool Bar { get; set; }
-
-        public int Baz { get; set; }
-
-        public int? Bat { get; set; }
-    }
 }
