@@ -58,7 +58,7 @@ namespace Davenport
                 }
 
                 var infoBody = JsonConvert.DeserializeAnonymousType( await request.ReceiveString(), new { version = "" });
-                var version = Convert.ToDecimal(infoBody);
+                var version = Convert.ToInt32(infoBody.version.Split('.')[0]);
 
                 if (version < 2)
                 {
