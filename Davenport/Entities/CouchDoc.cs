@@ -1,19 +1,19 @@
 ﻿using Newtonsoft.Json;
 
-namespace Davenport.Interfaces
+namespace Davenport.Entities
 {
-    public interface ICouchDoc
+    public class CouchDoc
     {
         /// <summary>
         /// The object's database id.
         /// </summary>
         [JsonProperty("_id")]
-        string Id { get; set; }
+        public string Id { get; set; }
             
         /// <summary>
         /// The object's database revision.
         /// </summary>
         [JsonProperty("_rev")]
-        string Rev { get; set; }
+        public string Rev { get; set; }
     }
 }
