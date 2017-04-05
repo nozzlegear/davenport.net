@@ -128,23 +128,13 @@ namespace Davenport
             return await FindAsync(selector, options?.ToDictionary() ?? new Dictionary<string, object>());
         }
 
-        public async Task<ListResponse<DocumentType>> ListWithDocsAsync(ListOptions options = null)
+        (List<ListedRow<object>> DesignDocs, List<ListedRow<T>> Docs) SortDocuments<T>(ListResponse<JToken> docs)
         {
-            var request = PrepareRequest("_all_docs");
-
-            if (options != null)
-            {
-                request.Url.QueryParams.AddRange(options.ToQueryParameters());
-            }
-
-            request.Url.SetQueryParam("include_docs", true);
-
-            var result = await ExecuteRequestAsync<ListResponse<JToken>>(request, HttpMethod.Get);
-            var rows = new List<ListedRow<DocumentType>>();
+            var rows = new List<ListedRow<T>>();
             var designDocs = new List<ListedRow<object>>();
 
             // Will probably need to split out the DesignDocs as they won't deserialize properly.
-            foreach (var designDoc in result.Rows.Where(r => r.Id.StartsWith("_design")))
+            foreach (var designDoc in docs.Rows.Where(r => r.Id.StartsWith("_design")))
             {
                 var row = new ListedRow<object>()
                 {
@@ -157,25 +147,71 @@ namespace Davenport
                 designDocs.Add(row);
             }
 
-            foreach (var doc in result.Rows.Where(r => !r.Id.StartsWith("_design")))
+            foreach (var doc in docs.Rows.Where(r => !r.Id.StartsWith("_design")))
             {
-                var row = new ListedRow<DocumentType>()
+                var row = new ListedRow<T>()
                 {
                     Id = doc.Id,
                     Key = doc.Key,
                     Value = doc.Value,
-                    Doc = doc.Doc.ToObject<DocumentType>(),
+                    Doc = doc.Doc.ToObject<T>(),
                 };
 
                 rows.Add(row);
+            }   
+
+            return (DesignDocs: designDocs, Docs: rows);
+        }
+
+        /// <summary>
+        /// Lists all documents on the database. 
+        /// </summary>
+        public async Task<ListResponse<DocumentType>> ListWithDocsAsync(ListOptions options = null)
+        {
+            var request = PrepareRequest("_all_docs");
+
+            if (options != null)
+            {
+                request.Url.QueryParams.AddRange(options.ToQueryParameters());
             }
+
+            request.Url.SetQueryParam("include_docs", true);
+
+            var result = await ExecuteRequestAsync<ListResponse<JToken>>(request, HttpMethod.Get);
+            var sort = SortDocuments<DocumentType>(result);
 
             return new ListResponse<DocumentType>()
             {
                 TotalRows = result.TotalRows,
                 Offset = result.Offset,
-                DesignDocs = designDocs,
-                Rows = rows,
+                DesignDocs = sort.DesignDocs,
+                Rows = sort.Docs,
+            };
+        }
+
+        /// <summary>
+        /// Lists all documents on the database, but does not return the documents themselves.
+        /// </summary>
+        public async Task<ListResponse<Revision>> ListWithoutDocsAsync(ListOptions options = null)
+        {
+            var request = PrepareRequest("_all_docs");
+
+            if (options != null)
+            {
+                request.Url.QueryParams.AddRange(options.ToQueryParameters());
+            }
+
+            request.Url.SetQueryParam("include_docs", true);
+
+            var result = await ExecuteRequestAsync<ListResponse<JToken>>(request, HttpMethod.Get);
+            var sort = SortDocuments<Revision>(result);
+
+            return new ListResponse<Revision>()
+            {
+                TotalRows = result.TotalRows,
+                Offset = result.Offset,
+                DesignDocs = sort.DesignDocs,
+                Rows = sort.Docs,
             };
         }
 
