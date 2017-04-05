@@ -18,11 +18,6 @@ namespace Davenport
     {
         private Configuration Config { get; }
 
-        /// <summary>
-        /// A warning event fired when CouchDB returns a warning with its response, or when Davenport detects a possible error.
-        /// </summary>
-        public event EventHandler<string> Warning;
-
         public Client(Configuration config)
         {
             Config = config ?? new Configuration();
@@ -268,7 +263,7 @@ namespace Davenport
         {
             if (string.IsNullOrEmpty(rev))
             {
-                Warning?.Invoke(this, $"No revision specified for Davenport.DeleteAsync method with id ${id}. This may cause a document conflict error.");
+                Config.Warning?.Invoke(this, $"No revision specified for Davenport.DeleteAsync method with id ${id}. This may cause a document conflict error.");
             }
 
             var request = PrepareRequest(id, rev);
