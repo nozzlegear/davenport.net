@@ -1,20 +1,19 @@
-﻿using Davenport.Interfaces;
-using Flurl;
+﻿using Flurl;
 using Flurl.Http;
 using System;
 using System.Threading.Tasks;
 using System.Net.Http;
-using Davenport.Infrastructure;
 using Newtonsoft.Json;
 using Davenport.Entities;
 using System.Linq;
 using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
 using System.Linq.Expressions;
+using Davenport.Infrastructure;
 
 namespace Davenport
 {
-    public class Client<DocumentType> where DocumentType: ICouchDoc
+    public class Client<DocumentType> where DocumentType: CouchDoc
     {
         private Configuration Config { get; }
 
@@ -263,7 +262,7 @@ namespace Davenport
         {
             if (string.IsNullOrEmpty(rev))
             {
-                Config.Warning?.Invoke(this, $"No revision specified for Davenport.DeleteAsync method with id ${id}. This may cause a document conflict error.");
+                Config.InvokeWarningEvent(this, $"No revision specified for Davenport.DeleteAsync method with id ${id}. This may cause a document conflict error.");
             }
 
             var request = PrepareRequest(id, rev);
