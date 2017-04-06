@@ -63,7 +63,7 @@ namespace Davenport.Infrastructure
 			{
 				return (false, InvokeExpression(member));
 			}
-			catch (Exception ex)
+			catch (Exception)
 			{
 				return (true, member.Member.Name);
 			}

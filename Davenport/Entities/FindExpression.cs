@@ -44,7 +44,7 @@ namespace Davenport.Entities
         [JsonProperty("$eq")]
         public object EqualTo { get; set; }
         
-        [JsonProperty("$neq")]
+        [JsonProperty("$ne")]
         public object NotEqualTo { get; set; }
         
         [JsonProperty("$gt")]
