@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Davenport;
+using Davenport.Entities;
 using Xunit;
 
 namespace Davenport.Tests
@@ -9,6 +10,14 @@ namespace Davenport.Tests
     public class ClientTests
     {
         Client<MyTestClass> Client { get; }
+
+        MyTestClass ExampleClass = new MyTestClass()
+        {
+            Foo = "test value",
+            Bar = false,
+            Baz = 11,
+            Bat = 5,
+        };
 
         public ClientTests()
         {
@@ -25,11 +34,7 @@ namespace Davenport.Tests
         [Fact(DisplayName = "Client PostAsync")]
         public async Task PostAsync()
         {
-            var doc = await Client.PostAsync(new MyTestClass()
-            {
-                Foo = "test value",
-                Baz = 11
-            });
+            var doc = await Client.PostAsync(ExampleClass);
 
             Assert.False(string.IsNullOrEmpty(doc.Id));
             Assert.False(string.IsNullOrEmpty(doc.Rev));
@@ -39,13 +44,7 @@ namespace Davenport.Tests
         [Fact(DisplayName = "Client GetAsync")]
         public async Task GetAsync()
         {
-            var created = await Client.PostAsync(new MyTestClass()
-            {
-                Foo = "test value",
-                Bar = false,
-                Baz = 11,
-                Bat = 5,
-            });
+            var created = await Client.PostAsync(ExampleClass);
             var doc = await Client.GetAsync(created.Id);
 
             Assert.Equal(doc.Foo, "test value");
@@ -53,6 +52,68 @@ namespace Davenport.Tests
             Assert.Equal(doc.Baz, 11);
             Assert.True(doc.Bat.HasValue);
             Assert.Equal(doc.Bat, 5);
+        }
+
+        [Fact(DisplayName = "Client PutAsync")]
+        public async Task PutAsync()
+        {
+            var created = await Client.PostAsync(ExampleClass);
+            var retrieved = await Client.GetAsync(created.Id, created.Rev);
+
+            retrieved.Foo = "test value 2";
+            retrieved.Bar = true;
+            retrieved.Baz = 9;
+            retrieved.Bat = null;
+
+            var updated = await Client.PutAsync(created.Id, retrieved, created.Rev);
+            retrieved = await Client.GetAsync(updated.Id, updated.Rev);
+
+            Assert.Equal(retrieved.Foo, "test value 2");
+            Assert.True(retrieved.Bar);
+            Assert.Equal(retrieved.Baz, 9);
+            Assert.Null(retrieved.Bat);
+            Assert.False(retrieved.Bat.HasValue);
+        }
+
+        [Fact(DisplayName = "Client DeleteAsync")]
+        public async Task DeleteAsync()
+        {
+            var created = await Client.PostAsync(ExampleClass);
+            
+            await Client.DeleteAsync(created.Id, created.Rev);
+        }
+
+        [Fact(DisplayName = "Client ListWithDocsAsync")]
+        public async Task ListWithDocsAsync()
+        {
+            var list = await Client.ListWithDocsAsync();
+
+            Assert.NotNull(list);
+            Assert.Equal(list.Offset, 0);
+            Assert.True(list.Rows.Count() > 0);
+            Assert.True(list.DesignDocs.Count() > 0);
+            Assert.True(list.Rows.All(row => row.Doc.GetType() == typeof(MyTestClass)));
+            Assert.True(list.Rows.All(row => ! row.Id.StartsWith("_design")));
+            Assert.True(list.Rows.All(row => ! string.IsNullOrEmpty(row.Doc.Id)));
+            Assert.True(list.Rows.All(row => ! string.IsNullOrEmpty(row.Doc.Rev)));
+            Assert.True(list.DesignDocs.All(doc => doc.Id.StartsWith("_design")));
+            Assert.True(list.DesignDocs.All(doc => doc.Doc != null));;
+        }
+
+        [Fact(DisplayName = "Client ListWithoutDocsAsync")]
+        public async Task ListWithoutDocsAsync()
+        {
+            var list = await Client.ListWithoutDocsAsync();
+
+            Assert.NotNull(list);
+            Assert.Equal(list.Offset, 0);
+            Assert.True(list.Rows.Count() > 0, "Rows.Count should be greater than 0.");
+            Assert.True(list.DesignDocs.Count() > 0, "Rows.DesignDocs.Count should be greater than 0.");
+            Assert.True(list.Rows.All(row => row.Doc.GetType() == typeof(Revision)), "All row docs should be of type Revision.");
+            Assert.True(list.Rows.All(row => ! string.IsNullOrEmpty(row.Doc.Rev)), "All rows should have a Doc.Rev value.");
+            Assert.True(list.Rows.All(row => ! row.Id.StartsWith("_design")), "All row ids should not start with _design.");
+            Assert.True(list.DesignDocs.All(doc => doc.Id.StartsWith("_design")), "All design doc ids should start with _design.");
+            Assert.True(list.DesignDocs.All(doc => doc.Doc != null), "All design doc documents should not be null.");;
         }
     }
 }
