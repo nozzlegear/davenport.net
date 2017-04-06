@@ -67,6 +67,8 @@ namespace Davenport
                     throw ex;
                 }
 
+                Console.WriteLine(rawBody);
+
                 return JsonConvert.DeserializeObject<T>(rawBody);
             }
         }
@@ -303,6 +305,41 @@ namespace Davenport
             }
         }
 
+        private async Task<bool> _ExistsBySelector(object selector)
+        {
+            var result = await FindAsync(selector, new FindOptions()
+            {
+                Fields = new string[] { "_id" },
+                Limit = 1
+            });
+
+            return result.Count() > 0;
+        }
+
+        /// <summary>
+        /// Checks that a document matching the given selector exists. NOTE: Davenport currently only supports simple 1 argument selectors, e.g. x => x.Foo == "value".
+        /// </summary>
+        public async Task<bool> ExistsBySelector(Expression<Func<DocumentType, bool>> expression)
+        {
+            return await _ExistsBySelector(ExpressionParser.Parse(expression));
+        }
+
+        /// <summary>
+        /// Checks that a document matching the given selector exists.
+        /// </summary>
+        public async Task<bool> ExistsBySelector(object selector)
+        {
+            return await _ExistsBySelector(selector);
+        }
+
+        /// <summary>
+        /// Checks that a document matching the given selector exists.
+        /// </summary>
+        public async Task<bool> ExistsBySelector(Dictionary<string, FindExpression> selector)
+        {
+            return await _ExistsBySelector(selector);
+        }
+
         /// <summary>
         /// Copies the document with the given <paramref name="id" /> and assigns the <paramref name="newId" /> to the copy.
         /// </summary>
@@ -332,7 +369,7 @@ namespace Davenport
         /// <summary>
         /// Executes a view with the given <paramref name="designDocName" /> and <paramref name="viewName" />
         /// </summary>
-        public async Task<ListResponse<ReturnType>> ViewAsync<ReturnType>(string designDocName, string viewName, ViewOptions options = null)
+        public async Task<IEnumerable<ViewResult<ReturnType>>> ViewAsync<ReturnType>(string designDocName, string viewName, ViewOptions options = null)
         {
             var request = PrepareRequest($"_design/{designDocName}/_view/{viewName}");
 
@@ -341,7 +378,9 @@ namespace Davenport
                 request.Url.QueryParams.AddRange(options.ToQueryParameters());
             }
 
-            return await ExecuteRequestAsync<ListResponse<ReturnType>>(request, HttpMethod.Get);
+            var result = await ExecuteRequestAsync<JToken>(request, HttpMethod.Get);
+            
+            return result.SelectToken("rows").ToObject<List<ViewResult<ReturnType>>>();
         }
     }
 }
