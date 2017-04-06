@@ -96,13 +96,13 @@ namespace Davenport
             var content = new JsonContent(options);
             var result = await ExecuteRequestAsync<JToken>(request, HttpMethod.Post, content);
             var warning = result.SelectToken("warning", false);
-            
-            if (warning.HasValues)
+
+            if (warning?.HasValues == true)
             {
                 Config.InvokeWarningEvent(this, warning.Value<string>());
             }
 
-            return result.Value<List<DocumentType>>("docs");
+            return result.SelectToken("docs").ToObject<List<DocumentType>>();
         }
 
         /// <summary>
