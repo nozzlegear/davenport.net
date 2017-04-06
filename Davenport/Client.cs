@@ -93,11 +93,6 @@ namespace Davenport
             
             options.Add("selector", selector);
 
-            foreach (var kvp in options)
-            {
-                Console.WriteLine("FindOption key: {0}. Value: {1}. Type: {2}", kvp.Key, kvp.Value, kvp.Value.GetType());
-            }
-
             var content = new JsonContent(options);
             var result = await ExecuteRequestAsync<JToken>(request, HttpMethod.Post, content);
             var warning = result.SelectToken("warning", false);
