@@ -142,7 +142,7 @@ namespace Davenport
                     Id = designDoc.Id,
                     Key = designDoc.Key,
                     Value = designDoc.Value,
-                    Doc = designDoc.Doc.ToObject<object>(),
+                    Doc = designDoc.Doc?.ToObject<object>(),
                 };
 
                 designDocs.Add(row);
@@ -155,7 +155,6 @@ namespace Davenport
                     Id = doc.Id,
                     Key = doc.Key,
                     Value = doc.Value,
-                    Doc = doc.Doc.ToObject<T>(),
                 };
 
                 rows.Add(row);
@@ -202,10 +201,14 @@ namespace Davenport
                 request.Url.QueryParams.AddRange(options.ToQueryParameters());
             }
 
-            request.Url.SetQueryParam("include_docs", true);
+            request.Url.SetQueryParam("include_docs", false);
 
             var result = await ExecuteRequestAsync<ListResponse<JToken>>(request, HttpMethod.Get);
             var sort = SortDocuments<Revision>(result);
+
+            // Docs weren't included, so copy the Revision value to the doc instead
+            sort.Docs.ForEach(doc => doc.Doc = doc.Value);
+            sort.DesignDocs.ForEach(doc => doc.Doc = doc.Value);
 
             return new ListResponse<Revision>()
             {
