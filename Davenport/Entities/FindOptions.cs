@@ -7,7 +7,7 @@ namespace Davenport.Entities
     public class FindOptions : Serializable
     {
         [JsonProperty("fields")]
-        public string Fields { get; set; }
+        public IEnumerable<string> Fields { get; set; }
         
         [JsonProperty("sort")]
         public IEnumerable<object> Sort { get; set; }
