@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Threading.Tasks;
 using Davenport;
 using Davenport.Entities;
@@ -52,6 +54,24 @@ namespace Davenport.Tests
             Assert.Equal(doc.Baz, 11);
             Assert.True(doc.Bat.HasValue);
             Assert.Equal(doc.Bat, 5);
+        }
+
+        [Fact(DisplayName = "Client CountAsync")]
+        public async Task CountAsync()
+        {
+            var count = await Client.CountAsync();
+
+            Assert.True(count > 0);
+        }
+
+        [Fact(DisplayName = "Client CountWithExpressionAsync")]
+        public async Task CountWithExpressionAsync()
+        {
+            var count = await Client.CountBySelectorAsync(doc => doc.Foo == "test value 2");
+            var totalCount = await Client.CountAsync();
+
+            Assert.True(count > 0);
+            Assert.True(totalCount > count);
         }
 
         [Fact(DisplayName = "Client PutAsync")]
@@ -114,6 +134,141 @@ namespace Davenport.Tests
             Assert.True(list.Rows.All(row => ! row.Id.StartsWith("_design")), "All row ids should not start with _design.");
             Assert.True(list.DesignDocs.All(doc => doc.Id.StartsWith("_design")), "All design doc ids should start with _design.");
             Assert.True(list.DesignDocs.All(doc => doc.Doc != null), "All design doc documents should not be null.");;
+        }
+
+        [Fact(DisplayName = "Client FindLambdaAsync")]
+        public async Task FindLambdaAsync()
+        {
+            var equalsResult = await Client.FindAsync(doc => doc.Foo == "test value 2");
+
+            Assert.NotNull(equalsResult);
+            Assert.True(equalsResult.All(row => row.Foo == "test value 2"));
+            Assert.True(equalsResult.All(row => ! string.IsNullOrEmpty(row.Id)));
+            Assert.True(equalsResult.All(row => ! string.IsNullOrEmpty(row.Rev)));
+
+            var notEqualsResult = await Client.FindAsync(doc => doc.Foo != "test value 2");
+
+            Assert.NotNull(notEqualsResult);
+            Assert.True(notEqualsResult.All(row => row.Foo != "test value 2"));
+            Assert.True(notEqualsResult.All(row => ! string.IsNullOrEmpty(row.Id)));
+            Assert.True(notEqualsResult.All(row => ! string.IsNullOrEmpty(row.Rev)));
+        }
+
+        [Fact(DisplayName = "Client FindDictionaryAsync")]
+        public async Task FindDictionaryAsync()
+        {
+            var equalsResult = await Client.FindAsync(new Dictionary<string, FindExpression>()
+            {
+                { "Foo", new FindExpression(ExpressionType.Equal, "test value 2") }
+            });
+
+            Assert.NotNull(equalsResult);
+            Assert.True(equalsResult.All(row => row.Foo == "test value 2"));
+            Assert.True(equalsResult.All(row => ! string.IsNullOrEmpty(row.Id)));
+            Assert.True(equalsResult.All(row => ! string.IsNullOrEmpty(row.Rev)));
+
+            var notEqualsResult = await Client.FindAsync(new Dictionary<string, FindExpression>()
+            {
+                { "Foo", new FindExpression(ExpressionType.NotEqual, "test value 2") }
+            });
+
+            Assert.NotNull(notEqualsResult);
+            Assert.True(notEqualsResult.All(row => row.Foo != "test value 2"));
+            Assert.True(notEqualsResult.All(row => ! string.IsNullOrEmpty(row.Id)));
+            Assert.True(notEqualsResult.All(row => ! string.IsNullOrEmpty(row.Rev)));
+        }
+
+        [Fact(DisplayName = "Client FindObjectAsync")]
+        public async Task FindObjectAsync()
+        {
+            var equalsResult = await Client.FindAsync(new 
+            {
+                Foo = new Dictionary<string, object>
+                {
+                    { "$eq", "test value 2" }
+                }
+            });
+
+            Assert.NotNull(equalsResult);
+            Assert.True(equalsResult.All(row => row.Foo == "test value 2"));
+            Assert.True(equalsResult.All(row => ! string.IsNullOrEmpty(row.Id)));
+            Assert.True(equalsResult.All(row => ! string.IsNullOrEmpty(row.Rev)));
+
+            var notEqualsResult = await Client.FindAsync(new 
+            {
+                Foo = new Dictionary<string, object>
+                {
+                    { "$ne", "test value 2" }
+                }
+            });
+
+            Assert.NotNull(notEqualsResult);
+            Assert.True(notEqualsResult.All(row => row.Foo != "test value 2"));
+            Assert.True(notEqualsResult.All(row => ! string.IsNullOrEmpty(row.Id)));
+            Assert.True(notEqualsResult.All(row => ! string.IsNullOrEmpty(row.Rev)));
+        }
+
+        [Fact(DisplayName = "Client ExistsAsync")]
+        public async Task ExistsAsync()
+        {
+            var created = await Client.PostAsync(ExampleClass);
+            var exists = await Client.ExistsAsync(created.Id);
+            var existsWithRev = await Client.ExistsAsync(created.Id, created.Rev);
+
+            Assert.True(exists);
+            Assert.True(existsWithRev);
+        }
+
+        [Fact(DisplayName = "Client ExistsByExpressionAsync")]
+        public async Task ExistsByExpressionAsync()
+        {
+            var exists = await Client.ExistsBySelector(doc => doc.Foo == "test value 2");
+
+            Assert.True(exists);
+        }
+
+        [Fact(DisplayName = "Client ExistsByDictionaryAsync")]
+        public async Task ExistsByDictionaryAsync()
+        {
+            var exists = await Client.ExistsBySelector(new Dictionary<string, FindExpression>()
+            {
+                { "Foo", new FindExpression(ExpressionType.Equal, "test value 2") }
+            });
+
+            Assert.True(exists);
+        }
+
+        [Fact(DisplayName = "Client ExistsByObjectAsync")]
+        public async Task ExistsByObjectAsync()
+        {
+            var exists = await Client.ExistsBySelector(new 
+            {
+                Foo = new Dictionary<string, object>
+                {
+                    { "$eq", "test value 2" }
+                }
+            });
+
+            Assert.True(exists);
+        }
+
+        [Fact(DisplayName = "Client CopyAsync")]
+        public async Task CopyAsync()
+        {
+            var uuid = $"a-unique-string-{DateTime.Now.Millisecond}";
+            var createResult = await Client.PostAsync(ExampleClass);
+            var copyResult = await Client.CopyAsync(createResult.Id, uuid);
+
+            Assert.Equal(copyResult.Id, uuid);
+        }
+
+        [Fact(DisplayName = "Client ViewAsync")]
+        public async Task ViewAsync()
+        {
+            var viewResult = await Client.ViewAsync<int>("list", "only-bazs-greater-than-10");
+
+            Assert.True(viewResult.Count() > 0);
+            Assert.True(viewResult.Sum(doc => doc.Value) > 0);
         }
     }
 }
