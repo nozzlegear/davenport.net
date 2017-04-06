@@ -81,6 +81,19 @@ namespace Davenport
             return await ExecuteRequestAsync<DocumentType>(request, HttpMethod.Get);
         }
 
+        /// <summary>
+        /// Retrieves a count of all documents in the database. NOTE: this count includes design documents.
+        /// </summary>
+        public async Task<int> CountAsync()
+        {
+            var list = await ListWithoutDocsAsync(new ListOptions()
+            {
+                Limit = 0
+            });
+
+            return list.TotalRows;
+        }
+
         private async Task<IEnumerable<DocumentType>> FindAsync(object selector, Dictionary<string, object> options)
         {
             var request = PrepareRequest("_find");
