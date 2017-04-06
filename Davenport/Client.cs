@@ -81,20 +81,7 @@ namespace Davenport
             return await ExecuteRequestAsync<DocumentType>(request, HttpMethod.Get);
         }
 
-        /// <summary>
-        /// Retrieves a count of all documents in the database. NOTE: this count includes design documents.
-        /// </summary>
-        public async Task<int> CountAsync()
-        {
-            var list = await ListWithoutDocsAsync(new ListOptions()
-            {
-                Limit = 0
-            });
-
-            return list.TotalRows;
-        }
-
-        private async Task<IEnumerable<DocumentType>> FindAsync(object selector, Dictionary<string, object> options)
+        private async Task<IEnumerable<DocumentType>> _FindAsync(object selector, Dictionary<string, object> options)
         {
             var request = PrepareRequest("_find");
             
@@ -105,6 +92,11 @@ namespace Davenport
             }
             
             options.Add("selector", selector);
+
+            foreach (var kvp in options)
+            {
+                Console.WriteLine("FindOption key: {0}. Value: {1}. Type: {2}", kvp.Key, kvp.Value, kvp.Value.GetType());
+            }
 
             var content = new JsonContent(options);
             var result = await ExecuteRequestAsync<JToken>(request, HttpMethod.Post, content);
@@ -123,7 +115,7 @@ namespace Davenport
         /// </summary>
         public async Task<IEnumerable<DocumentType>> FindAsync(Expression<Func<DocumentType, bool>> expression, FindOptions options = null)
         {
-            return await FindAsync(ExpressionParser.Parse(expression), options?.ToDictionary() ?? new Dictionary<string, object>());
+            return await _FindAsync(ExpressionParser.Parse(expression), options?.ToDictionary() ?? new Dictionary<string, object>());
         }
 
         /// <summary>
@@ -131,7 +123,7 @@ namespace Davenport
         /// </summary>
         public async Task<IEnumerable<DocumentType>> FindAsync(object selector, FindOptions options = null)
         {
-            return await FindAsync(selector, options?.ToDictionary() ?? new Dictionary<string, object>());
+            return await _FindAsync(selector, options?.ToDictionary() ?? new Dictionary<string, object>());
         }
 
         /// <summary>
@@ -139,10 +131,58 @@ namespace Davenport
         /// </summary>
         public async Task<IEnumerable<DocumentType>> FindAsync(Dictionary<string, FindExpression> selector, FindOptions options = null)
         {
-            return await FindAsync(selector, options?.ToDictionary() ?? new Dictionary<string, object>());
+            return await _FindAsync(selector, options?.ToDictionary() ?? new Dictionary<string, object>());
         }
 
-        (List<ListedRow<object>> DesignDocs, List<ListedRow<T>> Docs) SortDocuments<T>(ListResponse<JToken> docs)
+        /// <summary>
+        /// Retrieves a count of all documents in the database. NOTE: this count includes design documents.
+        /// </summary>
+        public async Task<int> CountAsync()
+        {
+            var list = await ListWithoutDocsAsync(new ListOptions()
+            {
+                Limit = 0
+            });
+
+            return list.TotalRows;
+        }
+
+        private async Task<int> _CountBySelectorAsync(object selector)
+        {
+            // Selectors must use the Find API, which means they must return documents too. Limit the bandwidth by just returning _id.
+            var result = await FindAsync(selector, new FindOptions()
+            {
+                Fields = new string[] { "_id" }
+            });
+
+            return result.Count();
+        }
+
+        /// <summary>
+        /// Retrieves a count of all documents matching the given selector. NOTE: Davenport currently only supports simple 1 argument selectors, e.g. x => x.Foo == "value".
+        /// </summary>
+        public async Task<int> CountBySelectorAsync(Expression<Func<DocumentType, bool>> expression)
+        {
+            return await _CountBySelectorAsync(ExpressionParser.Parse(expression));
+        }
+
+        /// <summary>
+        /// Retrieves a count of all documents matching the given selector. 
+        /// </summary>
+        public async Task<int> CountBySelectorAsync(object selector)
+        {
+            return await _CountBySelectorAsync(selector);
+        }
+
+        /// <summary>
+        /// Retrieves a count of all documents matching the given selector. 
+        /// </summary>
+        public async Task<int> CountBySelectorAsync(Dictionary<string, FindExpression> selector)
+        {
+            return await _CountBySelectorAsync(selector);
+        }
+
+        (List<ListedRow<object>> DesignDocs, List<ListedRow<T>> Docs) _SortDocuments<T>(ListResponse<JToken> docs)
         {
             var rows = new List<ListedRow<T>>();
             var designDocs = new List<ListedRow<object>>();
@@ -192,7 +232,7 @@ namespace Davenport
             request.Url.SetQueryParam("include_docs", true);
 
             var result = await ExecuteRequestAsync<ListResponse<JToken>>(request, HttpMethod.Get);
-            var sort = SortDocuments<DocumentType>(result);
+            var sort = _SortDocuments<DocumentType>(result);
 
             return new ListResponse<DocumentType>()
             {
@@ -218,7 +258,7 @@ namespace Davenport
             request.Url.SetQueryParam("include_docs", false);
 
             var result = await ExecuteRequestAsync<ListResponse<JToken>>(request, HttpMethod.Get);
-            var sort = SortDocuments<Revision>(result);
+            var sort = _SortDocuments<Revision>(result);
 
             // Docs weren't included, so copy the Revision value to the doc instead
             sort.Docs.ForEach(doc => doc.Doc = doc.Value);
