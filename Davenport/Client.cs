@@ -155,6 +155,7 @@ namespace Davenport
                     Id = doc.Id,
                     Key = doc.Key,
                     Value = doc.Value,
+                    Doc = doc.Doc != null ? doc.Doc.ToObject<T>() : default(T)
                 };
 
                 rows.Add(row);
