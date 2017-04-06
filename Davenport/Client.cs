@@ -67,8 +67,6 @@ namespace Davenport
                     throw ex;
                 }
 
-                Console.WriteLine(rawBody);
-
                 return JsonConvert.DeserializeObject<T>(rawBody);
             }
         }
