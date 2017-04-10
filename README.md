@@ -112,10 +112,10 @@ config.Warning += (object sender, string message) =>
 There are four different events that will create a warning message:
 
 1. You executed a `FindAsync` operation and looked up documents based on indexes (properties) that weren't configured in your database. 
-    Hint: You can use `Davenport.Configuration.ConfigureDatabaseAsync` to create indexes. Using indexes improves the performance of your `FindAsync` calls.
+    - Hint: You can use `Davenport.Configuration.ConfigureDatabaseAsync` to create indexes. Using indexes improves the performance of your `FindAsync` calls.
 2. Davenport is updating or creating a design doc when configuring a database.
 3. Your CouchDB installation is using a version less than 2.0.0.
-    If this is the case, you won't be able to use `FindAsync` methods, or any other Davenport methods that use `FindAsync` internally, e.g. `ExistsBySelectorAsync` and `CountBySelectorAsync`.
+    - If this is the case, you won't be able to use `FindAsync` methods, or any other Davenport methods that use `FindAsync` internally, e.g. `ExistsBySelectorAsync` and `CountBySelectorAsync`.
 4. You're attempting to delete a document with `DeleteAsync`, but you don't pass a document revision id.
-    In some cases, this may cause a document conflict error.
+    - In some cases, this may cause a document conflict error.
 
