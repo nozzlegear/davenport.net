@@ -6,6 +6,15 @@
     <VersionPrefix>0.1.0</VersionPrefix>
     <VersionSuffix>alpha</VersionSuffix>
   </PropertyGroup>
+  <PropertyGroup>
+    <Description>Davenport is a CouchDB client for simplifying common tasks like get, list, create, update and delete.</Description>
+    <Author>Nozzlegear</Author>
+    <Copyright>Nozzlegear Software</Copyright>
+    <PackageLicenseUrl>https://raw.githubusercontent.com/nozzlegear/davenport.net/master/LICENSE</PackageLicenseUrl>
+    <PackageProjectUrl>https://github.com/nozzlegear/davenport.net</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/nozzlegear/davenport.net</RepositoryUrl>
+    <PackageTags>couchdb,couch,davenport,database</PackageTags>
+  </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="flurl" Version="2.3.0" />
     <PackageReference Include="flurl.http" Version="1.1.2" />
