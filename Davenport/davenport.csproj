@@ -3,12 +3,12 @@
     <TargetFramework>netstandard1.4</TargetFramework>
     <AssemblyName>Davenport</AssemblyName>
     <RootNamespace>Davenport</RootNamespace>
-    <VersionPrefix>0.1.0</VersionPrefix>
+    <VersionPrefix>0.1.1</VersionPrefix>
     <VersionSuffix>alpha</VersionSuffix>
   </PropertyGroup>
   <PropertyGroup>
     <Description>Davenport is a CouchDB client for simplifying common tasks like get, list, create, update and delete.</Description>
-    <Author>Nozzlegear</Author>
+    <Authors>Nozzlegear</Authors>
     <Copyright>Nozzlegear Software</Copyright>
     <PackageLicenseUrl>https://raw.githubusercontent.com/nozzlegear/davenport.net/master/LICENSE</PackageLicenseUrl>
     <PackageProjectUrl>https://github.com/nozzlegear/davenport.net</PackageProjectUrl>
