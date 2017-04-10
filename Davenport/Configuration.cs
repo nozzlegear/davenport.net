@@ -5,7 +5,6 @@ using System.Net;
 using System.Threading.Tasks;
 using Davenport.Entities;
 using Davenport.Infrastructure;
-using Flurl;
 using Flurl.Http;
 using Newtonsoft.Json;
 
