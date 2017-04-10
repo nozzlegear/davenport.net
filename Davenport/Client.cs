@@ -30,6 +30,8 @@ namespace Davenport
             {
                 throw new ArgumentNullException(nameof(config));
             }
+
+            Config = config;
         }
 
         protected IFlurlClient PrepareRequest(string path, string rev = null)
