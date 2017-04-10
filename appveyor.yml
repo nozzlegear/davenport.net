@@ -20,7 +20,7 @@ test_script:
 
     echo $output;
 
-    if ($output -contains "Test Run Failed.") {
+    if ($LastExitCode -eq 0 -or $output -contains "Test Run Failed.") {
         echo "Last output code was $LastExitCode";
-       throw "Test failed. Review output.";
+        throw "Test failed. Review output.";
     }
