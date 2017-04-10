@@ -2,8 +2,8 @@ version: 1.0.{build}
 image: Visual Studio 2017
 build_script:
 - ps: >-
-    dotnet restore
-    dotnet build -c Release
+    dotnet restore;
+    dotnet build -c Release;
 test_script:
 - ps: >-
     curl https://dl.bintray.com/apache/couchdb/win/2.0.0.1/apache-couchdb-2.0.0.1.msi -UseBasicParsing -outfile couchdb.msi;
@@ -21,5 +21,5 @@ test_script:
     echo $output;
 
     if ($output -contains "Test Run Failed.") {
-       throw "Test failed. Review output."
+       throw "Test failed. Review output.";
     }
