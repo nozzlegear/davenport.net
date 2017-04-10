@@ -23,11 +23,7 @@ namespace Davenport.Tests
 
         public ClientTests()
         {
-            var config = new Configuration()
-            {
-                CouchUrl = "http://localhost:5984",
-                DatabaseName = "davenport_net"
-            };
+            var config = new Configuration("http://localhost:5984", "davenport_net");
             Client = new Client<MyTestClass>(config);
 
             config.Warning += (object sender, string message) => Console.WriteLine(message);

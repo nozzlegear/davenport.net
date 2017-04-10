@@ -16,6 +16,24 @@ namespace Davenport
     /// </summary>
     public class Configuration
     {
+        /// <param name="couchUrl">URL string pointing to your CouchDB installation, e.g. http://localhost:5984. Should not include your database name.</param>
+        /// <param name="databaseName">The name of your database. Should be URL compatible.</param>
+        public Configuration(string couchUrl, string databaseName)
+        {
+            if (! Uri.IsWellFormedUriString(couchUrl, UriKind.Absolute))
+            {
+                throw new ArgumentException($"{nameof(couchUrl)} is not a well formed uri string.");
+            }
+
+            if (string.IsNullOrEmpty(databaseName))
+            {
+                throw new ArgumentNullException(nameof(databaseName));
+            }
+
+            CouchUrl = couchUrl;
+            DatabaseName = databaseName;
+        }
+
         /// <summary>
         /// URL string pointing to your CouchDB installation, e.g. http://localhost:5984. Should not include your database name.
         /// </summary>

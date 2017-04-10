@@ -17,9 +17,19 @@ namespace Davenport
     {
         private Configuration Config { get; }
 
+        /// <param name="couchUrl">URL string pointing to your CouchDB installation, e.g. http://localhost:5984. Should not include your database name.</param>
+        /// <param name="databaseName">The name of your database. Should be URL compatible.</param>
+        public Client(string couchUrl, string databaseName)
+        {
+            Config = new Configuration(couchUrl, databaseName);
+        }
+
         public Client(Configuration config)
         {
-            Config = config ?? new Configuration();
+            if (config == null)
+            {
+                throw new ArgumentNullException(nameof(config));
+            }
         }
 
         protected IFlurlClient PrepareRequest(string path, string rev = null)

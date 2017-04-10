@@ -8,11 +8,7 @@ namespace Davenport.Tests
 {
     public class ConfigurationTests
     {
-        Configuration Config = new Configuration()
-        {
-            CouchUrl = "http://localhost:5984",
-            DatabaseName = "davenport_net",
-        };
+        Configuration Config = new Configuration("http://localhost:5984", "davenport_net");
 
         public ConfigurationTests()
         {
