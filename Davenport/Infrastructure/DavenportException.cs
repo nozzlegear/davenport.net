@@ -18,18 +18,5 @@ namespace Davenport.Infrastructure
         public string Url { get; set; }
 
         public string ResponseBody { get; set; }
-
-        public static DavenportException FromHttpResponseMessage(HttpResponseMessage response, string rawBody, string message = "")
-        {
-            var ex = new DavenportException(message)
-            {
-                StatusCode = (int) response.StatusCode,
-                StatusText = response.ReasonPhrase,
-                Url = response.Headers.GetValues("HOST").FirstOrDefault(),
-                ResponseBody = rawBody,
-            };
-
-            return ex;
-        }
     }
 }
