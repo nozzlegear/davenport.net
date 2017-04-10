@@ -24,3 +24,8 @@ test_script:
         echo "Last output code was $LastExitCode";
         throw "Test failed. Review output.";
     }
+artifacts:
+- path: Davenport/bin/Release/netstandard1.6
+  name: netstandard16
+- path: Davenport/bin/Release/net461
+  name: net461
