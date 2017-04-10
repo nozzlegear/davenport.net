@@ -1,6 +1,10 @@
-# Davenport.Net
+# Davenport.NET
 
-.NET implementation of [Davenport](https://github.com/nozzlegear/davenport). Davenport is a CouchDB client for simplifying common tasks like get, list, create, update and delete.
+[![Build status](https://ci.appveyor.com/api/projects/status/8cy7l4f582fnuf9g/branch/master?svg=true)](https://ci.appveyor.com/project/nozzlegear/davenport-net/branch/master)
+[![NuGet](https://img.shields.io/nuget/v/Davenport.svg?maxAge=3600)](https://www.nuget.org/packages/Davenport/)
+[![license](https://img.shields.io/github/license/nozzlegear/davenport.net.svg?maxAge=3600)](https://raw.githubusercontent.com/nozzlegear/davenport.net/master/LICENSE)
+
+Davenport.NET is a .NET implementation of [Davenport](https://github.com/nozzlegear/davenport). Davenport is a CouchDB client for simplifying common tasks like get, list, create, update and delete.
 
 ## Installation
 
