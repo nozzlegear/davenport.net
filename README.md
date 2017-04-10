@@ -23,6 +23,8 @@ Davenport can handle the initial setup of your databases, manage your find index
 Once configured, Davenport will return an instance of `Client` that's ready to use:
 
 ```cs
+// Create a Find index on the "Foo" property of documents in this database.
+string[] indexes = { "Foo" };
 var designDocs = new DesignDocConfig[] 
 {
     new DesignDocConfig()
@@ -47,9 +49,6 @@ var designDocs = new DesignDocConfig[]
     }
 };
 
-// Create a Find index on the "Foo" property of documents in this database.
-string[] indexes = { "Foo" };
-
 Client<DocumentType> client;
 
 try
@@ -62,9 +61,11 @@ catch (DavenportException ex)
 }
 ```
 
-It should be noted that configuring the design docs and their views is a **"dumb"** process. Davenport will check to see if the design documents you gave it match the ones that exist on your database **exactly**. That is to say, if you have a design doc named `list` on your database, and it has a view called `list-foos`, Davenport will check that the map and reduce functions match the ones you passed it *exactly, to the letter*. If not, Davenport will overwrite the view's map and reduce functions with the ones you gave it.
+It should be noted that configuring the design docs and their views is a **"dumb"** process. Davenport will check to see if the design documents you gave it match the ones that exist on your database **exactly**. That is to say, if you have a design doc named `list` on your database, and it has a view called `list-foos`, Davenport will check that the map and reduce functions match the ones you passed it *exactly, to the letter*. If not, Davenport will overwrite the view's map and reduce functions with the ones you gave it. 
 
-However, you don't need to use `ConfigureDatabaseAsync`. If you don't need to configure your database from code, you can just create a new `Client` which is immediately ready to interact with your database:
+Davenport **does not** delete design documents that it encounters but weren't listed in your configuration. It will simply skip them.
+
+If you don't need to configure your database or design docs from code, then you don't need to use `ConfigureDatabaseAsync` at all. You can just create a new `Client` which is immediately ready to interact with your database:
 
 ```cs
 var client = new Davenport.Client<DocumentType>("http://localhost:5984", "my_database_name");
