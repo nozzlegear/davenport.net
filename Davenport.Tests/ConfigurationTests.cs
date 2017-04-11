@@ -18,7 +18,7 @@ namespace Davenport.Tests
             };
         }
 
-        [Fact(DisplayName = "Config Should Configure")]
+        [Fact(DisplayName = "Config Should Configure"), Trait("Category", "Config")]
         public async Task ShouldConfigure()
         {
             var designDocs = new DesignDocConfig[] 

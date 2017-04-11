@@ -28,7 +28,7 @@ namespace Davenport.Tests
             config.Warning += (object sender, string message) => Console.WriteLine(message);
         }
 
-        [Fact(DisplayName = "Client PostAsync")]
+        [Fact(DisplayName = "Client PostAsync"), Trait("Category", "Client")]
         public async Task PostAsync()
         {
             var doc = await Client.PostAsync(ExampleClass);
@@ -38,7 +38,7 @@ namespace Davenport.Tests
             Assert.True(doc.Ok);
         }
 
-        [Fact(DisplayName = "Client GetAsync")]
+        [Fact(DisplayName = "Client GetAsync"), Trait("Category", "Client")]
         public async Task GetAsync()
         {
             var created = await Client.PostAsync(ExampleClass);
@@ -51,7 +51,7 @@ namespace Davenport.Tests
             Assert.Equal(doc.Bat, 5);
         }
 
-        [Fact(DisplayName = "Client CountAsync")]
+        [Fact(DisplayName = "Client CountAsync"), Trait("Category", "Client")]
         public async Task CountAsync()
         {
             await Client.PostAsync(ExampleClass);
@@ -61,7 +61,7 @@ namespace Davenport.Tests
             Assert.True(count > 0);
         }
 
-        [Fact(DisplayName = "Client CountWithExpressionAsync")]
+        [Fact(DisplayName = "Client CountWithExpressionAsync"), Trait("Category", "Client")]
         public async Task CountWithExpressionAsync()
         {
             await Client.PostAsync(ExampleClass);
@@ -73,7 +73,7 @@ namespace Davenport.Tests
             Assert.True(totalCount > count);
         }
 
-        [Fact(DisplayName = "Client PutAsync")]
+        [Fact(DisplayName = "Client PutAsync"), Trait("Category", "Client")]
         public async Task PutAsync()
         {
             var created = await Client.PostAsync(ExampleClass);
@@ -94,7 +94,7 @@ namespace Davenport.Tests
             Assert.False(retrieved.Bat.HasValue);
         }
 
-        [Fact(DisplayName = "Client DeleteAsync")]
+        [Fact(DisplayName = "Client DeleteAsync"), Trait("Category", "Client")]
         public async Task DeleteAsync()
         {
             var created = await Client.PostAsync(ExampleClass);
@@ -102,7 +102,7 @@ namespace Davenport.Tests
             await Client.DeleteAsync(created.Id, created.Rev);
         }
 
-        [Fact(DisplayName = "Client ListWithDocsAsync")]
+        [Fact(DisplayName = "Client ListWithDocsAsync"), Trait("Category", "Client")]
         public async Task ListWithDocsAsync()
         {
             await Client.PostAsync(ExampleClass);
@@ -121,7 +121,7 @@ namespace Davenport.Tests
             Assert.True(list.DesignDocs.All(doc => doc.Doc != null));;
         }
 
-        [Fact(DisplayName = "Client ListWithoutDocsAsync")]
+        [Fact(DisplayName = "Client ListWithoutDocsAsync"), Trait("Category", "Client")]
         public async Task ListWithoutDocsAsync()
         {
             await Client.PostAsync(ExampleClass);
@@ -139,7 +139,7 @@ namespace Davenport.Tests
             Assert.True(list.DesignDocs.All(doc => doc.Doc != null), "All design doc documents should not be null.");;
         }
 
-        [Fact(DisplayName = "Client FindLambdaAsync")]
+        [Fact(DisplayName = "Client FindLambdaAsync"), Trait("Category", "Client")]
         public async Task FindLambdaAsync()
         {
             var created = await Client.PostAsync(new MyTestClass()
@@ -165,7 +165,7 @@ namespace Davenport.Tests
             Assert.True(notEqualsResult.All(row => ! string.IsNullOrEmpty(row.Rev)));
         }
 
-        [Fact(DisplayName = "Client FindDictionaryAsync")]
+        [Fact(DisplayName = "Client FindDictionaryAsync"), Trait("Category", "Client")]
         public async Task FindDictionaryAsync()
         {
             var created = await Client.PostAsync(new MyTestClass()
@@ -197,7 +197,7 @@ namespace Davenport.Tests
             Assert.True(notEqualsResult.All(row => ! string.IsNullOrEmpty(row.Rev)));
         }
 
-        [Fact(DisplayName = "Client FindObjectAsync")]
+        [Fact(DisplayName = "Client FindObjectAsync"), Trait("Category", "Client")]
         public async Task FindObjectAsync()
         {
             var created = await Client.PostAsync(new MyTestClass()
@@ -235,7 +235,7 @@ namespace Davenport.Tests
             Assert.True(notEqualsResult.All(row => ! string.IsNullOrEmpty(row.Rev)));
         }
 
-        [Fact(DisplayName = "Client ExistsAsync")]
+        [Fact(DisplayName = "Client ExistsAsync"), Trait("Category", "Client")]
         public async Task ExistsAsync()
         {
             var created = await Client.PostAsync(ExampleClass);
@@ -246,7 +246,7 @@ namespace Davenport.Tests
             Assert.True(existsWithRev);
         }
 
-        [Fact(DisplayName = "Client ExistsByExpressionAsync")]
+        [Fact(DisplayName = "Client ExistsByExpressionAsync"), Trait("Category", "Client")]
         public async Task ExistsByExpressionAsync()
         {
             var created = await Client.PostAsync(new MyTestClass()
@@ -258,7 +258,7 @@ namespace Davenport.Tests
             Assert.True(exists);
         }
 
-        [Fact(DisplayName = "Client ExistsByDictionaryAsync")]
+        [Fact(DisplayName = "Client ExistsByDictionaryAsync"), Trait("Category", "Client")]
         public async Task ExistsByDictionaryAsync()
         {
             var created = await Client.PostAsync(new MyTestClass()
@@ -273,7 +273,7 @@ namespace Davenport.Tests
             Assert.True(exists);
         }
 
-        [Fact(DisplayName = "Client ExistsByObjectAsync")]
+        [Fact(DisplayName = "Client ExistsByObjectAsync"), Trait("Category", "Client")]
         public async Task ExistsByObjectAsync()
         {
             var created = await Client.PostAsync(new MyTestClass()
@@ -291,7 +291,7 @@ namespace Davenport.Tests
             Assert.True(exists);
         }
 
-        [Fact(DisplayName = "Client CopyAsync")]
+        [Fact(DisplayName = "Client CopyAsync"), Trait("Category", "Client")]
         public async Task CopyAsync()
         {
             var uuid = $"a-unique-string-{DateTime.Now.Millisecond}";
@@ -301,7 +301,7 @@ namespace Davenport.Tests
             Assert.Equal(copyResult.Id, uuid);
         }
 
-        [Fact(DisplayName = "Client ViewAsync")]
+        [Fact(DisplayName = "Client ViewAsync"), Trait("Category", "Client")]
         public async Task ViewAsync()
         {
             var created = await Client.PostAsync(new MyTestClass()
