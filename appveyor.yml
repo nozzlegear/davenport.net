@@ -1,9 +1,7 @@
 version: 1.0.{build}
 image: Visual Studio 2017
 build_script:
-- ps: >-
-    dotnet restore;
-    dotnet build -c Release;
+- ps: ./ps/build_script.ps1
 test_script:
 - ps: ./ps/test_script.ps1
 on_success:
@@ -13,3 +11,19 @@ artifacts:
   name: netstandard16
 - path: Davenport/bin/Release/net461
   name: net461
+deploy:
+- provider: NuGet
+  api_key:
+    secure: uUJ91Fu+H69EdZ8RTYIa7G7UufCgCw1UXfZ2jAOEWJfKi8KNwDTFYaEDQCJS9xOc
+  on:
+    branch: master
+    appveyor_repo_tag: true
+- provider: GitHub
+  tag: $(APPVEYOR_REPO_TAG_NAME)
+  description: "Automated AppVeyor release for Davenport v$(APPVEYOR_REPO_TAG_NAME)."
+  auth_token:
+    secure: OS2yhg1H8KSYenGLlIIvVgsxU1xjtmNRjxrUBuwiWltI3JlvTmaBFijVINnGclbp
+  artifact: *.zip,*.nupkg
+  on:
+    branch: master
+    appveyor_repo_tag: true
