@@ -34,6 +34,8 @@ test_script:
     checkLastOutput $clientTests "Client";
 
     dotnet pack Davenport/davenport.csproj;
+on_success:
+- ps: dotnet pack --no-build -c Release Davenport/davenport.csproj;
 artifacts:
 - path: Davenport/bin/Release/*.nupkg
   name: nupkg
