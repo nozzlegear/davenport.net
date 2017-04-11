@@ -32,8 +32,6 @@ test_script:
     $clientTests = dotnet test $testProj -c Release --filter DisplayName~Client;
 
     checkLastOutput $clientTests "Client";
-
-    dotnet pack Davenport/davenport.csproj;
 on_success:
 - ps: dotnet pack --no-build -c Release Davenport/davenport.csproj;
 artifacts:
