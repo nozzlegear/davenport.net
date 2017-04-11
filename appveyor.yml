@@ -23,7 +23,7 @@ deploy:
   description: "Automated AppVeyor release for Davenport v$(APPVEYOR_REPO_TAG_NAME)."
   auth_token:
     secure: OS2yhg1H8KSYenGLlIIvVgsxU1xjtmNRjxrUBuwiWltI3JlvTmaBFijVINnGclbp
-  artifact: *.nupkg
+  artifact: davenport.nupkg
   on:
     branch: master
     appveyor_repo_tag: true
