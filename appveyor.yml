@@ -27,11 +27,11 @@ test_script:
     $testProj = "Davenport.Tests/Davenport.Tests.csproj";
     $configTests = dotnet test -c Release $testProj --filter DisplayName~Config;
 
-    checkLastOutput($configTests, "Config");
+    checkLastOutput $configTests "Config";
 
     $clientTests = dotnet test $testProj -c Release --filter DisplayName~Client;
 
-    checkLastOutput($clientTests, "Client");
+    checkLastOutput $clientTests "Client";
 artifacts:
 - path: Davenport/bin/Release/netstandard1.6
   name: netstandard16
