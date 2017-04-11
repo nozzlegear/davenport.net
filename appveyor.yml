@@ -35,7 +35,8 @@ test_script:
 on_success:
 - ps: >- 
     dotnet pack --no-build -c Release Davenport/davenport.csproj;
-    gci Davenport/bin/Release/*.nupkg | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name }
+    $nupkg = (gci Davenport/bin/Release/*.nupkg)[0];
+    Push-AppveyorArtifact $nupkg.FullName -FileName $_.Name -DeploymentName $_.Name;
 artifacts:
 - path: Davenport/bin/Release/netstandard1.6
   name: netstandard16
