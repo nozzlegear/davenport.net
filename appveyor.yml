@@ -19,7 +19,7 @@ test_script:
     function checkLastOutput ($output, $testName) {
         echo $output;
 
-        if ($LastExitCode -eq 0 -or $output -contains "Test Run Failed.") {
+        if ($LastExitCode -ne 0 -or $output -contains "Test Run Failed.") {
             throw "$testName tests failed with exit code $LastExitCode.";
         }
     }
