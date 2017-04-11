@@ -32,7 +32,11 @@ test_script:
     $clientTests = dotnet test $testProj -c Release --filter DisplayName~Client;
 
     checkLastOutput $clientTests "Client";
+
+    dotnet pack Davenport/davenport.csproj;
 artifacts:
+- path: Davenport/bin/Release/*.nupkg
+  name: nupkg
 - path: Davenport/bin/Release/netstandard1.6
   name: netstandard16
 - path: Davenport/bin/Release/net461
