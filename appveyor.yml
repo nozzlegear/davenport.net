@@ -33,10 +33,10 @@ test_script:
 
     checkLastOutput $clientTests "Client";
 on_success:
-- ps: dotnet pack --no-build -c Release Davenport/davenport.csproj;
+- ps: >- 
+    dotnet pack --no-build -c Release Davenport/davenport.csproj;
+    gci Davenport/bin/Release/*.nupkg | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name }
 artifacts:
-- path: Davenport/bin/Release/*.nupkg
-  name: nupkg
 - path: Davenport/bin/Release/netstandard1.6
   name: netstandard16
 - path: Davenport/bin/Release/net461
