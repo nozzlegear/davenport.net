@@ -7,8 +7,8 @@ test_script:
 on_success:
 - ps: ./ps/on_success.ps1
 artifacts:
-- path: Davenport/bin/Release/netstandard1.6
-  name: netstandard16
+- path: Davenport/bin/Release/netstandard1.4
+  name: netstandard14
 - path: Davenport/bin/Release/net461
   name: net461
 deploy:
