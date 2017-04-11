@@ -4,8 +4,6 @@ build_script:
 - ps: ./ps/build_script.ps1
 test_script:
 - ps: ./ps/test_script.ps1
-before_deploy:
-- ps: ./ps/before_deploy.ps1
 artifacts:
 - path: Davenport/bin/Release/netstandard1.4
   name: netstandard14
