@@ -54,6 +54,8 @@ namespace Davenport.Tests
         [Fact(DisplayName = "Client CountAsync")]
         public async Task CountAsync()
         {
+            await Client.PostAsync(ExampleClass);
+
             var count = await Client.CountAsync();
 
             Assert.True(count > 0);
@@ -62,6 +64,8 @@ namespace Davenport.Tests
         [Fact(DisplayName = "Client CountWithExpressionAsync")]
         public async Task CountWithExpressionAsync()
         {
+            await Client.PostAsync(ExampleClass);
+
             var count = await Client.CountBySelectorAsync(doc => doc.Foo == "test value 2");
             var totalCount = await Client.CountAsync();
 
@@ -101,6 +105,8 @@ namespace Davenport.Tests
         [Fact(DisplayName = "Client ListWithDocsAsync")]
         public async Task ListWithDocsAsync()
         {
+            await Client.PostAsync(ExampleClass);
+            
             var list = await Client.ListWithDocsAsync();
 
             Assert.NotNull(list);
@@ -118,6 +124,8 @@ namespace Davenport.Tests
         [Fact(DisplayName = "Client ListWithoutDocsAsync")]
         public async Task ListWithoutDocsAsync()
         {
+            await Client.PostAsync(ExampleClass);
+            
             var list = await Client.ListWithoutDocsAsync();
 
             Assert.NotNull(list);
@@ -134,6 +142,10 @@ namespace Davenport.Tests
         [Fact(DisplayName = "Client FindLambdaAsync")]
         public async Task FindLambdaAsync()
         {
+            var created = await Client.PostAsync(new MyTestClass()
+            {
+                Foo = "test value 2"
+            });
             var equalsResult = await Client.FindAsync(doc => doc.Foo == "test value 2");
 
             Assert.NotNull(equalsResult);
@@ -141,6 +153,10 @@ namespace Davenport.Tests
             Assert.True(equalsResult.All(row => ! string.IsNullOrEmpty(row.Id)));
             Assert.True(equalsResult.All(row => ! string.IsNullOrEmpty(row.Rev)));
 
+            created = await Client.PostAsync(new MyTestClass()
+            {
+                Foo = "test value"
+            });
             var notEqualsResult = await Client.FindAsync(doc => doc.Foo != "test value 2");
 
             Assert.NotNull(notEqualsResult);
@@ -152,6 +168,10 @@ namespace Davenport.Tests
         [Fact(DisplayName = "Client FindDictionaryAsync")]
         public async Task FindDictionaryAsync()
         {
+            var created = await Client.PostAsync(new MyTestClass()
+            {
+                Foo = "test value 2"
+            });
             var equalsResult = await Client.FindAsync(new Dictionary<string, FindExpression>()
             {
                 { "Foo", new FindExpression(ExpressionType.Equal, "test value 2") }
@@ -162,6 +182,10 @@ namespace Davenport.Tests
             Assert.True(equalsResult.All(row => ! string.IsNullOrEmpty(row.Id)));
             Assert.True(equalsResult.All(row => ! string.IsNullOrEmpty(row.Rev)));
 
+            created = await Client.PostAsync(new MyTestClass()
+            {
+                Foo = "test value"
+            });
             var notEqualsResult = await Client.FindAsync(new Dictionary<string, FindExpression>()
             {
                 { "Foo", new FindExpression(ExpressionType.NotEqual, "test value 2") }
@@ -176,6 +200,10 @@ namespace Davenport.Tests
         [Fact(DisplayName = "Client FindObjectAsync")]
         public async Task FindObjectAsync()
         {
+            var created = await Client.PostAsync(new MyTestClass()
+            {
+                Foo = "test value 2"
+            });
             var equalsResult = await Client.FindAsync(new 
             {
                 Foo = new Dictionary<string, object>
@@ -189,6 +217,10 @@ namespace Davenport.Tests
             Assert.True(equalsResult.All(row => ! string.IsNullOrEmpty(row.Id)));
             Assert.True(equalsResult.All(row => ! string.IsNullOrEmpty(row.Rev)));
 
+            created = await Client.PostAsync(new MyTestClass()
+            {
+                Foo = "test value"
+            });
             var notEqualsResult = await Client.FindAsync(new 
             {
                 Foo = new Dictionary<string, object>
@@ -217,6 +249,10 @@ namespace Davenport.Tests
         [Fact(DisplayName = "Client ExistsByExpressionAsync")]
         public async Task ExistsByExpressionAsync()
         {
+            var created = await Client.PostAsync(new MyTestClass()
+            {
+                Foo = "test value 2"
+            });
             var exists = await Client.ExistsBySelector(doc => doc.Foo == "test value 2");
 
             Assert.True(exists);
@@ -225,6 +261,10 @@ namespace Davenport.Tests
         [Fact(DisplayName = "Client ExistsByDictionaryAsync")]
         public async Task ExistsByDictionaryAsync()
         {
+            var created = await Client.PostAsync(new MyTestClass()
+            {
+                Foo = "test value 2"
+            });
             var exists = await Client.ExistsBySelector(new Dictionary<string, FindExpression>()
             {
                 { "Foo", new FindExpression(ExpressionType.Equal, "test value 2") }
@@ -236,6 +276,10 @@ namespace Davenport.Tests
         [Fact(DisplayName = "Client ExistsByObjectAsync")]
         public async Task ExistsByObjectAsync()
         {
+            var created = await Client.PostAsync(new MyTestClass()
+            {
+                Foo = "test value 2"
+            });
             var exists = await Client.ExistsBySelector(new 
             {
                 Foo = new Dictionary<string, object>
@@ -260,6 +304,11 @@ namespace Davenport.Tests
         [Fact(DisplayName = "Client ViewAsync")]
         public async Task ViewAsync()
         {
+            var created = await Client.PostAsync(new MyTestClass()
+            {
+                Foo = "test value",
+                Baz = 15,
+            });
             var viewResult = await Client.ViewAsync<int>("list", "only-bazs-greater-than-10");
 
             Assert.True(viewResult.Count() > 0);
