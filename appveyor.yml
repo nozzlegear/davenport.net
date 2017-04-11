@@ -16,14 +16,22 @@ test_script:
         throw "CouchDB did not return a 200 OK status code. Did it fail to install?";
     }
 
-    $output = dotnet test Davenport.Tests/Davenport.Tests.csproj -c Release;
+    function checkLastOutput ($output, $testName) {
+        echo $output;
 
-    echo $output;
-
-    if ($LastExitCode -eq 0 -or $output -contains "Test Run Failed.") {
-        echo "Last output code was $LastExitCode";
-        throw "Test failed. Review output.";
+        if ($LastExitCode -eq 0 -or $output -contains "Test Run Failed.") {
+            throw "$testName tests failed with exit code $LastExitCode.";
+        }
     }
+
+    $testProj = "Davenport.Tests/Davenport.Tests.csproj";
+    $configTests = dotnet test -c Release $testProj --filter DisplayName~Config;
+
+    checkLastOutput($configTests, "Config");
+
+    $clientTests = dotnet test $testProj -c Release --filter DisplayName~Client;
+
+    checkLastOutput($clientTests, "Client");
 artifacts:
 - path: Davenport/bin/Release/netstandard1.6
   name: netstandard16
