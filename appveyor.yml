@@ -11,6 +11,13 @@ artifacts:
   name: netstandard14
 - path: Davenport/bin/Release/net461
   name: net461
+skip_commits:
+  message: /\[skip\]/
+  files:
+    - README.md
+    - LICENSE
+    - .gitignore
+    - .vscode/*
 deploy:
 - provider: NuGet
   api_key:
