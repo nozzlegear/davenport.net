@@ -13,7 +13,7 @@ using Davenport.Infrastructure;
 
 namespace Davenport
 {
-    public class Client<DocumentType> where DocumentType: CouchDoc
+    public class Client<DocumentType> where DocumentType : CouchDoc
     {
         private Configuration Config { get; }
 
@@ -38,17 +38,37 @@ namespace Davenport
         {
             var client = Url.Combine(Config.CouchUrl, Config.DatabaseName, path).AllowAnyHttpStatus();
 
-            if (! string.IsNullOrEmpty(Config.Username) && ! string.IsNullOrEmpty(Config.Password))
+            if (!string.IsNullOrEmpty(Config.Username) && !string.IsNullOrEmpty(Config.Password))
             {
                 client = client.WithBasicAuth(Config.Username, Config.Password);
             }
 
-            if (! string.IsNullOrEmpty(rev))
+            if (!string.IsNullOrEmpty(rev))
             {
                 client.Url.QueryParams.Add("rev", rev);
             }
-            
+
             return client;
+        }
+
+        /// <summary>
+        /// Checks a <see cref="HttpResponseMessage" /> for errors and throws a <see cref="DavenportException" /> if found.
+        /// </summary>
+        protected void CheckAndThrowIfError(IFlurlClient client, HttpResponseMessage result, string rawBody)
+        {
+            if (!result.IsSuccessStatusCode)
+            {
+                var message = $"Error with {client} request for CouchDB database {Config.DatabaseName} at {client.Url.ToString()}. {result.StatusCode} {result.ReasonPhrase}";
+                var ex = new DavenportException(message)
+                {
+                    StatusCode = (int)result.StatusCode,
+                    StatusText = result.ReasonPhrase,
+                    ResponseBody = rawBody,
+                    Url = client.Url.ToString(),
+                };
+
+                throw ex;
+            }
         }
 
         /// <summary>
@@ -65,24 +85,12 @@ namespace Davenport
                 var result = await request;
                 var rawBody = await request.ReceiveString();
 
-                if (! result.IsSuccessStatusCode)
-                {
-                    var message = $"Error with {client} request for CouchDB database {Config.DatabaseName} at {client.Url.ToString()}. {result.StatusCode} {result.ReasonPhrase}";
-                    var ex = new DavenportException(message)
-                    {
-                        StatusCode = (int) result.StatusCode,
-                        StatusText = result.ReasonPhrase,
-                        ResponseBody = rawBody,
-                        Url = client.Url.ToString(),   
-                    };
-                    
-                    throw ex;
-                }
+                CheckAndThrowIfError(client, result, rawBody);
 
                 return JsonConvert.DeserializeObject<T>(rawBody);
             }
         }
-        
+
         /// <summary>
         /// Gets a document with the given <paramref name="id" /> and optional <paramref name="rev" />.
         /// </summary>
@@ -96,13 +104,13 @@ namespace Davenport
         private async Task<IEnumerable<DocumentType>> _FindAsync(object selector, Dictionary<string, object> options)
         {
             var request = PrepareRequest("_find");
-            
+
             // Make sure the selector is occupying the selector key
             if (options.ContainsKey("selector"))
             {
                 options.Remove("selector");
             }
-            
+
             options.Add("selector", selector);
 
             var content = new JsonContent(options);
@@ -219,7 +227,7 @@ namespace Davenport
                 };
 
                 rows.Add(row);
-            }   
+            }
 
             return (DesignDocs: designDocs, Docs: rows);
         }
@@ -389,8 +397,46 @@ namespace Davenport
             }
 
             var result = await ExecuteRequestAsync<JToken>(request, HttpMethod.Get);
-            
+
             return result.SelectToken("rows").ToObject<List<ViewResult<ReturnType>>>();
+        }
+
+        /// <summary>
+        /// Creates the database associated with this client if it doesn't already exist.
+        /// </summary>
+        public async Task<CreateDatabaseResponse> CreateDatabaseAsync()
+        {
+            var request = PrepareRequest("");
+            var send = request.SendAsync(HttpMethod.Put);
+            var response = await send;
+            var rawBody = await send.ReceiveString();
+
+            if ((int)response.StatusCode == 412)
+            {
+                return new CreateDatabaseResponse()
+                {
+                    AlreadyExisted = true,
+                    Ok = true
+                };
+            }
+
+            CheckAndThrowIfError(request, response, rawBody);
+
+            var output = JsonConvert.DeserializeObject<CreateDatabaseResponse>(rawBody);
+            output.AlreadyExisted = false;
+
+            return output;
+        }
+
+        /// <summary>
+        /// Deletes the database associated with this client.
+        /// </summary>
+        public async Task<CouchResponse> DeleteDatabaseAsync()
+        {
+            var request = PrepareRequest("");
+            var response = await ExecuteRequestAsync<CouchResponse>(request, HttpMethod.Delete);
+
+            return response;
         }
     }
 }

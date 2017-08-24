@@ -98,7 +98,7 @@ namespace Davenport.Tests
         public async Task DeleteAsync()
         {
             var created = await Client.PostAsync(ExampleClass);
-            
+
             await Client.DeleteAsync(created.Id, created.Rev);
         }
 
@@ -106,7 +106,7 @@ namespace Davenport.Tests
         public async Task ListWithDocsAsync()
         {
             await Client.PostAsync(ExampleClass);
-            
+
             var list = await Client.ListWithDocsAsync();
 
             Assert.NotNull(list);
@@ -114,18 +114,18 @@ namespace Davenport.Tests
             Assert.True(list.Rows.Count() > 0);
             Assert.True(list.DesignDocs.Count() > 0);
             Assert.True(list.Rows.All(row => row.Doc.GetType() == typeof(MyTestClass)));
-            Assert.True(list.Rows.All(row => ! row.Id.StartsWith("_design")));
-            Assert.True(list.Rows.All(row => ! string.IsNullOrEmpty(row.Doc.Id)));
-            Assert.True(list.Rows.All(row => ! string.IsNullOrEmpty(row.Doc.Rev)));
+            Assert.True(list.Rows.All(row => !row.Id.StartsWith("_design")));
+            Assert.True(list.Rows.All(row => !string.IsNullOrEmpty(row.Doc.Id)));
+            Assert.True(list.Rows.All(row => !string.IsNullOrEmpty(row.Doc.Rev)));
             Assert.True(list.DesignDocs.All(doc => doc.Id.StartsWith("_design")));
-            Assert.True(list.DesignDocs.All(doc => doc.Doc != null));;
+            Assert.True(list.DesignDocs.All(doc => doc.Doc != null)); ;
         }
 
         [Fact(DisplayName = "Client ListWithoutDocsAsync"), Trait("Category", "Client")]
         public async Task ListWithoutDocsAsync()
         {
             await Client.PostAsync(ExampleClass);
-            
+
             var list = await Client.ListWithoutDocsAsync();
 
             Assert.NotNull(list);
@@ -133,10 +133,10 @@ namespace Davenport.Tests
             Assert.True(list.Rows.Count() > 0, "Rows.Count should be greater than 0.");
             Assert.True(list.DesignDocs.Count() > 0, "Rows.DesignDocs.Count should be greater than 0.");
             Assert.True(list.Rows.All(row => row.Doc.GetType() == typeof(Revision)), "All row docs should be of type Revision.");
-            Assert.True(list.Rows.All(row => ! string.IsNullOrEmpty(row.Doc.Rev)), "All rows should have a Doc.Rev value.");
-            Assert.True(list.Rows.All(row => ! row.Id.StartsWith("_design")), "All row ids should not start with _design.");
+            Assert.True(list.Rows.All(row => !string.IsNullOrEmpty(row.Doc.Rev)), "All rows should have a Doc.Rev value.");
+            Assert.True(list.Rows.All(row => !row.Id.StartsWith("_design")), "All row ids should not start with _design.");
             Assert.True(list.DesignDocs.All(doc => doc.Id.StartsWith("_design")), "All design doc ids should start with _design.");
-            Assert.True(list.DesignDocs.All(doc => doc.Doc != null), "All design doc documents should not be null.");;
+            Assert.True(list.DesignDocs.All(doc => doc.Doc != null), "All design doc documents should not be null."); ;
         }
 
         [Fact(DisplayName = "Client FindLambdaAsync"), Trait("Category", "Client")]
@@ -150,8 +150,8 @@ namespace Davenport.Tests
 
             Assert.NotNull(equalsResult);
             Assert.True(equalsResult.All(row => row.Foo == "test value 2"));
-            Assert.True(equalsResult.All(row => ! string.IsNullOrEmpty(row.Id)));
-            Assert.True(equalsResult.All(row => ! string.IsNullOrEmpty(row.Rev)));
+            Assert.True(equalsResult.All(row => !string.IsNullOrEmpty(row.Id)));
+            Assert.True(equalsResult.All(row => !string.IsNullOrEmpty(row.Rev)));
 
             created = await Client.PostAsync(new MyTestClass()
             {
@@ -161,8 +161,8 @@ namespace Davenport.Tests
 
             Assert.NotNull(notEqualsResult);
             Assert.True(notEqualsResult.All(row => row.Foo != "test value 2"));
-            Assert.True(notEqualsResult.All(row => ! string.IsNullOrEmpty(row.Id)));
-            Assert.True(notEqualsResult.All(row => ! string.IsNullOrEmpty(row.Rev)));
+            Assert.True(notEqualsResult.All(row => !string.IsNullOrEmpty(row.Id)));
+            Assert.True(notEqualsResult.All(row => !string.IsNullOrEmpty(row.Rev)));
         }
 
         [Fact(DisplayName = "Client FindDictionaryAsync"), Trait("Category", "Client")]
@@ -179,8 +179,8 @@ namespace Davenport.Tests
 
             Assert.NotNull(equalsResult);
             Assert.True(equalsResult.All(row => row.Foo == "test value 2"));
-            Assert.True(equalsResult.All(row => ! string.IsNullOrEmpty(row.Id)));
-            Assert.True(equalsResult.All(row => ! string.IsNullOrEmpty(row.Rev)));
+            Assert.True(equalsResult.All(row => !string.IsNullOrEmpty(row.Id)));
+            Assert.True(equalsResult.All(row => !string.IsNullOrEmpty(row.Rev)));
 
             created = await Client.PostAsync(new MyTestClass()
             {
@@ -193,8 +193,8 @@ namespace Davenport.Tests
 
             Assert.NotNull(notEqualsResult);
             Assert.True(notEqualsResult.All(row => row.Foo != "test value 2"));
-            Assert.True(notEqualsResult.All(row => ! string.IsNullOrEmpty(row.Id)));
-            Assert.True(notEqualsResult.All(row => ! string.IsNullOrEmpty(row.Rev)));
+            Assert.True(notEqualsResult.All(row => !string.IsNullOrEmpty(row.Id)));
+            Assert.True(notEqualsResult.All(row => !string.IsNullOrEmpty(row.Rev)));
         }
 
         [Fact(DisplayName = "Client FindObjectAsync"), Trait("Category", "Client")]
@@ -204,7 +204,7 @@ namespace Davenport.Tests
             {
                 Foo = "test value 2"
             });
-            var equalsResult = await Client.FindAsync(new 
+            var equalsResult = await Client.FindAsync(new
             {
                 Foo = new Dictionary<string, object>
                 {
@@ -214,14 +214,14 @@ namespace Davenport.Tests
 
             Assert.NotNull(equalsResult);
             Assert.True(equalsResult.All(row => row.Foo == "test value 2"));
-            Assert.True(equalsResult.All(row => ! string.IsNullOrEmpty(row.Id)));
-            Assert.True(equalsResult.All(row => ! string.IsNullOrEmpty(row.Rev)));
+            Assert.True(equalsResult.All(row => !string.IsNullOrEmpty(row.Id)));
+            Assert.True(equalsResult.All(row => !string.IsNullOrEmpty(row.Rev)));
 
             created = await Client.PostAsync(new MyTestClass()
             {
                 Foo = "test value"
             });
-            var notEqualsResult = await Client.FindAsync(new 
+            var notEqualsResult = await Client.FindAsync(new
             {
                 Foo = new Dictionary<string, object>
                 {
@@ -231,8 +231,8 @@ namespace Davenport.Tests
 
             Assert.NotNull(notEqualsResult);
             Assert.True(notEqualsResult.All(row => row.Foo != "test value 2"));
-            Assert.True(notEqualsResult.All(row => ! string.IsNullOrEmpty(row.Id)));
-            Assert.True(notEqualsResult.All(row => ! string.IsNullOrEmpty(row.Rev)));
+            Assert.True(notEqualsResult.All(row => !string.IsNullOrEmpty(row.Id)));
+            Assert.True(notEqualsResult.All(row => !string.IsNullOrEmpty(row.Rev)));
         }
 
         [Fact(DisplayName = "Client ExistsAsync"), Trait("Category", "Client")]
@@ -280,7 +280,7 @@ namespace Davenport.Tests
             {
                 Foo = "test value 2"
             });
-            var exists = await Client.ExistsBySelector(new 
+            var exists = await Client.ExistsBySelector(new
             {
                 Foo = new Dictionary<string, object>
                 {
@@ -313,6 +313,25 @@ namespace Davenport.Tests
 
             Assert.True(viewResult.Count() > 0);
             Assert.True(viewResult.Sum(doc => doc.Value) > 0);
+        }
+
+        [Fact(DisplayName = "Client CreateDatabaseAsync and DeleteDatabaseAsync"), Trait("Category", "Client")]
+        public async Task CreateAndDeleteDatabaseAsync()
+        {
+            string name = "davenport_net_delete_me";
+            var newDb = new Davenport.Client<MyTestClass>("http://localhost:5984", name);
+            var createResult = await newDb.CreateDatabaseAsync();
+
+            Assert.True(createResult.Ok);
+
+            // Create the database again to ensure .AlreadyExisted works.
+            createResult = await newDb.CreateDatabaseAsync();
+
+            Assert.True(createResult.AlreadyExisted);
+
+            var deleteResult = await newDb.DeleteDatabaseAsync();
+
+            Assert.True(deleteResult.Ok);
         }
     }
 }
