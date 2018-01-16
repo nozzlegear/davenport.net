@@ -76,10 +76,11 @@ namespace Davenport
         /// </summary>
         /// <param name="flurlRequest">The Flurl request.</param>
         /// <param name="method">Method used for the request.</param>
-        /// <param name="content">Optional content sent along with POST or PUT requests.</param>
-        protected async Task<T> ExecuteRequestAsync<T>(IFlurlRequest flurlRequest, HttpMethod method, HttpContent content = null)
+        /// <param name="content">Optional content sent along with POST or PUT requests. Will be converted to JSON using the Configuration object's custom json converter.</param>
+        protected async Task<T> ExecuteRequestAsync<T>(IFlurlRequest flurlRequest, HttpMethod method, object content = null)
         {
-            var request = flurlRequest.SendAsync(method, content);
+            HttpContent body = content == null ? null : new JsonContent(content, Config.Converter);
+            var request = flurlRequest.SendAsync(method, body);
             var result = await request;
             var rawBody = await request.ReceiveString();
 
@@ -116,8 +117,7 @@ namespace Davenport
 
             options.Add("selector", selector);
 
-            var content = new JsonContent(options);
-            var result = await ExecuteRequestAsync<JToken>(request, HttpMethod.Post, content);
+            var result = await ExecuteRequestAsync<JToken>(request, HttpMethod.Post, options);
             var warning = result.SelectToken("warning", false);
 
             if (warning?.HasValues == true)
@@ -296,10 +296,9 @@ namespace Davenport
         /// </summary>
         public async Task<PostPutCopyResponse> PostAsync(DocumentType doc)
         {
-            var content = new JsonContent(doc);
             var request = PrepareRequest("");
 
-            return await ExecuteRequestAsync<PostPutCopyResponse>(request, HttpMethod.Post, content);
+            return await ExecuteRequestAsync<PostPutCopyResponse>(request, HttpMethod.Post, doc);
         }
 
         /// <summary>
@@ -307,10 +306,9 @@ namespace Davenport
         /// </summary>
         public async Task<PostPutCopyResponse> PutAsync(string id, DocumentType doc, string rev = null)
         {
-            var content = new JsonContent(doc);
             var request = PrepareRequest(id, rev);
 
-            return await ExecuteRequestAsync<PostPutCopyResponse>(request, HttpMethod.Put, content);
+            return await ExecuteRequestAsync<PostPutCopyResponse>(request, HttpMethod.Put, doc);
         }
 
         /// <summary>
