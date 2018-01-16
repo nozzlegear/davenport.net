@@ -1,8 +1,30 @@
-module Davenport.Fsharp
+module Davenport.Fsharp.Wrapper
 
+open Davenport.Fsharp.Infrastructure
+open Davenport.Entities
 open Newtonsoft.Json
-open Newtonsoft.Json.Linq
-open System.Linq
+open System
+open System.Linq.Expressions
+open Microsoft.FSharp.Quotations
+open Microsoft.FSharp.Linq.RuntimeHelpers
+
+type Find =
+    | EqualTo of obj
+    | NotEqualTo of obj
+    | GreaterThan of obj
+    | LesserThan of obj
+    | GreaterThanOrEqualTo of obj
+    | LessThanOrEqualTo of obj
+    with
+    member x.ToFindExpression() =
+        match x with
+        | EqualTo x -> ExpressionType.Equal, x
+        | NotEqualTo x -> ExpressionType.NotEqual, x
+        | GreaterThan x -> ExpressionType.GreaterThan, x
+        | LesserThan x -> ExpressionType.LessThan, x
+        | GreaterThanOrEqualTo x -> ExpressionType.GreaterThanOrEqual, x
+        | LessThanOrEqualTo x -> ExpressionType.LessThanOrEqual, x
+        |> FindExpression
 
 type CouchProps = private {
     username: string option
@@ -10,7 +32,6 @@ type CouchProps = private {
     converter: JsonConverter option
     databaseName: string
     couchUrl: string
-    docType: System.Type
     id: string
     rev: string
 }
@@ -21,106 +42,53 @@ let private defaultCouchProps() = {
         converter = None
         databaseName = ""
         couchUrl = ""
-        docType = typeof<obj>
         id = "_id"
         rev = "_rev"
     }
 
-/// This type is combined with the custom json converter to allow consumers of this package to pass any F# record type to Davenport without turning their records into classes that inherit couchdoc.
-type private FsDoc() =
-    inherit Davenport.Entities.CouchDoc()
-    member val Data: obj option = None with get,set
+let private toConfig<'doctype> (props: CouchProps) =
+    let config = Davenport.Configuration(props.couchUrl, props.databaseName)
+    config.Username <- Option.defaultValue "" props.username
+    config.Password <- Option.defaultValue "" props.password
+    config.Converter <- FsConverter<'doctype>(props.id, props.rev, props.converter) :> JsonConverter
+    config
 
-type private MyRandoType = { MyId: string; MyRev: string; Foo: bool; Bar: int }
+let private toClient<'doctype> = toConfig<'doctype> >> Davenport.Client<FsDoc<'doctype>>
 
-type FsConverter<'doctype>(idField: string, revField: string, docType: System.Type) =
-    inherit JsonConverter()
-    let fableConverter = Fable.JsonConverter() :> JsonConverter
-    override __.CanConvert objectType = objectType = typeof<FsDoc>
+/// Converts an F# expression to a LINQ expression
+/// Source: https://stackoverflow.com/a/23390583
+let private toLinq (expr : Expr<'a -> 'b>) =
+      let linq = LeafExpressionConverter.QuotationToExpression expr
+      let call = linq :?> MethodCallExpression
+      let lambda = call.Arguments.[0] :?> LambdaExpression
+      Expression.Lambda<Func<'a, 'b>>(lambda.Body, lambda.Parameters)
 
-    override __.ReadJson(reader: JsonReader, objectType: System.Type, existingValue: obj, serializer: JsonSerializer) =
-        let j = JObject.Load reader
-        let id: JToken option = Option.ofObj j.["_id"]
-        let rev: JToken option = Option.ofObj j.["_rev"]
+let private listedRowToDoctypeRow<'doctype> (row: ListedRow<FsDoc<'doctype>>) =
+    let newRow = ListedRow<'doctype>()
+    newRow.Doc <- Option.get row.Doc.Data
+    newRow.Id <- row.Id
+    newRow.Key <- row.Key
+    newRow.Value <- row.Value
 
-        id
-        |> Option.iter (fun value ->
-            // Rename _id to idField
-            if idField <> "_id" then
-                j.Remove "_id" |> ignore
-                j.Add(idField, value)
-        )
+    newRow
 
-        rev
-        |> Option.iter (fun value ->
-            // Rename _rev to revField
-            if revField <> "_rev" then
-                j.Remove "_rev" |> ignore
-                j.Add(revField, value)
-        )
+let private convertMapExpr (map: Map<string, Find>) =
+    Map.map (fun _ (value: Find) -> value.ToFindExpression()) map
+    |> Map.toSeq
+    |> dict
+    :?> Collections.Generic.Dictionary<string, FindExpression>
 
-        let data = j.ToObject(docType, serializer)
-        let output = FsDoc()
-        output.Id <-
-            id
-            |> Option.bind (fun id -> id.Value<string>() |> Some)
-            |> Option.defaultValue ""
-        output.Rev <-
-            rev
-            |> Option.bind (fun rev -> rev.Value<string>() |> Some)
-            |> Option.defaultValue ""
-        output.Data <- data |> Some
+let private asyncMap (fn: 't -> 'u) task = async {
+    let! result = task
 
-        output :> obj
+    return fn result
+}
 
-    override __.WriteJson(writer: JsonWriter, objValue: obj, serializer: JsonSerializer) =
-        if isNull objValue
-        then serializer.Serialize(writer, null)
-        else
+let private asyncMapSeq (fn: 't -> 'u) task = async {
+    let! result = task
 
-        let doc = objValue :?> FsDoc
-        writer.WriteStartObject()
-
-        // Load the data object into a JObject
-        let j = JObject.FromObject doc.Data
-
-        // Find the data object's id and rev fields.
-        // A JObject field will be null if it doesn't exist, but will return a JToken with Null value if the field does exist and it's null.
-        let id =
-            if isNull j.[idField]
-            then sprintf "Id field '%s' was not found on type %s." idField docType.FullName |> System.ArgumentException |> raise
-            else j.[idField]
-
-        let rev =
-            if isNull j.[revField]
-            then sprintf "Rev field '%s' was not found on type %s." revField docType.FullName |> System.ArgumentException |> raise
-            else j.[revField]
-
-        // Write the _id and _rev values if they aren't null or empty. Writing either one when it isn't intended can make CouchDB throw an error.
-        [id, "_id"; rev, "_rev"]
-        |> Seq.iter (fun (token, name) ->
-            let value = token.Value<string>()
-
-            if System.String.IsNullOrEmpty value |> not then
-                writer.WritePropertyName name
-                writer.WriteValue value
-        )
-
-        // Merge the FsDoc's data property with the doc being written so they're at the same level.
-        Seq.cast<JProperty> j
-        |> Seq.filter (fun prop -> prop.Name <> idField && prop.Name <> revField)
-        |> Seq.iter (fun prop -> prop.WriteTo(writer, [|fableConverter|]))
-
-        // // Merge the FsDoc's data property with the doc being written so they're at the same level.
-        // doc.Data.GetType().GetProperties()
-        // |> Seq.filter (fun prop -> prop.Name <> idField && prop.Name <> revField)
-        // |> Seq.iter (fun prop ->
-        //     writer.WritePropertyName(prop.Name)
-        //     // Let the serializer figure out how to serialize the property value
-        //     serializer.Serialize(writer, prop.GetValue(doc.Data, null))
-        // )
-
-        writer.WriteEndObject()
+    return Seq.map fn result
+}
 
 let database name couchUrl =
     { defaultCouchProps() with databaseName = name; couchUrl = couchUrl }
@@ -133,19 +101,7 @@ let idName name props = { props with id = name }
 
 let revName name props = { props with rev = name }
 
-let docType docType props = { props with docType = docType }
-
 let converter converter props = { props with converter = Some converter }
-
-let private toConfig (props: CouchProps) =
-    let config = Davenport.Configuration(props.couchUrl, props.databaseName)
-    config.Username <- Option.defaultValue "" props.username
-    config.Password <- Option.defaultValue "" props.password
-    config.Converter <- Option.defaultWith (fun _ -> FsConverter(props.id, props.rev, props.docType) :> JsonConverter) props.converter
-    config
-
-let private mapFsDocRowTo<'a> row: Entities.ListedRow<'a> =
-    Entities.ListedRow<'a>()
 
 let getCouchVersion props =
     toConfig props
@@ -177,25 +133,65 @@ let createIndexes (indexes: string seq) props =
     |> Async.AwaitTask
 
 /// Combines the createDatabase, createDesignDocs and createIndexes functions, running all three at once.
-let configure (designDocs: Davenport.Entities.DesignDocConfig seq) (indexes: string seq) props = async {
+let configureDatabase (designDocs: Davenport.Entities.DesignDocConfig seq) (indexes: string seq) props = async {
     let config = toConfig props
 
     do!
-        Davenport.Configuration.ConfigureDatabaseAsync<FsDoc>(config, indexes, designDocs)
+        Davenport.Configuration.ConfigureDatabaseAsync<FsDoc<obj>>(config, indexes, designDocs)
         |> Async.AwaitTask
         |> Async.Ignore
 }
 
-let create data props =
-    let client = toConfig props |> Davenport.Client<FsDoc>
+/// Deletes the database. This cannot be undone!
+let deleteDatabase props =
+    let client = toClient props
+
+    client.DeleteDatabaseAsync()
+    |> Async.AwaitTask
+
+/// Creates the given document and assigns a random id. If you want to choose the id, use the update function with no revision.
+let create<'doctype> data props =
+    let client = toClient<'doctype> props
     let doc = FsDoc()
     doc.Data <- Some data
 
     client.PostAsync doc
     |> Async.AwaitTask
 
-let get id (rev: string option) props = async {
-    let client = toConfig props |> Davenport.Client<FsDoc>
+/// Updates *or creates* the document with the given id.
+let update<'doctype> id doc (rev: string option) props =
+    let client = toClient<'doctype> props
+
+    // I prefer not to add Async.Catch to everything in the package, but in cases where it may be likely to fail (e.g. the id is already taken) it makes sense.
+    client.PutAsync(id, doc, Option.toObj rev)
+    |> Async.AwaitTask
+    |> Async.Catch
+
+/// Copies the document with the oldId and assigns the newId to the copy.
+let copy oldId newId props =
+    let client = toClient props
+
+    client.CopyAsync(oldId, newId)
+    |> Async.AwaitTask
+
+/// Deletes the document with the given id and revision.
+let delete id rev props =
+    let client = toClient props
+
+    client.DeleteAsync(id, rev)
+    |> Async.AwaitTask
+
+/// Executes the view with the given designDocName and viewName.
+let view<'returnType> designDocName viewName (viewOptions: ViewOptions option) props =
+    let client = toClient props
+    let options = Option.toObj viewOptions
+
+    client.ViewAsync(designDocName, viewName, options)
+    |> Async.AwaitTask
+
+/// Gets the document with the given id. If a revision is given, that specific version will be returned.
+let get<'doctype> id (rev: string option) props = async {
+    let client = toClient<'doctype> props
     let! doc =
         client.GetAsync(id, Option.toObj rev)
         |> Async.AwaitTask
@@ -203,27 +199,145 @@ let get id (rev: string option) props = async {
 
     return
         match doc with
-        | Choice1Of2 doc -> Some doc.Data
-        | Choice2Of2 _ -> None
+        | Choice1Of2 doc -> Option.get doc.Data |> Some // We want this to fail if, for some reason, the jsonconverter was unable to convert FsDoc.Data
+        | Choice2Of2 exn ->
+            match exn with
+            | :? Davenport.Infrastructure.DavenportException as exn when exn.StatusCode = 404 -> None
+            | _ -> raise exn
 }
 
-let listWithDocs (listOptions: Entities.ListOptions option) props = async {
-    let client = toConfig props |> Davenport.Client<FsDoc>
+/// Lists all documents on the database.
+let listWithDocs<'doctype> (listOptions: ListOptions option) props = async {
+    let client = toClient<'doctype> props
     let options = Option.toObj listOptions
 
     let! result =
-        client.ListWithDocsAsync(options)
+        client.ListWithDocsAsync options
         |> Async.AwaitTask
+
     let newRows =
         result.Rows
-        |> Seq.map mapFsDocRowTo
+        |> Seq.map listedRowToDoctypeRow<'doctype>
 
-    return ""
+    let response = ListResponse<'doctype>()
+    response.DesignDocs <- result.DesignDocs
+    response.Offset <- result.Offset
+    response.Rows <- newRows
+    response.TotalRows <- result.TotalRows
+
+    return response
 }
 
-let connection =
+/// Lists all documents on the database, but does not return the documents themselves.
+let listWithoutDocs (listOptions: ListOptions option) props =
+    let client = toClient props
+    let options = Option.toObj listOptions
+
+    client.ListWithoutDocsAsync options
+    |> Async.AwaitTask
+
+/// Searches for documents matching the given selector.
+let findByMap<'doctype> (selector: Map<string, obj>) (findOptions: FindOptions option) props =
+    let client = toClient<'doctype> props
+    let options = Option.toObj findOptions
+
+    client.FindAsync(selector, options)
+    |> Async.AwaitTask
+    |> asyncMapSeq (fun doc -> Option.get doc.Data)
+
+/// Searches for documents matching the given selector.
+/// Usage: findByExpr<DocType> (<@ (c: DocType) -> c.SomeProp = SomeValue @>)
+/// NOTE: Davenport currently only supports simple 1 argument selectors.
+let findByExpr<'doctype> (selector: Expr<('doctype -> bool)>) (findOptions: FindOptions option) props =
+    let client = toClient<'doctype> props
+    let options = Option.toObj findOptions
+    let expr = toLinq selector
+
+    client.FindAsync(expr, options)
+    |> Async.AwaitTask
+    |> asyncMapSeq (fun doc -> Option.get doc.Data)
+
+/// Searches for documents matching the given selector.
+let findByMapExpr<'doctype> map (findOptions: FindOptions option) props =
+    let client = toClient<'doctype> props
+    let options = Option.toObj findOptions
+    let selector = convertMapExpr map
+
+    client.FindAsync(selector, options)
+    |> Async.AwaitTask
+    |> asyncMapSeq (fun doc -> Option.get doc.Data)
+
+/// Returns a count of all documents, *including design documents*.
+let count props =
+    let client = toClient props
+
+    client.CountAsync()
+    |> Async.AwaitTask
+
+/// Retrieves a count of all documents matching the given selector.
+let countByMap (selector: Map<string, obj>) props =
+    let client = toClient props
+
+    client.CountBySelectorAsync selector
+    |> Async.AwaitTask
+
+/// Retrieves a count of all documents matching the given selector.
+/// Usage: countByExpr<DocType> (<@ (c: DocType) -> c.SomeProp = SomeValue @>)
+/// NOTE: Davenport currently only supports simple 1 argument selectors.
+let countByExpr (selector: Expr<('doctype -> bool)>) props =
+    let client = toClient props
+    let expr = toLinq selector
+
+    client.CountBySelectorAsync(expr)
+    |> Async.AwaitTask
+
+/// Retrieves a count of all documents matching the given selector.
+let countByMapExpr map props =
+    let client = toClient props
+    let selector = convertMapExpr map
+
+    client.CountBySelectorAsync(selector)
+    |> Async.AwaitTask
+
+/// Checks whether a document with the given id exists. If a revision is given, it will check whether that specific version exists.
+let exists id (rev: string option) props =
+    let client = toClient props
+
+    client.ExistsAsync(id, Option.toObj rev)
+    |> Async.AwaitTask
+
+/// Checks that a document matching the given selector exists.
+let existsByMap (m: Map<string, obj>) props =
+    let client = toClient props
+
+    client.ExistsBySelector m
+    |> Async.AwaitTask
+
+/// Checks that a document matching the given selector exists.
+/// Usage: existsByExpr<DocType> (<@ (c: DocType) -> c.SomeProp = SomeValue @>)
+/// NOTE: Davenport currently only supports simple 1 argument selectors.
+let existsByExpr<'doctype> (selector: Expr<('doctype -> bool)>) props =
+    let client = toClient props
+    let expr = toLinq selector
+
+    client.ExistsBySelector expr
+    |> Async.AwaitTask
+
+/// Checks that a document matching the given selector exists.
+let existsByMapExpr<'doctype> map props =
+    let client = toClient props
+    let selector = convertMapExpr map
+
+    client.ExistsBySelector selector
+    |> Async.AwaitTask
+
+// TESTING BELOW
+
+type MyRandoType = { MyId: string; MyRev: string; Foo: bool; Bar: int }
+
+let result =
    "localhost:5984"
     |> database "henlo_world"
-    |> docType typeof<MyRandoType>
     |> idName "MyId"
     |> revName "MyRev"
+    |> listWithDocs<MyRandoType> None
