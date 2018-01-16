@@ -34,37 +34,37 @@ namespace Davenport
             Config = config;
         }
 
-        protected IFlurlClient PrepareRequest(string path, string rev = null)
+        protected IFlurlRequest PrepareRequest(string path, string rev = null)
         {
-            var client = Url.Combine(Config.CouchUrl, Config.DatabaseName, path).AllowAnyHttpStatus();
+            var request = Url.Combine(Config.CouchUrl, Config.DatabaseName, path).AllowAnyHttpStatus();
 
             if (!string.IsNullOrEmpty(Config.Username) && !string.IsNullOrEmpty(Config.Password))
             {
-                client = client.WithBasicAuth(Config.Username, Config.Password);
+                request = request.WithBasicAuth(Config.Username, Config.Password);
             }
 
             if (!string.IsNullOrEmpty(rev))
             {
-                client.Url.QueryParams.Add("rev", rev);
+                request.Url.QueryParams.Add("rev", rev);
             }
 
-            return client;
+            return request;
         }
 
         /// <summary>
         /// Checks a <see cref="HttpResponseMessage" /> for errors and throws a <see cref="DavenportException" /> if found.
         /// </summary>
-        protected void CheckAndThrowIfError(IFlurlClient client, HttpResponseMessage result, string rawBody)
+        protected void CheckAndThrowIfError(IFlurlRequest request, HttpResponseMessage result, string rawBody)
         {
             if (!result.IsSuccessStatusCode)
             {
-                var message = $"Error with {client} request for CouchDB database {Config.DatabaseName} at {client.Url.ToString()}. {result.StatusCode} {result.ReasonPhrase}";
+                var message = $"Error with {request} request for CouchDB database {Config.DatabaseName} at {request.Url.ToString()}. {result.StatusCode} {result.ReasonPhrase}";
                 var ex = new DavenportException(message)
                 {
                     StatusCode = (int)result.StatusCode,
                     StatusText = result.ReasonPhrase,
                     ResponseBody = rawBody,
-                    Url = client.Url.ToString(),
+                    Url = request.Url.ToString(),
                 };
 
                 throw ex;
@@ -72,23 +72,20 @@ namespace Davenport
         }
 
         /// <summary>
-        /// Takes a Flurl request client and executes it, sending along any provided content.
+        /// Takes a Flurl request and executes it, sending along any provided content.
         /// </summary>
-        /// <param name="client">The Flurl request client. This will be automatically disposed.</param>
+        /// <param name="flurlRequest">The Flurl request.</param>
         /// <param name="method">Method used for the request.</param>
         /// <param name="content">Optional content sent along with POST or PUT requests.</param>
-        protected async Task<T> ExecuteRequestAsync<T>(IFlurlClient client, HttpMethod method, HttpContent content = null)
+        protected async Task<T> ExecuteRequestAsync<T>(IFlurlRequest flurlRequest, HttpMethod method, HttpContent content = null)
         {
-            using (client)
-            {
-                var request = client.SendAsync(method, content);
-                var result = await request;
-                var rawBody = await request.ReceiveString();
+            var request = flurlRequest.SendAsync(method, content);
+            var result = await request;
+            var rawBody = await request.ReceiveString();
 
-                CheckAndThrowIfError(client, result, rawBody);
+            CheckAndThrowIfError(flurlRequest, result, rawBody);
 
-                return JsonConvert.DeserializeObject<T>(rawBody);
-            }
+            return JsonConvert.DeserializeObject<T>(rawBody);
         }
 
         /// <summary>
@@ -182,7 +179,7 @@ namespace Davenport
         }
 
         /// <summary>
-        /// Retrieves a count of all documents matching the given selector. 
+        /// Retrieves a count of all documents matching the given selector.
         /// </summary>
         public async Task<int> CountBySelectorAsync(object selector)
         {
@@ -190,7 +187,7 @@ namespace Davenport
         }
 
         /// <summary>
-        /// Retrieves a count of all documents matching the given selector. 
+        /// Retrieves a count of all documents matching the given selector.
         /// </summary>
         public async Task<int> CountBySelectorAsync(Dictionary<string, FindExpression> selector)
         {
@@ -233,7 +230,7 @@ namespace Davenport
         }
 
         /// <summary>
-        /// Lists all documents on the database. 
+        /// Lists all documents on the database.
         /// </summary>
         public async Task<ListResponse<DocumentType>> ListWithDocsAsync(ListOptions options = null)
         {
@@ -315,12 +312,10 @@ namespace Davenport
         /// </summary>
         public async Task<bool> ExistsAsync(string id, string rev = null)
         {
-            using (var request = PrepareRequest(id, rev))
-            {
-                var result = await request.HeadAsync();
+            var request = PrepareRequest(id, rev);
+            var result = await request.HeadAsync();
 
-                return result.IsSuccessStatusCode;
-            }
+            return result.IsSuccessStatusCode;
         }
 
         private async Task<bool> _ExistsBySelector(object selector)
