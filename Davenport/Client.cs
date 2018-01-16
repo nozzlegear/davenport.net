@@ -85,7 +85,8 @@ namespace Davenport
 
             CheckAndThrowIfError(flurlRequest, result, rawBody);
 
-            return JsonConvert.DeserializeObject<T>(rawBody);
+            // Use the custom json converter if it exists
+            return JsonConvert.DeserializeObject<T>(rawBody, Config.Converter);
         }
 
         /// <summary>

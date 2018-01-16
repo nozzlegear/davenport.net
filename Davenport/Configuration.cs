@@ -53,6 +53,9 @@ namespace Davenport
         /// </summary>
         public string Password { get; set; }
 
+        /// A custom JsonConverter which will be used when converting to and from json.
+        public JsonConverter Converter { get; set; }
+
         /// <summary>
         /// A warning event fired when CouchDB returns a warning with its response, or when Davenport detects a possible error.
         /// </summary>
@@ -130,8 +133,8 @@ namespace Davenport
             }
         }
 
-        /// Creates the given design docs.
-        /// Will throw an ArgumentException if no indexes are given.
+        /// Creates the given design docs. Will check that each view in each design doc has functions that perfectly match the ones found in the database, and update them if they don't match.
+        /// Will throw an ArgumentException if no design docs are given.
         public static async Task CreateDesignDocsAsync(Configuration config, IEnumerable<DesignDocConfig> designDocs = null)
         {
             foreach (var docConfiguration in designDocs)
