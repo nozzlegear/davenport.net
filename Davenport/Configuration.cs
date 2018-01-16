@@ -61,7 +61,7 @@ namespace Davenport
         /// </summary>
         public event EventHandler<string> Warning;
 
-        public static async Task<bool> IsVersion2OrAboveAsync(Configuration config)
+        public static async Task<string> GetVersionAsync(Configuration config)
         {
             var request = Flurl.Url.Combine(config.CouchUrl).AllowAnyHttpStatus();
             var response = await request.GetAsync();
@@ -72,7 +72,20 @@ namespace Davenport
             }
 
             var infoBody = JsonConvert.DeserializeAnonymousType(await response.Content.ReadAsStringAsync(), new { version = "" });
-            var version = Convert.ToInt32(infoBody.version.Split('.')[0]);
+
+            return infoBody.version;
+        }
+
+        public static async Task<bool> IsVersion2OrAboveAsync(Configuration config)
+        {
+            var versionStr = await GetVersionAsync(config);
+
+            return IsVersion2OrAbove(versionStr);
+        }
+
+        public static bool IsVersion2OrAbove(string versionStr)
+        {
+            var version = Convert.ToInt32(versionStr.Split('.')[0]);
 
             return version >= 2;
         }
@@ -223,11 +236,11 @@ namespace Davenport
         /// Configures a Davenport client and database by validating the CouchDB version, creating indexes and design documents, and then returning a client to interact with the database.
         public static async Task<Client<DocumentType>> ConfigureDatabaseAsync<DocumentType>(Configuration config, IEnumerable<string> indexes = null, IEnumerable<DesignDocConfig> designDocs = null) where DocumentType : CouchDoc
         {
-            var isVersion2 = await IsVersion2OrAboveAsync(config);
+            var version = await GetVersionAsync(config);
 
-            if (!isVersion2)
+            if (!IsVersion2OrAbove(version))
             {
-                config.InvokeWarningEvent(config, $"Warning: Davenport expects your CouchDB instance to be running CouchDB 2.0 or higher. Version detected: {infoBody.version}. Some database methods may not work.");
+                config.InvokeWarningEvent(config, $"Warning: Davenport expects your CouchDB instance to be running CouchDB 2.0 or higher. Version detected: {version}. Some database methods may not work.");
             }
 
             await CreateDatabaseAsync(config);
