@@ -255,7 +255,7 @@ let findByMap<'doctype> (selector: Map<string, obj>) (findOptions: FindOptions o
     |> asyncMapSeq (fun doc -> Option.get doc.Data)
 
 /// Searches for documents matching the given selector.
-/// Usage: findByExpr<DocType> (<@ (c: DocType) -> c.SomeProp = SomeValue @>)
+/// Usage: findByExpr<DocType> (<@ fun (c: DocType) -> c.SomeProp = SomeValue @>)
 /// NOTE: Davenport currently only supports simple 1 argument selectors.
 let findByExpr<'doctype> (selector: Expr<('doctype -> bool)>) (findOptions: FindOptions option) props =
     let client = toClient<'doctype> props
@@ -291,7 +291,7 @@ let countByMap (selector: Map<string, obj>) props =
     |> Async.AwaitTask
 
 /// Retrieves a count of all documents matching the given selector.
-/// Usage: countByExpr<DocType> (<@ (c: DocType) -> c.SomeProp = SomeValue @>)
+/// Usage: countByExpr<DocType> (<@ fun (c: DocType) -> c.SomeProp = SomeValue @>)
 /// NOTE: Davenport currently only supports simple 1 argument selectors.
 let countByExpr (selector: Expr<('doctype -> bool)>) props =
     let client = toClient props
@@ -323,7 +323,7 @@ let existsByMap (m: Map<string, obj>) props =
     |> Async.AwaitTask
 
 /// Checks that a document matching the given selector exists.
-/// Usage: existsByExpr<DocType> (<@ (c: DocType) -> c.SomeProp = SomeValue @>)
+/// Usage: existsByExpr<DocType> (<@ fun (c: DocType) -> c.SomeProp = SomeValue @>)
 /// NOTE: Davenport currently only supports simple 1 argument selectors.
 let existsByExpr<'doctype> (selector: Expr<('doctype -> bool)>) props =
     let client = toClient props
