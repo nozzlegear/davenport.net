@@ -155,7 +155,7 @@ let deleteDatabase props =
     client.DeleteDatabaseAsync()
     |> Async.AwaitTask
 
-/// Creates the given document and assigns a random id. If you want to choose the id, use the update function with no revision.
+/// Creates the given document and assigns a random id. If you want to choose the id, use the createWithId.
 let create<'doctype> data props =
     let client = toClient<'doctype> props
     let doc = FsDoc()
@@ -165,17 +165,26 @@ let create<'doctype> data props =
     |> Async.AwaitTask
     |> asyncMap convertPostPutCopyResponse
 
-/// Updates *or creates* the document with the given id.
-let update<'doctype> id data (rev: string option) props =
+/// Creates the document using the given id. This will result in a 409 conflict error if the id is already taken.
+let createWithId<'doctype> id data props =
     let client = toClient<'doctype> props
     let doc = FsDoc()
     doc.Data <- Some data
 
-    // I prefer not to add Async.Catch to everything in the package, but in cases where it may be likely to fail (e.g. the id is already taken) it makes sense.
-    client.PutAsync(id, doc, Option.toObj rev)
+    // Passing a null rev to the PutAsync function will create the doc using the specified id.
+    client.PutAsync(id, doc, null)
     |> Async.AwaitTask
     |> asyncMap convertPostPutCopyResponse
-    |> Async.Catch
+
+/// Updates the document with the given id and revision.
+let update<'doctype> id rev data props =
+    let client = toClient<'doctype> props
+    let doc = FsDoc()
+    doc.Data <- Some data
+
+    client.PutAsync(id, doc, rev)
+    |> Async.AwaitTask
+    |> asyncMap convertPostPutCopyResponse
 
 /// Copies the document with the oldId and assigns the newId to the copy.
 let copy oldId newId props =
