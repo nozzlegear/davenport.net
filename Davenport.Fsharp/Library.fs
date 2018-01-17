@@ -55,13 +55,15 @@ let private toConfig<'doctype> (props: CouchProps) =
 
 let private toClient<'doctype> = toConfig<'doctype> >> Davenport.Client<FsDoc<'doctype>>
 
-/// Converts an F# expression to a LINQ expression
-/// Source: https://stackoverflow.com/a/23390583
-let private toLinq (expr : Expr<'a -> 'b>) =
-      let linq = LeafExpressionConverter.QuotationToExpression expr
-      let call = linq :?> MethodCallExpression
-      let lambda = call.Arguments.[0] :?> LambdaExpression
-      Expression.Lambda<Func<'a, 'b>>(lambda.Body, lambda.Parameters)
+/// Converts an F# expression to a LINQ expression, then converts that LINQ expression to a Map<string, Find> due to an incompatibility with the FsDoc and the types expected by Find, Exists and CountByExpression functions.
+let private convertExprToMap<'a> (expr : Expr<'a -> bool>) =
+    /// Source: https://stackoverflow.com/a/23390583
+    let linq = LeafExpressionConverter.QuotationToExpression expr
+    let call = linq :?> MethodCallExpression
+    let lambda = call.Arguments.[0] :?> LambdaExpression
+
+    Expression.Lambda<Func<'a, bool>>(lambda.Body, lambda.Parameters)
+    |> Davenport.Infrastructure.ExpressionParser.Parse
 
 let private listedRowToDoctypeRow<'doctype> (row: ListedRow<FsDoc<'doctype>>) =
     let newRow = ListedRow<'doctype>()
@@ -72,7 +74,7 @@ let private listedRowToDoctypeRow<'doctype> (row: ListedRow<FsDoc<'doctype>>) =
 
     newRow
 
-let private convertMapExpr (map: Map<string, Find>) =
+let private convertMapToDict (map: Map<string, Find>) =
     Map.map (fun _ (value: Find) -> value.ToFindExpression()) map
     |> Map.toSeq
     |> dict
@@ -245,36 +247,21 @@ let listWithoutDocs (listOptions: ListOptions option) props =
     client.ListWithoutDocsAsync options
     |> Async.AwaitTask
 
-/// Searches for documents matching the given selector.
-let findByMap<'doctype> (selector: Map<string, obj>) (findOptions: FindOptions option) props =
+let private findByDictionary<'doctype> selector (findOptions: FindOptions option) props =
     let client = toClient<'doctype> props
     let options = Option.toObj findOptions
 
-    client.FindAsync(selector, options)
+    client.FindBySelectorAsync (selector, options)
     |> Async.AwaitTask
     |> asyncMapSeq (fun doc -> Option.get doc.Data)
+
+/// Searches for documents matching the given selector.
+let findBySelector<'doctype> = convertMapToDict >> findByDictionary<'doctype>
 
 /// Searches for documents matching the given selector.
 /// Usage: findByExpr<DocType> (<@ fun (c: DocType) -> c.SomeProp = SomeValue @>)
 /// NOTE: Davenport currently only supports simple 1 argument selectors.
-let findByExpr<'doctype> (selector: Expr<('doctype -> bool)>) (findOptions: FindOptions option) props =
-    let client = toClient<'doctype> props
-    let options = Option.toObj findOptions
-    let expr = toLinq selector
-
-    client.FindAsync(expr, options)
-    |> Async.AwaitTask
-    |> asyncMapSeq (fun doc -> Option.get doc.Data)
-
-/// Searches for documents matching the given selector.
-let findByMapExpr<'doctype> map (findOptions: FindOptions option) props =
-    let client = toClient<'doctype> props
-    let options = Option.toObj findOptions
-    let selector = convertMapExpr map
-
-    client.FindAsync(selector, options)
-    |> Async.AwaitTask
-    |> asyncMapSeq (fun doc -> Option.get doc.Data)
+let findByExpr<'doctype> = convertExprToMap<'doctype> >> findByDictionary<'doctype>
 
 /// Returns a count of all documents, *including design documents*.
 let count props =
@@ -283,30 +270,19 @@ let count props =
     client.CountAsync()
     |> Async.AwaitTask
 
-/// Retrieves a count of all documents matching the given selector.
-let countByMap (selector: Map<string, obj>) props =
+let private countByDictionary selector props =
     let client = toClient props
 
     client.CountBySelectorAsync selector
     |> Async.AwaitTask
 
 /// Retrieves a count of all documents matching the given selector.
-/// Usage: countByExpr<DocType> (<@ fun (c: DocType) -> c.SomeProp = SomeValue @>)
-/// NOTE: Davenport currently only supports simple 1 argument selectors.
-let countByExpr (selector: Expr<('doctype -> bool)>) props =
-    let client = toClient props
-    let expr = toLinq selector
-
-    client.CountBySelectorAsync(expr)
-    |> Async.AwaitTask
+let countBySelector = convertMapToDict >> countByDictionary
 
 /// Retrieves a count of all documents matching the given selector.
-let countByMapExpr map props =
-    let client = toClient props
-    let selector = convertMapExpr map
-
-    client.CountBySelectorAsync(selector)
-    |> Async.AwaitTask
+/// Usage: countByExpr<DocType> (<@ fun (c: DocType) -> c.SomeProp = SomeValue @>)
+/// NOTE: Davenport currently only supports simple 1 argument selectors.
+let countByExpr<'doctype> = convertExprToMap<'doctype> >> countByDictionary
 
 /// Checks whether a document with the given id exists. If a revision is given, it will check whether that specific version exists.
 let exists id (rev: string option) props =
@@ -315,27 +291,16 @@ let exists id (rev: string option) props =
     client.ExistsAsync(id, Option.toObj rev)
     |> Async.AwaitTask
 
-/// Checks that a document matching the given selector exists.
-let existsByMap (m: Map<string, obj>) props =
+let private existsByDictionary selector props =
     let client = toClient props
 
-    client.ExistsBySelector m
+    client.ExistsBySelectorAsync selector
     |> Async.AwaitTask
+
+/// Checks that a document matching the given selector exists.
+let existsBySelector = convertMapToDict >> existsByDictionary
 
 /// Checks that a document matching the given selector exists.
 /// Usage: existsByExpr<DocType> (<@ fun (c: DocType) -> c.SomeProp = SomeValue @>)
 /// NOTE: Davenport currently only supports simple 1 argument selectors.
-let existsByExpr<'doctype> (selector: Expr<('doctype -> bool)>) props =
-    let client = toClient props
-    let expr = toLinq selector
-
-    client.ExistsBySelector expr
-    |> Async.AwaitTask
-
-/// Checks that a document matching the given selector exists.
-let existsByMapExpr<'doctype> map props =
-    let client = toClient props
-    let selector = convertMapExpr map
-
-    client.ExistsBySelector selector
-    |> Async.AwaitTask
+let existsByExpr<'doctype> = convertExprToMap<'doctype> >> existsByDictionary
