@@ -36,14 +36,7 @@ namespace Davenport
 
         protected IFlurlRequest PrepareRequest(string path, string rev = null)
         {
-            var couchUrl = Config.CouchUrl;
-
-            if (!couchUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && !couchUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-            {
-                couchUrl = "http://" + couchUrl;
-            }
-
-            var request = Url.Combine(couchUrl, Config.DatabaseName, path).AllowAnyHttpStatus();
+            var request = Url.Combine(Config.CouchUrl, Config.DatabaseName, path).AllowAnyHttpStatus();
 
             if (!string.IsNullOrEmpty(Config.Username) && !string.IsNullOrEmpty(Config.Password))
             {

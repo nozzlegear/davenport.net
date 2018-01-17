@@ -19,6 +19,11 @@ namespace Davenport
         /// <param name="databaseName">The name of your database. Should be URL compatible.</param>
         public Configuration(string couchUrl, string databaseName)
         {
+            if (!couchUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && !couchUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                couchUrl = "http://" + couchUrl;
+            }
+
             if (!Uri.IsWellFormedUriString(couchUrl, UriKind.Absolute))
             {
                 throw new ArgumentException($"{nameof(couchUrl)} is not a well formed uri string.");
