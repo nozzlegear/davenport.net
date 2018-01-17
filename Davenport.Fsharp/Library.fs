@@ -330,14 +330,3 @@ let existsByMapExpr<'doctype> map props =
 
     client.ExistsBySelector selector
     |> Async.AwaitTask
-
-// TESTING BELOW
-
-type MyRandoType = { MyId: string; MyRev: string; Foo: bool; Bar: int }
-
-let result =
-   "localhost:5984"
-    |> database "henlo_world"
-    |> idName "MyId"
-    |> revName "MyRev"
-    |> listWithDocs<MyRandoType> None
