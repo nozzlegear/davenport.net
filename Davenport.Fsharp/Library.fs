@@ -166,8 +166,10 @@ let create<'doctype> data props =
     |> asyncMap convertPostPutCopyResponse
 
 /// Updates *or creates* the document with the given id.
-let update<'doctype> id doc (rev: string option) props =
+let update<'doctype> id data (rev: string option) props =
     let client = toClient<'doctype> props
+    let doc = FsDoc()
+    doc.Data <- Some data
 
     // I prefer not to add Async.Catch to everything in the package, but in cases where it may be likely to fail (e.g. the id is already taken) it makes sense.
     client.PutAsync(id, doc, Option.toObj rev)
