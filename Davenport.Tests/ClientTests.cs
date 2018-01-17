@@ -61,12 +61,12 @@ namespace Davenport.Tests
             Assert.True(count > 0);
         }
 
-        [Fact(DisplayName = "Client CountWithExpressionAsync"), Trait("Category", "Client")]
-        public async Task CountWithExpressionAsync()
+        [Fact(DisplayName = "Client CountByExpressionAsync"), Trait("Category", "Client")]
+        public async Task CountByExpressionAsync()
         {
             await Client.PostAsync(ExampleClass);
 
-            var count = await Client.CountBySelectorAsync(doc => doc.Foo == "test value 2");
+            var count = await Client.CountByExpressionAsync(doc => doc.Foo == "test value 2");
             var totalCount = await Client.CountAsync();
 
             Assert.True(count > 0);
@@ -139,14 +139,14 @@ namespace Davenport.Tests
             Assert.True(list.DesignDocs.All(doc => doc.Doc != null), "All design doc documents should not be null."); ;
         }
 
-        [Fact(DisplayName = "Client FindLambdaAsync"), Trait("Category", "Client")]
-        public async Task FindLambdaAsync()
+        [Fact(DisplayName = "Client FindByExpressionAsync"), Trait("Category", "Client")]
+        public async Task FindByExpressionAsync()
         {
             var created = await Client.PostAsync(new MyTestClass()
             {
                 Foo = "test value 2"
             });
-            var equalsResult = await Client.FindAsync(doc => doc.Foo == "test value 2");
+            var equalsResult = await Client.FindByExpressionAsync(doc => doc.Foo == "test value 2");
 
             Assert.NotNull(equalsResult);
             Assert.True(equalsResult.All(row => row.Foo == "test value 2"));
@@ -157,7 +157,7 @@ namespace Davenport.Tests
             {
                 Foo = "test value"
             });
-            var notEqualsResult = await Client.FindAsync(doc => doc.Foo != "test value 2");
+            var notEqualsResult = await Client.FindByExpressionAsync(doc => doc.Foo != "test value 2");
 
             Assert.NotNull(notEqualsResult);
             Assert.True(notEqualsResult.All(row => row.Foo != "test value 2"));
@@ -165,14 +165,14 @@ namespace Davenport.Tests
             Assert.True(notEqualsResult.All(row => !string.IsNullOrEmpty(row.Rev)));
         }
 
-        [Fact(DisplayName = "Client FindDictionaryAsync"), Trait("Category", "Client")]
-        public async Task FindDictionaryAsync()
+        [Fact(DisplayName = "Client FindByDictionaryAsync"), Trait("Category", "Client")]
+        public async Task FindByDictionaryAsync()
         {
             var created = await Client.PostAsync(new MyTestClass()
             {
                 Foo = "test value 2"
             });
-            var equalsResult = await Client.FindAsync(new Dictionary<string, FindExpression>()
+            var equalsResult = await Client.FindBySelectorAsync(new Dictionary<string, FindExpression>()
             {
                 { "Foo", new FindExpression(ExpressionType.Equal, "test value 2") }
             });
@@ -186,7 +186,7 @@ namespace Davenport.Tests
             {
                 Foo = "test value"
             });
-            var notEqualsResult = await Client.FindAsync(new Dictionary<string, FindExpression>()
+            var notEqualsResult = await Client.FindBySelectorAsync(new Dictionary<string, FindExpression>()
             {
                 { "Foo", new FindExpression(ExpressionType.NotEqual, "test value 2") }
             });
@@ -197,14 +197,14 @@ namespace Davenport.Tests
             Assert.True(notEqualsResult.All(row => !string.IsNullOrEmpty(row.Rev)));
         }
 
-        [Fact(DisplayName = "Client FindObjectAsync"), Trait("Category", "Client")]
-        public async Task FindObjectAsync()
+        [Fact(DisplayName = "Client FindByObjectAsync"), Trait("Category", "Client")]
+        public async Task FindByObjectAsync()
         {
             var created = await Client.PostAsync(new MyTestClass()
             {
                 Foo = "test value 2"
             });
-            var equalsResult = await Client.FindAsync(new
+            var equalsResult = await Client.FindByObjectAsync(new
             {
                 Foo = new Dictionary<string, object>
                 {
@@ -221,7 +221,7 @@ namespace Davenport.Tests
             {
                 Foo = "test value"
             });
-            var notEqualsResult = await Client.FindAsync(new
+            var notEqualsResult = await Client.FindByObjectAsync(new
             {
                 Foo = new Dictionary<string, object>
                 {
@@ -253,7 +253,7 @@ namespace Davenport.Tests
             {
                 Foo = "test value 2"
             });
-            var exists = await Client.ExistsBySelector(doc => doc.Foo == "test value 2");
+            var exists = await Client.ExistsByExpressionAsync(doc => doc.Foo == "test value 2");
 
             Assert.True(exists);
         }
@@ -265,7 +265,7 @@ namespace Davenport.Tests
             {
                 Foo = "test value 2"
             });
-            var exists = await Client.ExistsBySelector(new Dictionary<string, FindExpression>()
+            var exists = await Client.ExistsBySelectorAsync(new Dictionary<string, FindExpression>()
             {
                 { "Foo", new FindExpression(ExpressionType.Equal, "test value 2") }
             });
@@ -280,7 +280,7 @@ namespace Davenport.Tests
             {
                 Foo = "test value 2"
             });
-            var exists = await Client.ExistsBySelector(new
+            var exists = await Client.ExistsByObjectAsync(new
             {
                 Foo = new Dictionary<string, object>
                 {
