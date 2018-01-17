@@ -3,6 +3,13 @@ module Davenport.Fsharp.Infrastructure
 open Newtonsoft.Json
 open Newtonsoft.Json.Linq
 
+/// Translates the C# PostPutCopyResponse, which contains a nullable book Ok prop, to F# removing the nullable bool.
+type FsPostPutCopyResponse = {
+    Id: string
+    Rev: string
+    Ok: bool
+}
+
 /// This type is combined with the custom json converter to allow consumers of this package to pass any F# record type to Davenport without turning their records into classes that inherit couchdoc.
 type FsDoc<'doctype>() =
     inherit Davenport.Entities.CouchDoc()

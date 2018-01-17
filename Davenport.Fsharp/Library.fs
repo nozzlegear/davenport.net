@@ -78,6 +78,12 @@ let private convertMapExpr (map: Map<string, Find>) =
     |> dict
     :?> Collections.Generic.Dictionary<string, FindExpression>
 
+let private convertPostPutCopyResponse (r: PostPutCopyResponse) =
+    // Convert 'Ok' prop to false if it's null.
+    { Id = r.Id
+      Rev = r.Rev
+      Ok = Option.ofNullable r.Ok |> Option.defaultValue false }
+
 let private asyncMap (fn: 't -> 'u) task = async {
     let! result = task
 
@@ -157,6 +163,7 @@ let create<'doctype> data props =
 
     client.PostAsync doc
     |> Async.AwaitTask
+    |> asyncMap convertPostPutCopyResponse
 
 /// Updates *or creates* the document with the given id.
 let update<'doctype> id doc (rev: string option) props =
@@ -165,6 +172,7 @@ let update<'doctype> id doc (rev: string option) props =
     // I prefer not to add Async.Catch to everything in the package, but in cases where it may be likely to fail (e.g. the id is already taken) it makes sense.
     client.PutAsync(id, doc, Option.toObj rev)
     |> Async.AwaitTask
+    |> asyncMap convertPostPutCopyResponse
     |> Async.Catch
 
 /// Copies the document with the oldId and assigns the newId to the copy.
@@ -173,6 +181,7 @@ let copy oldId newId props =
 
     client.CopyAsync(oldId, newId)
     |> Async.AwaitTask
+    |> asyncMap convertPostPutCopyResponse
 
 /// Deletes the document with the given id and revision.
 let delete id rev props =
