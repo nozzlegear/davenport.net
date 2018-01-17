@@ -131,7 +131,7 @@ namespace Davenport
         /// <summary>
         /// Searches for documents matching the given selector. NOTE: Davenport currently only supports simple 1 argument selectors, e.g. x => x.Foo == "value".
         /// </summary>
-        public async Task<IEnumerable<DocumentType>> FindAsync(Expression<Func<DocumentType, bool>> expression, FindOptions options = null)
+        public async Task<IEnumerable<DocumentType>> FindByExpressionAsync(Expression<Func<DocumentType, bool>> expression, FindOptions options = null)
         {
             return await _FindAsync(ExpressionParser.Parse(expression), options?.ToDictionary() ?? new Dictionary<string, object>());
         }
@@ -139,7 +139,7 @@ namespace Davenport
         /// <summary>
         /// Searches for documents matching the given selector.
         /// </summary>
-        public async Task<IEnumerable<DocumentType>> FindAsync(object selector, FindOptions options = null)
+        public async Task<IEnumerable<DocumentType>> FindByObjectAsync(object selector, FindOptions options = null)
         {
             return await _FindAsync(selector, options?.ToDictionary() ?? new Dictionary<string, object>());
         }
@@ -147,7 +147,7 @@ namespace Davenport
         /// <summary>
         /// Searches for documents matching the given selector.
         /// </summary>
-        public async Task<IEnumerable<DocumentType>> FindAsync(Dictionary<string, FindExpression> selector, FindOptions options = null)
+        public async Task<IEnumerable<DocumentType>> FindBySelectorAsync(Dictionary<string, FindExpression> selector, FindOptions options = null)
         {
             return await _FindAsync(selector, options?.ToDictionary() ?? new Dictionary<string, object>());
         }
@@ -165,10 +165,10 @@ namespace Davenport
             return list.TotalRows;
         }
 
-        private async Task<int> _CountBySelectorAsync(object selector)
+        private async Task<int> _CountByAsync(object selector)
         {
             // Selectors must use the Find API, which means they must return documents too. Limit the bandwidth by just returning _id.
-            var result = await FindAsync(selector, new FindOptions()
+            var result = await FindByObjectAsync(selector, new FindOptions()
             {
                 Fields = new string[] { "_id" }
             });
@@ -179,17 +179,17 @@ namespace Davenport
         /// <summary>
         /// Retrieves a count of all documents matching the given selector. NOTE: Davenport currently only supports simple 1 argument selectors, e.g. x => x.Foo == "value".
         /// </summary>
-        public async Task<int> CountBySelectorAsync(Expression<Func<DocumentType, bool>> expression)
+        public async Task<int> CountByExpressionAsync(Expression<Func<DocumentType, bool>> expression)
         {
-            return await _CountBySelectorAsync(ExpressionParser.Parse(expression));
+            return await _CountByAsync(ExpressionParser.Parse(expression));
         }
 
         /// <summary>
         /// Retrieves a count of all documents matching the given selector.
         /// </summary>
-        public async Task<int> CountBySelectorAsync(object selector)
+        public async Task<int> CountByObjectAsync(object selector)
         {
-            return await _CountBySelectorAsync(selector);
+            return await _CountByAsync(selector);
         }
 
         /// <summary>
@@ -197,7 +197,7 @@ namespace Davenport
         /// </summary>
         public async Task<int> CountBySelectorAsync(Dictionary<string, FindExpression> selector)
         {
-            return await _CountBySelectorAsync(selector);
+            return await _CountByAsync(selector);
         }
 
         (List<ListedRow<object>> DesignDocs, List<ListedRow<T>> Docs) _SortDocuments<T>(ListResponse<JToken> docs)
@@ -322,9 +322,9 @@ namespace Davenport
             return result.IsSuccessStatusCode;
         }
 
-        private async Task<bool> _ExistsBySelector(object selector)
+        private async Task<bool> _ExistsByAsync(object selector)
         {
-            var result = await FindAsync(selector, new FindOptions()
+            var result = await FindByObjectAsync(selector, new FindOptions()
             {
                 Fields = new string[] { "_id" },
                 Limit = 1
@@ -336,25 +336,25 @@ namespace Davenport
         /// <summary>
         /// Checks that a document matching the given selector exists. NOTE: Davenport currently only supports simple 1 argument selectors, e.g. x => x.Foo == "value".
         /// </summary>
-        public async Task<bool> ExistsBySelector(Expression<Func<DocumentType, bool>> expression)
+        public async Task<bool> ExistsByExpressionAsync(Expression<Func<DocumentType, bool>> expression)
         {
-            return await _ExistsBySelector(ExpressionParser.Parse(expression));
+            return await _ExistsByAsync(ExpressionParser.Parse(expression));
         }
 
         /// <summary>
         /// Checks that a document matching the given selector exists.
         /// </summary>
-        public async Task<bool> ExistsBySelector(object selector)
+        public async Task<bool> ExistsByObjectAsync(object selector)
         {
-            return await _ExistsBySelector(selector);
+            return await _ExistsByAsync(selector);
         }
 
         /// <summary>
         /// Checks that a document matching the given selector exists.
         /// </summary>
-        public async Task<bool> ExistsBySelector(Dictionary<string, FindExpression> selector)
+        public async Task<bool> ExistsBySelectorAsync(Dictionary<string, FindExpression> selector)
         {
-            return await _ExistsBySelector(selector);
+            return await _ExistsByAsync(selector);
         }
 
         /// <summary>
