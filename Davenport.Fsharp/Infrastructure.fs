@@ -69,7 +69,7 @@ type FsConverter<'doctype>(idField: string, revField: string, customConverter: J
         writer.WriteStartObject()
 
         // Load the data object into a JObject
-        let j = JObject.FromObject doc.Data
+        let j = Option.get doc.Data |> JObject.FromObject
 
         // Find the data object's id and rev fields.
         // A JObject field will be null if it doesn't exist, but will return a JToken with Null value if the field does exist and it's null.
