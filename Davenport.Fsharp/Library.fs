@@ -76,9 +76,7 @@ let private listedRowToDoctypeRow<'doctype> (row: ListedRow<FsDoc<'doctype>>) =
 
 let private convertMapToDict (map: Map<string, Find>) =
     Map.map (fun _ (value: Find) -> value.ToFindExpression()) map
-    |> Map.toSeq
-    |> dict
-    :?> Collections.Generic.Dictionary<string, FindExpression>
+    |> Collections.Generic.Dictionary
 
 let private convertPostPutCopyResponse (r: PostPutCopyResponse) =
     // Convert 'Ok' prop to false if it's null.
