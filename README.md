@@ -29,7 +29,7 @@ Once configured, Davenport will return an instance of `Client` that's ready to u
 ```cs
 // Create a Find index on the "Foo" property of documents in this database.
 string[] indexes = { "Foo" };
-var designDocs = new DesignDocConfig[] 
+var designDocs = new DesignDocConfig[]
 {
     new DesignDocConfig()
     {
@@ -65,7 +65,7 @@ catch (DavenportException ex)
 }
 ```
 
-It should be noted that configuring the design docs and their views is a **"dumb"** process. Davenport will check to see if the design documents you gave it match the ones that exist on your database **exactly**. That is to say, if you have a design doc named `list` on your database, and it has a view called `list-foos`, Davenport will check that the map and reduce functions match the ones you passed it *exactly, to the letter*. If not, Davenport will overwrite the view's map and reduce functions with the ones you gave it. 
+It should be noted that configuring the design docs and their views is a **"dumb"** process. Davenport will check to see if the design documents you gave it match the ones that exist on your database **exactly**. That is to say, if you have a design doc named `list` on your database, and it has a view called `list-foos`, Davenport will check that the map and reduce functions match the ones you passed it *exactly, to the letter*. If not, Davenport will overwrite the view's map and reduce functions with the ones you gave it.
 
 Davenport **does not** delete design documents that it encounters but weren't listed in your configuration. It will simply skip them.
 
@@ -81,7 +81,7 @@ All CouchDB documents are assigned an `_id` and `_rev` parameter on every create
 
 ## JSON serialization
 
-Like many .NET packages, Davenport uses Newtonsoft.Json to handle de/serialization to and from JSON. That means your document classes can use the entire cadre of Json.Net attributes and serializers on your properties. 
+Like many .NET packages, Davenport uses Newtonsoft.Json to handle de/serialization to and from JSON. That means your document classes can use the entire cadre of Json.Net attributes and serializers on your properties.
 
 For example, you can use the `[JsonProperty("foo")]` attribute on a `Foo` property, which forces the property name to `foo` when sent to your database, and deserializes it back to `Foo` when returned. This is what Davenport uses internally to map `Id` and `Rev` on the `CouchDoc` class to `_id` and `_rev` in CouchDB.
 
@@ -95,7 +95,7 @@ public class MyClass : Davenport.CouchDoc
 }
 ```
 
-**Davenport is configured to ignore null property values when serializing and deserializing**. 
+**Davenport is configured to ignore null property values when serializing and deserializing**.
 
 ## Warnings
 
@@ -106,7 +106,7 @@ var config = new Configuration("http://localhost:5984", "database_name");
 var client = new Client<DocumentType>(config);
 
 // Wire up the Warning event:
-config.Warning += (object sender, string message) => 
+config.Warning += (object sender, string message) =>
 {
     // Do whatever you want with the warning message.
     Console.WriteLine(message);
@@ -115,11 +115,11 @@ config.Warning += (object sender, string message) =>
 
 There are four different events that will create a warning message:
 
-1. You executed a `FindAsync` operation and looked up documents based on indexes (properties) that weren't configured in your database. 
+1. You executed a `FindBy*Async` operation and looked up documents based on indexes (properties) that weren't configured in your database.
     - Hint: You can use `Davenport.Configuration.ConfigureDatabaseAsync` to create indexes. Using indexes improves the performance of your `FindAsync` calls.
 2. Davenport is updating or creating a design doc when configuring a database.
 3. Your CouchDB installation is using a version less than 2.0.0.
-    - If this is the case, you won't be able to use `FindAsync` methods, or any other Davenport methods that use `FindAsync` internally, e.g. `ExistsBySelectorAsync` and `CountBySelectorAsync`.
+    - If this is the case, you won't be able to use `FindBy*Async` methods, or any other Davenport methods that use `FindBy*Async` internally, e.g. `ExistsBy*Async` and `CountBy*Async`.
 4. You're attempting to delete a document with `DeleteAsync`, but you don't pass a document revision id.
     - In some cases, this may cause a document conflict error.
 

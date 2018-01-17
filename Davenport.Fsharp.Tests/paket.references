@@ -1,0 +1,4 @@
+fsharp.core
+Expecto
+Expecto.BenchmarkDotNet
+Expecto.FsCheck

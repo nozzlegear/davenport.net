@@ -10,3 +10,6 @@ nuget xunit.runner.visualstudio
 nuget fsharp.core
 nuget newtonsoft.json
 nuget fable.jsonconverter
+nuget Expecto
+nuget Expecto.BenchmarkDotNet
+nuget Expecto.FsCheck

@@ -20,7 +20,9 @@ type FsConverter<'doctype>(idField: string, revField: string, customConverter: J
 
     let dataConverter = Option.defaultWith (fun _ -> Fable.JsonConverter() :> JsonConverter) customConverter
 
-    override __.CanConvert objectType = objectType = typeof<FsDoc<'doctype>>
+    override __.CanConvert objectType =
+        // TODO: Indicate that this jsonconverter will deserialize Davenport.Entities.ListedRows, else List requests will fail to deserialize.
+        objectType = typeof<FsDoc<'doctype>>
 
     override __.ReadJson(reader: JsonReader, objectType: System.Type, existingValue: obj, serializer: JsonSerializer) =
         let j = JObject.Load reader
