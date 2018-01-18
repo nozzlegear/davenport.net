@@ -70,7 +70,7 @@ namespace Davenport.Tests
             var totalCount = await Client.CountAsync();
 
             Assert.True(count > 0);
-            Assert.True(totalCount > count);
+            Assert.True(totalCount >= count);
         }
 
         [Fact(DisplayName = "Client PutAsync"), Trait("Category", "Client")]
