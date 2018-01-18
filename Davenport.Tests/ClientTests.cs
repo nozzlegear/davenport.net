@@ -36,11 +36,11 @@ namespace Davenport.Tests
             var created = await Fixture.Client.PostAsync(ExampleClass);
             var doc = await Fixture.Client.GetAsync(created.Id);
 
-            Assert.Equal(doc.Foo, "test value");
+            Assert.Equal("test value", doc.Foo);
             Assert.False(doc.Bar);
-            Assert.Equal(doc.Baz, 11);
+            Assert.Equal(11, doc.Baz);
             Assert.True(doc.Bat.HasValue);
-            Assert.Equal(doc.Bat, 5);
+            Assert.Equal(5, doc.Bat);
         }
 
         [Fact(DisplayName = "Client CountAsync"), Trait("Category", "Client")]
@@ -79,9 +79,9 @@ namespace Davenport.Tests
             var updated = await Fixture.Client.PutAsync(created.Id, retrieved, created.Rev);
             retrieved = await Fixture.Client.GetAsync(updated.Id, updated.Rev);
 
-            Assert.Equal(retrieved.Foo, "test value 2");
+            Assert.Equal("test value 2", retrieved.Foo);
             Assert.True(retrieved.Bar);
-            Assert.Equal(retrieved.Baz, 9);
+            Assert.Equal(9, retrieved.Baz);
             Assert.Null(retrieved.Bat);
             Assert.False(retrieved.Bat.HasValue);
         }
@@ -102,7 +102,7 @@ namespace Davenport.Tests
             var list = await Fixture.Client.ListWithDocsAsync();
 
             Assert.NotNull(list);
-            Assert.Equal(list.Offset, 0);
+            Assert.Equal(0, list.Offset);
             Assert.True(list.Rows.Count() > 0);
             Assert.True(list.DesignDocs.Count() > 0);
             Assert.True(list.Rows.All(row => row.Doc.GetType() == typeof(MyTestClass)));
@@ -121,7 +121,7 @@ namespace Davenport.Tests
             var list = await Fixture.Client.ListWithoutDocsAsync();
 
             Assert.NotNull(list);
-            Assert.Equal(list.Offset, 0);
+            Assert.Equal(0, list.Offset);
             Assert.True(list.Rows.Count() > 0, "Rows.Count should be greater than 0.");
             Assert.True(list.DesignDocs.Count() > 0, "Rows.DesignDocs.Count should be greater than 0.");
             Assert.True(list.Rows.All(row => row.Doc.GetType() == typeof(Revision)), "All row docs should be of type Revision.");
