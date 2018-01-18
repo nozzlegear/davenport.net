@@ -10,16 +10,26 @@ if ($couchOutput.StatusCode -ne 200) {
     throw "CouchDB did not return a 200 OK status code. Did it fail to install?";
 }
 
-$testProj = "Davenport.Tests/Davenport.Tests.csproj";
-$tests = "Parser", "Config", "Client";
+$fsTestProj = "Davenport.Fsharp.Tests/Davenport.Fsharp.Tests.fsproj"
+$csTestProj = "Davenport.Tests/Davenport.Tests.csproj";
+$csTests = "Parser", "Config", "Client";
 
-# Execute all tests, throwing when one fails.
-$tests | % {
-    $output = dotnet test -c Release $testProj --filter Category=$_;
+# Execute all C# tests, throwing when one fails.
+$csTests | % {
+    $output = dotnet test -c Release $csTestProj --filter Category=$_;
 
     echo $output;
 
     if ($LastExitCode -ne 0 -or $output -contains "Test Run Failed.") {
         throw "$testName tests failed with exit code $LastExitCode.";
     }
+}
+
+# Execute F# tests
+$output = dotnet run -c Release -p $fsTestProj
+
+echo $output
+
+if ($LastExitCode -ne 0 -or $output -contains "Test Run Failed.") {
+    throw "F# tests failed with exit code $LastExitCode.";
 }
