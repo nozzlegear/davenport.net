@@ -20,6 +20,18 @@ let defaultRecord = {
     Baz = 11
 }
 
+let viewName = "only-bazs-greater-than-10"
+
+let designDocName = "list"
+
+let defaultDesignDocs =
+    mapFunction "function (doc) { if (doc.Baz > 10) { emit(doc._id, doc); } }"
+    |> reduceFunction "_count"
+    |> view viewName
+    |> toSeq
+    |> designDoc designDocName
+    |> toSeq
+
 let client =
     "localhost:5984"
     |> database "davenport_net_fsharp"
@@ -308,5 +320,19 @@ let tests =
                 |> Async.Ignore
 
             Expect.isTrue called "Warning event was not called"
+        }
+
+        testCaseAsync "Creates design docs and gets view results" <| async {
+            // Make sure the design docs exist
+            do! createDesignDocs defaultDesignDocs client
+            // Create at least one doc that would match
+            let! created = create ({defaultRecord with Baz = 15}) client
+
+            printfn "Created id is %s" created.Id
+
+            let! viewResult = executeView<int> designDocName viewName None client
+
+            Expect.isGreaterThan (Seq.length viewResult) 0 "View should return at least one result"
+            Expect.isGreaterThanOrEqual (viewResult |> Seq.sumBy (fun d -> d.Value)) 10 "The sum of all doc values should be greater than 10"
         }
     ]
