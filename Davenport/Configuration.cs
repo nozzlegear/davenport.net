@@ -165,7 +165,7 @@ namespace Davenport
                 // If CouchDB returns a 404, we'll need to create the design document.
                 if (!getResult.IsSuccessStatusCode && getResult.StatusCode != HttpStatusCode.NotFound)
                 {
-                    throw new DavenportException($"Davenport: Failed to retrieve design doc \"{docConfiguration.Name}\". {getResult.StatusCode} {getResult.ReasonPhrase}")
+                    throw new DavenportException($"Davenport: Failed to retrieve design doc \"{docConfiguration.Name}\". {(int)getResult.StatusCode} {getResult.ReasonPhrase}")
                     {
                         StatusCode = (int)getResult.StatusCode,
                         StatusText = getResult.ReasonPhrase,
@@ -226,7 +226,7 @@ namespace Davenport
 
                     if (!response.IsSuccessStatusCode)
                     {
-                        throw new DavenportException($"Could not create or update CouchDB design doc \"{docConfiguration.Name}\". {response.StatusCode} {response.ReasonPhrase}")
+                        throw new DavenportException($"Could not create or update CouchDB design doc \"{docConfiguration.Name}\". {(int)response.StatusCode} {response.ReasonPhrase}")
                         {
                             StatusCode = (int)response.StatusCode,
                             StatusText = response.ReasonPhrase,
