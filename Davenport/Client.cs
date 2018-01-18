@@ -218,6 +218,14 @@ namespace Davenport
                 designDocs.Add(row);
             }
 
+            // Create a jsonserializer that uses the customconverter if applicable. This serializer will be used to convert docs
+            var serializer = new JsonSerializer();
+
+            if (Config.Converter != null)
+            {
+                serializer.Converters.Add(Config.Converter);
+            }
+
             foreach (var doc in docs.Rows.Where(r => !r.Id.StartsWith("_design")))
             {
                 var row = new ListedRow<T>()
@@ -225,7 +233,7 @@ namespace Davenport
                     Id = doc.Id,
                     Key = doc.Key,
                     Value = doc.Value,
-                    Doc = doc.Doc != null ? doc.Doc.ToObject<T>() : default(T)
+                    Doc = doc.Doc != null ? doc.Doc.ToObject<T>(serializer) : default(T)
                 };
 
                 rows.Add(row);
