@@ -164,8 +164,6 @@ let tests =
         }
 
         testCaseAsync "Lists with docs" <| async {
-            skiptest "FsJsonConverter must be adjusted to parse ListedRow<FsDoc<DocType>>"
-
             // Create at least one doc to list
             do! create defaultRecord client |> Async.Ignore
 
@@ -173,17 +171,14 @@ let tests =
 
             Expect.equal list.Offset 0 "List offset is not 0."
             Expect.isNonEmpty list.Rows "List is empty."
-            Expect.all list.Rows (fun r -> r.Doc.GetType() <> typeof<MyTestClass>) "All docs should be of type MyTestClass"
+            Expect.all list.Rows (fun r -> r.Doc.GetType() = typeof<MyTestClass>) "All docs should be of type MyTestClass"
             Expect.all list.Rows (fun r -> not <| r.Id.StartsWith "_design") "No doc should start with _design"
             Expect.all list.Rows (fun r -> not <| String.IsNullOrEmpty r.Doc.MyId) "No doc should have an empty id"
             Expect.all list.Rows (fun r -> not <| String.IsNullOrEmpty r.Doc.MyRev) "No doc should have an empty rev"
         }
 
         testCaseAsync "Lists without docs" <| async {
-            skiptest "FsJsonConverter must be adjusted to parse ListedRow<FsDoc<DocType>>"
-
             // Create at least one doc to list
-
             do! create defaultRecord client |> Async.Ignore
 
             let! list = listWithoutDocs None client
