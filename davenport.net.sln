@@ -7,7 +7,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "davenport", "Davenport\dave
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Davenport.Tests", "Davenport.Tests\Davenport.Tests.csproj", "{80508D26-7BDE-4251-AEE6-5F0E36F9D269}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Davenport.fsharp", "Davenport.Fsharp\Davenport.fsharp.fsproj", "{25E65E1B-5AED-4AE4-8DF1-5BB0757C30E1}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Davenport.Fsharp", "Davenport.Fsharp\Davenport.Fsharp.fsproj", "{25E65E1B-5AED-4AE4-8DF1-5BB0757C30E1}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Davenport.Fsharp.Tests", "Davenport.Fsharp.Tests\Davenport.Fsharp.Tests.fsproj", "{AC0FFB4B-04CF-431C-9BBE-567809865B25}"
 EndProject
