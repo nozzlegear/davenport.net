@@ -37,6 +37,11 @@ type CouchProps = private {
     onWarning: (IEvent<EventHandler<string>,string> -> unit) option
 }
 
+type ViewProps = private {
+    map: string option
+    reduce: string option
+}
+
 let private defaultCouchProps() = {
         username = None
         password = None
@@ -47,6 +52,11 @@ let private defaultCouchProps() = {
         rev = "_rev"
         onWarning = None
     }
+
+let private defaultViewProps() = {
+    map = None
+    reduce = None
+}
 
 let private toConfig<'doctype> (props: CouchProps) =
     let config = Davenport.Configuration(props.couchUrl, props.databaseName)
@@ -90,17 +100,41 @@ let private convertPostPutCopyResponse (r: PostPutCopyResponse) =
       Rev = r.Rev
       Ok = Option.ofNullable r.Ok |> Option.defaultValue false }
 
-let private asyncMap (fn: 't -> 'u) task = async {
+let asyncMap (fn: 't -> 'u) task = async {
     let! result = task
 
     return fn result
 }
 
-let private asyncMapSeq (fn: 't -> 'u) task = async {
+let asyncMapSeq (fn: 't -> 'u) task = async {
     let! result = task
 
     return Seq.map fn result
 }
+
+/// Creates a sequence with a length of one out of the object given.
+let toSeq x = Seq.ofList [x]
+
+/// Used to create a DesignDoc view.
+let mapFunction func = { defaultViewProps() with map = Some func }
+
+/// Used to create a DesignDoc view.
+let reduceFunction func props = { props with reduce = Some func }
+
+/// Creates a DesignDoc view object.
+let view name (props: ViewProps) =
+    let v = View()
+    v.Name <- name
+    v.MapFunction <- Option.toObj props.map
+    v.ReduceFunction <- Option.toObj props.reduce
+    v
+
+/// Creates a DesignDoc object for use with the `configureDatabase` and `createDesignDocs` functions.
+let designDoc name (views: View seq) =
+    let d = DesignDocConfig()
+    d.Name <- name
+    d.Views <- views
+    d
 
 let database name couchUrl =
     { defaultCouchProps() with databaseName = name; couchUrl = couchUrl }
@@ -210,11 +244,11 @@ let delete id rev props =
     |> Async.AwaitTask
 
 /// Executes the view with the given designDocName and viewName.
-let view<'returnType> designDocName viewName (viewOptions: ViewOptions option) props =
+let executeView<'returnType> designDocName viewName (viewOptions: ViewOptions option) props =
     let client = toClient props
     let options = Option.toObj viewOptions
 
-    client.ViewAsync(designDocName, viewName, options)
+    client.ViewAsync<'returnType>(designDocName, viewName, options)
     |> Async.AwaitTask
 
 /// Gets the document with the given id. If a revision is given, that specific version will be returned.
