@@ -8,7 +8,7 @@ Davenport.NET is a .NET implementation of [Davenport](https://github.com/nozzleg
 
 ## Installation
 
-Davenport is published on [Nuget](https://nuget.org/packages/davenport). You can install Davenport from the Dotnet command line:
+Davenport is published on [Nuget](https://nuget.org/packages/davenport). You can install Davenport from the dotnet command line:
 
 ```sh
 dotnet add package davenport
@@ -20,11 +20,21 @@ Or use the Visual Studio package manager console:
 install-package davenport
 ```
 
-## Client vs ConfigureDatabaseAsync
+And if you're using Paket, add this to your `paket.dependencies` file:
 
-Davenport can handle the initial setup of your databases, manage your find indexes, design documents and views at startup. You can do this with `Davenport.Configuration.ConfigureDatabaseAsync`. It will also check that your CouchDB instance is at version 2.0, which is required by many Davenport methods.
+```sh
+nuget davenport
+# You probably want the F# wrapper if you're using paket
+nuget davenport.fsharp
+```
 
-Once configured, Davenport will return an instance of `Client` that's ready to use:
+## C# Documentation
+
+(Want to use Davenport with F#? [See below.](#f-documentation))
+
+To use Davenport you'll need to create an instance of the `Client` class. Each `Client` is tied to a specific database which is more akin to a "table" in SQL terms, as each CouchDB installation can host thousands of databases; in fact, with CouchDB such a case is even encouraged with the database-per-user strategy.
+
+To create a `Client`, you can either construct the class itself, *or* you can use `Davenport.Configuration.ConfigureDatabaseAsync` which will take care of creating the database (if it doesn't exist), creating design docs, and creating find indexes all at once. `ConfigureDatabaseAsync` will also check that your CouchDB instance is at version 2.0, which is required by the `FindBy*Async`, `CountBy*Async` and `ExistsBy*Async` methods.
 
 ```cs
 // Create a Find index on the "Foo" property of documents in this database.
@@ -75,11 +85,9 @@ If you don't need to configure your database or design docs from code, then you 
 var client = new Davenport.Client<DocumentType>("http://localhost:5984", "my_database_name");
 ```
 
-## where DocumentType : CouchDoc
+### `where DocumentType : CouchDoc`
 
-All CouchDB documents are assigned an `_id` and `_rev` parameter on every create or update call. To ensure that Davenport can actually execute requests against your database and documents, all objects sent through the `Client` **must** inherit from the `Davenport.CouchDoc` class. The `CouchDoc` class implements the `Id` and `Rev` strings for you, which are then JSON serialized to the `_id` and `_rev` strings when sent to CouchDB.
-
-## JSON serialization
+CouchDB assigns all documents an `_id` and `_rev` property on every create or update call. To ensure that Davenport can actually execute requests against your database and documents, all objects sent through the `Client` **must** inherit from the `Davenport.CouchDoc` class. The `CouchDoc` class implements the `Id` and `Rev` strings for you, which are then mapped to the `_id` and `_rev` strings when sent to CouchDB.
 
 Like many .NET packages, Davenport uses Newtonsoft.Json to handle de/serialization to and from JSON. That means your document classes can use the entire cadre of Json.Net attributes and serializers on your properties.
 
@@ -91,11 +99,251 @@ public class MyClass : Davenport.CouchDoc
     [JsonProperty("foo")]
     public string Foo { get; set; }
 
-    // Serializes to { "foo" : "value" }
+    // Serializes to { "_id" : "some-id", "_rev" : "some-rev", "foo" : "value" }
 }
 ```
 
 **Davenport is configured to ignore null property values when serializing and deserializing**.
+
+### Usage
+
+Note that the code sample below does not cover all methods, just a fraction of them to show what's possible.
+
+```cs
+using Davenport;
+
+public class MyDoc : CouchDoc
+{
+    string Foo { get; set; }
+}
+
+//...
+
+// Create a client for working with the "my_database" database
+var client = new Client<MyDoc>("localhost:5984", "my_database");
+// Or, use an optional username and password to connect
+var client = new Client<MyDoc>(new Configuration("localhost:5984", "my_database")
+{
+    Username = "username",
+    Password = "password"
+});
+
+// Create the database if it doesn't exist
+await client.CreateDatabaseAsync();
+
+// Create a doc
+var myDoc = await client.PostAsync(new MyDoc()
+{
+    Foo = "Hello world!"
+});
+
+// Get a doc
+MyDoc doc;
+try
+{
+    doc = await client.GetAsync(docId);
+    // Or get one by a specific revision
+    doc = await client.GetAsync(docId, rev);
+}
+catch (DavenportException e)
+{
+    if (e.Status == 404)
+    {
+        // Doc was not found
+    }
+    else
+    {
+        // Some other error
+    }
+}
+
+// Find docs by the value of their Foo property
+var docs = await client.FindByExprAsync(d => d.Foo == "Hello world!");
+// Or use a dictionary
+var docs = await client.FindBySelectorAsync(new Dictionary<string, FindExpression>()
+{
+    { "Foo", new FindExpression(ExpressionType.Equal, "Hello world!")}
+});
+```
+
+### Getting around `where DocumentType : CouchDoc`
+
+If you chafe under the rule that all documents must inherit from `CouchDoc`, you can circumvent this requirement by passing your own custom `JsonConverter` to the `Configuration` object used when creating a `Client`. In fact, this is exactly what the F# wrapper for Davenport does to allow passing any F# record type to Davenport. Here's the general strategy:
+
+**Step one:** Create a class that inherits from CouchDoc, but has a `Data` property of the type you're expecting to send to CouchDB (or make it accept any type by using `object` as the F# wrapper does):
+
+```cs
+class CouchDocWrapper : CouchDoc
+{
+    public AnotherClass Data { get; set; }
+}
+```
+
+**Step two:** Create a custom JsonConverter that will serialize and deserialize all instances of that wrapper class:
+
+```cs
+class WrapperConverter : JsonConverter
+{
+    public override CanConvert(Type objectType)
+    {
+        // Only convert CouchDocWrapper instances
+        return objectType == typeof(CouchDocWrapper);
+    }
+}
+```
+
+**Step three:** Implement the `ReadJson` override:
+
+```cs
+class WrapperConverter : JsonConverter
+{
+    public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+    {
+        // This method reads the json returned by CouchDB and converting it to a CouchDocWrapper
+
+        var j = JObject.Load(reader);
+        JToken id = j["_id"]; // Will be null if the field doesn't exist
+        JToken rev = j["_rev"]; // Will be null if the field doesn't exist
+
+        if (id != null)
+        {
+            // Remove the _id field
+            j.Remove("_id");
+        }
+
+        if (rev != null)
+        {
+            // Remove the _rev field
+            j.Remove("_rev");
+        }
+
+        // Let the jsonSerializer parse the remaining data to "AnotherClass"
+        var data = j.ToObject<AnotherClass>(serializer);
+
+        // Return a CouchDocWrapper
+        return new CouchDocWrapper()
+        {
+            Id = id.Value<string>(),
+            Rev = rev.Value<string>(),
+            Data = data
+        };
+    }
+}
+```
+
+**Step four:** Implement the `WriteJson` override:
+
+```cs
+class WrapperConverter : JsonConverter
+{
+    public override void WriteJson(JsonWriter writer, object objValue, JsonSerializer serializer)
+    {
+        if (objValue == null)
+        {
+            serializer.Serialize(writer, null);
+
+            return;
+        }
+
+        // Because of the CanConvert override we know that this object is going to be a CouchDocWrapper
+        var doc = (CouchDocWrapper) objValue;
+
+        writer.WriteStartObject();
+
+        var id = doc.Id;
+        var rev = doc.Rev;
+        var data = JObject.FromObject(doc.Data);
+
+        // Write the _id and _rev values if they aren't null or empty. Writing either one when it isn't intended can make CouchDB throw an error
+        if (!String.IsNullOrEmpty(id))
+        {
+            writer.WritePropertyName("_id");
+            writer.WriteValue(id);
+        }
+
+        if (!String.IsNullOrEmpty(rev))
+        {
+            writer.WritePropertyName("_rev");
+            writer.WriteValue(rev);
+        }
+
+        // Merge the data property with the doc so they're at the same level
+        foreach (var prop in data.Cast<JProperty>().Where(p => p.Name != "Id" && p.Name != "Rev"))
+        {
+            prop.WriteTo(writer);
+        }
+
+        writer.WriteEndObject();
+    }
+}
+```
+
+And finally, to use your new custom converter, pass it to the Configuration object you use to configure the database or construct the client:
+
+```cs
+var config = new Configuration("http://localhost:5984", "my_database")
+{
+    Converter = new WrapperConverter()
+};
+var client = new Client(config);
+```
+
+## F# documentation
+
+I've built Davenport with an F# wrapper for the C# methods, making the package much more functional and easier to use Davenport from F#. To install the wrapper, just add the following to your `paket.dependencies` file:
+
+```sh
+nuget davenport
+nuget davenport.fsharp
+```
+
+### Usage
+
+Note that the code sample below does not cover all functions, just a fraction of them to show what's possible.
+
+```fs
+open Davenport.Fsharp.Wrapper
+
+type MyDoc = {
+    MyId: string
+    MyRev: string
+    Foo: string
+}
+
+let client =
+    "localhost:5984"
+    |> idField "MyId" //Map the "MyId" record label to the database's "_id" field
+    |> revField "MyRev" //Map the "MyRev" record label to the database's "_rev" field
+    |> username "username" //Optionally use a username to login
+    |> password "password" //Optionally use a password to login
+    |> converter someJsonConverter //Optionally use your own custom converter. NOTE: This must map your id and rev fields for you.
+    |> database "my_database" //All further requests will be to "my_database"
+
+// Create the database if it doesn't exist
+do! createDatabase client
+
+// Create a doc
+let! myDoc = client |> create ({ MyId = "SomeId"; MyRev = "SomeRev"; Foo = "Hello world!"})
+
+// Get a doc
+let! getResult = client |> get docId None
+let doc =
+    match getResult with
+    | Some d -> d
+    | None -> //No doc was found
+
+// Get a doc by a specific revision
+let! getResult = client |> get docId (Some rev)
+let doc =
+    match getResult with
+    | Some d -> d
+    | None -> //No doc was found
+
+// Find docs by the value of their Foo property
+let! docs = client |> find <@ fun (d: MyDoc) -> d.Foo = "Hello world!" @> None
+// Or use a map
+let! docs = client |> find (Map.ofSeq ["Foo", EqualTo "Hello world!"]) None
+```
 
 ## Warnings
 
