@@ -20,7 +20,7 @@ namespace Davenport.Tests
             Bat = 5,
         };
 
-        ClientTests(TestConfiguration fixture)
+        public ClientTests(TestConfiguration fixture)
         {
             this.Fixture = fixture;
         }
