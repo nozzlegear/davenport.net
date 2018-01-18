@@ -103,9 +103,9 @@ let username username config = { config with username = Some username }
 
 let password password config = { config with password = Some password }
 
-let idName name props = { props with id = name }
+let idField name props = { props with id = name }
 
-let revName name props = { props with rev = name }
+let revField name props = { props with rev = name }
 
 let converter converter props = { props with converter = Some converter }
 

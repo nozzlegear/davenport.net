@@ -23,8 +23,8 @@ let defaultRecord = {
 let client =
     "localhost:5984"
     |> database "davenport_net_fsharp"
-    |> idName "MyId"
-    |> revName "MyRev"
+    |> idField "MyId"
+    |> revField "MyRev"
 
 let notNullOrEmpty (s: string) = String.IsNullOrEmpty s |> Expect.isFalse
 
