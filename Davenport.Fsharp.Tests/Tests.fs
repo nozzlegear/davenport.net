@@ -290,4 +290,23 @@ let tests =
 
             Expect.isTrue deleteResponse.Ok "DeleteResponse.Ok should have been true."
         }
+
+        testCaseAsync "Warnings work" <| async {
+            let mutable called = false
+            let handleWarning s =
+                called <- true
+                printfn "%s" s
+
+            let clientWithWarning = client |> warning (Event.add handleWarning)
+            let! created = create defaultRecord clientWithWarning
+
+            // To get a warning, attempt to delete a document without a revision. This will throw an error, but not before firing the warning event.
+            do!
+                clientWithWarning
+                |> delete created.Id null
+                |> Async.Catch
+                |> Async.Ignore
+
+            Expect.isTrue called "Warning event was not called"
+        }
     ]

@@ -34,6 +34,7 @@ type CouchProps = private {
     couchUrl: string
     id: string
     rev: string
+    onWarning: (IEvent<EventHandler<string>,string> -> unit) option
 }
 
 let private defaultCouchProps() = {
@@ -44,6 +45,7 @@ let private defaultCouchProps() = {
         couchUrl = ""
         id = "_id"
         rev = "_rev"
+        onWarning = None
     }
 
 let private toConfig<'doctype> (props: CouchProps) =
@@ -51,6 +53,10 @@ let private toConfig<'doctype> (props: CouchProps) =
     config.Username <- Option.defaultValue "" props.username
     config.Password <- Option.defaultValue "" props.password
     config.Converter <- FsConverter<'doctype>(props.id, props.rev, props.converter) :> JsonConverter
+
+    props.onWarning
+    |> Option.iter (fun handler -> handler config.Warning)
+
     config
 
 let private toClient<'doctype> = toConfig<'doctype> >> Davenport.Client<FsDoc<'doctype>>
@@ -108,6 +114,8 @@ let idField name props = { props with id = name }
 let revField name props = { props with rev = name }
 
 let converter converter props = { props with converter = Some converter }
+
+let warning handler props = { props with onWarning = Some handler }
 
 let getCouchVersion props =
     toConfig props

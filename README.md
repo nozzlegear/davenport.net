@@ -4,7 +4,7 @@
 [![NuGet](https://img.shields.io/nuget/v/Davenport.svg?maxAge=3600)](https://www.nuget.org/packages/Davenport/)
 [![license](https://img.shields.io/github/license/nozzlegear/davenport.net.svg?maxAge=3600)](https://raw.githubusercontent.com/nozzlegear/davenport.net/master/LICENSE)
 
-Davenport.NET is a .NET implementation of [Davenport](https://github.com/nozzlegear/davenport). Davenport is a CouchDB client for simplifying common tasks like get, list, create, update and delete.
+Davenport is the comfiest .NET wrapper for CouchDB. Its goal is to simplify interacting with the CouchDB API by wrapping things like getting, listing, creating, updating, finding, copying and deleting documents.
 
 ## Installation
 
@@ -290,7 +290,7 @@ var client = new Client(config);
 
 ## F# documentation
 
-I've built Davenport with an F# wrapper for the C# methods, making the package much more functional and easier to use Davenport from F#. To install the wrapper, just add the following to your `paket.dependencies` file:
+I've built Davenport with an F# wrapper for the C# methods, making the package much more functional, idiomatic and easier to use with F#. To install the wrapper, just add the following to your `paket.dependencies` file:
 
 ```sh
 nuget davenport
@@ -312,12 +312,12 @@ type MyDoc = {
 
 let client =
     "localhost:5984"
+    |> database "my_database" //All requests will be to "my_database"
     |> idField "MyId" //Map the "MyId" record label to the database's "_id" field
     |> revField "MyRev" //Map the "MyRev" record label to the database's "_rev" field
     |> username "username" //Optionally use a username to login
     |> password "password" //Optionally use a password to login
     |> converter someJsonConverter //Optionally use your own custom converter. NOTE: This must map your id and rev fields for you.
-    |> database "my_database" //All further requests will be to "my_database"
 
 // Create the database if it doesn't exist
 do! createDatabase client
@@ -347,7 +347,9 @@ let! docs = client |> find (Map.ofSeq ["Foo", EqualTo "Hello world!"]) None
 
 ## Warnings
 
-Though rare if your database and indexes are configured properly, CouchDB may return a warning with `find` requests, particularly ones that used an index that wasn't configured in your database. Instead of logging to Console.WriteLine, Davenport includes a Warning event on all Configuration objects which you can use to log the message in a way more conducive to your application:
+Though rare if your database and indexes are configured properly, CouchDB may return a warning with `find` requests, particularly ones that used an index that wasn't configured in your database. Instead of logging to Console.WriteLine, Davenport includes a Warning event on all Configuration objects which you can use to log the message in a way more conducive to your application.
+
+To use it in C#:
 
 ```cs
 var config = new Configuration("http://localhost:5984", "database_name");
@@ -359,6 +361,15 @@ config.Warning += (object sender, string message) =>
     // Do whatever you want with the warning message.
     Console.WriteLine(message);
 };
+```
+
+And to use it in F#:
+
+```fs
+let client =
+    "localhost:5984"
+    |> database "my_database"
+    |> warning (Event.add (fun message -> printfn "%s" message))
 ```
 
 There are four different events that will create a warning message:
