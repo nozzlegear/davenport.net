@@ -117,15 +117,14 @@ namespace Davenport
 
             options.Add("selector", selector);
 
-            var result = await ExecuteRequestAsync<JToken>(request, HttpMethod.Post, options);
-            var warning = result.SelectToken("warning", false);
+            var result = await ExecuteRequestAsync<FindResult<DocumentType>>(request, HttpMethod.Post, options);
 
-            if (warning?.HasValues == true)
+            if (!String.IsNullOrEmpty(result.Warning))
             {
-                Config.InvokeWarningEvent(this, warning.Value<string>());
+                Config.InvokeWarningEvent(this, result.Warning);
             }
 
-            return result.SelectToken("docs").ToObject<List<DocumentType>>();
+            return result.Docs;
         }
 
         /// <summary>
