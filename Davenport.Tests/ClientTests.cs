@@ -61,9 +61,19 @@ namespace Davenport.Tests
         [Fact(DisplayName = "Client CountByExpressionAsync"), Trait("Category", "Client")]
         public async Task CountByExpressionAsync()
         {
+            var expected = "test value 2";
+            var cust = new MyTestClass()
+            {
+                Foo = expected,
+                Bar = ExampleClass.Bar,
+                Baz = ExampleClass.Baz,
+                Bat = ExampleClass.Bat
+            };
+
+            await Fixture.Client.PostAsync(cust);
             await Fixture.Client.PostAsync(ExampleClass);
 
-            var count = await Fixture.Client.CountByExpressionAsync(doc => doc.Foo == "test value 2");
+            var count = await Fixture.Client.CountByExpressionAsync(doc => doc.Foo == expected);
             var totalCount = await Fixture.Client.CountAsync();
 
             Assert.True(count > 0);
