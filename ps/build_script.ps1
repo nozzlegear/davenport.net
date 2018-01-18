@@ -1,6 +1,7 @@
 dotnet restore;
 dotnet build -c Release;
 dotnet pack --no-build -c Release Davenport/davenport.csproj;
+dotnet pack --no-build -c Release Davenport.Fsharp/Davenport.Fsharp.fsproj
 
 $csnupkg = (gci "Davenport/bin/Release/*.nupkg")[0];
 $fsnupkg = (gci "Davenport.Fsharp/bin/Release/*.nupkg")[0];
