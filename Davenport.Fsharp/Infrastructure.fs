@@ -15,18 +15,24 @@ type FsDoc<'doctype>() =
     inherit Davenport.Entities.CouchDoc()
     member val Data: 'doctype option = None with get,set
 
+/// The Fable JsonConverter uses a cache, so it's best to just instantiate it once.
+let private fableConverter = Fable.JsonConverter()
+
 type FsConverter<'doctype>(idField: string, revField: string, customConverter: JsonConverter option) =
     inherit JsonConverter()
 
-    member __.CustomConverter = Option.defaultWith (fun _ -> Fable.JsonConverter() :> JsonConverter) customConverter
+    member __.CustomConverter = Option.defaultWith (fun _ -> fableConverter :> JsonConverter) customConverter
 
     override x.CanConvert objectType =
-        // This converter will convert anything that is an FsDoc or anything that can be handled by Fable.JsonConverter
+        // Only convert objects of the FsDoc<'doctype> type, or objects that the custom converter can convert
         objectType = typeof<FsDoc<'doctype>> || x.CustomConverter.CanConvert objectType
 
     override x.ReadJson(reader: JsonReader, objectType: System.Type, existingValue: obj, serializer: JsonSerializer) =
         if objectType <> typeof<FsDoc<'doctype>>
-        then x.CustomConverter.ReadJson(reader, objectType, existingValue, serializer)
+        then
+            // Since this method will only be called if the type is FsDoc<'doctype> or a type that can be converted by the
+            // CustomConverter, we can safely use that converter here to read the value.
+            x.CustomConverter.ReadJson(reader, objectType, existingValue, serializer)
         else
 
         let j = JObject.Load reader
@@ -49,7 +55,7 @@ type FsConverter<'doctype>(idField: string, revField: string, customConverter: J
                 j.Add(revField, value)
         )
 
-        let data = j.ToObject<'doctype> serializer
+        let data = j.ToObject<'doctype>() // Warning: Adding serializer here causes Fable.JsonConverter to throw an exception when reading F# union types
         let output = FsDoc<'doctype>()
 
         output.Id <-
@@ -67,7 +73,10 @@ type FsConverter<'doctype>(idField: string, revField: string, customConverter: J
     override x.WriteJson(writer: JsonWriter, objValue: obj, serializer: JsonSerializer) =
         // If the value is not an FsDoc use the Fable.JsonConverter to serialize it.
         if objValue.GetType() <> typeof<FsDoc<'doctype>>
-        then x.CustomConverter.WriteJson(writer, objValue, serializer)
+        then
+            // Since this method will only be called if the type is FsDoc<'doctype> or a type that can be converted by the
+            // CustomConverter, we can safely use that converter here to write the value.
+            x.CustomConverter.WriteJson(writer, objValue, serializer)
         else
 
         writer.WriteStartObject()
