@@ -28,7 +28,7 @@ nuget davenport
 nuget davenport.fsharp
 ```
 
-## C# Documentation
+## C\# Documentation
 
 (Want to use Davenport with F#? [See below.](#f-documentation))
 
@@ -288,7 +288,7 @@ var config = new Configuration("http://localhost:5984", "my_database")
 var client = new Client(config);
 ```
 
-## F# documentation
+## F\# documentation
 
 I've built Davenport with an F# wrapper for the C# methods, making the package much more functional, idiomatic and easier to use with F#. To install the wrapper, just add the following to your `paket.dependencies` file:
 
@@ -296,6 +296,16 @@ I've built Davenport with an F# wrapper for the C# methods, making the package m
 nuget davenport
 nuget davenport.fsharp
 ```
+
+## Fable.JsonConverter
+
+**IMPORTANT**: The default JsonConverter used by the F# package uses the `Fable.JsonConverter` package internally to serialize things like Options, Union Types and so-on to a friendly JSON format that can then be easily deserialized by the same converter.
+
+In practice, this means that some values in the CouchDB database may not be in the same format or even the same type that you might be expecting. For example, the converter will convert the `int64` value `123456789L` to a string `"+123456789"`.
+
+In practice, if you're using Davenport.Fsharp to serialize and deserialize the database's documents everything will work just fine. If you're using other tools to *also* interact with those documents (such as the admin UI or apps built with other languages), you'll need to be aware of how Fable.JsonConverter converts those types.
+
+If you run into problems with this I would strongly recommend building your own JsonConverter and passing it to the database configuration (see usage below). [You can look at the FsJsonConverter file to see how the `FsConverter` is implemented in Davenport](https://github.com/nozzlegear/davenport.net/blob/9d371a8482bb51ca1988dd6966da290bfc11f70b/Davenport.Fsharp/Infrastructure.fs#L18). Your custom converter **must be able to, at the very least, serialize and deserialize the `FsDoc<'doctype>` class.**
 
 ### Usage
 
