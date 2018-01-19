@@ -1,10 +1,13 @@
 # Davenport.NET
 
-[![Build status](https://ci.appveyor.com/api/projects/status/8cy7l4f582fnuf9g/branch/master?svg=true)](https://ci.appveyor.com/project/nozzlegear/davenport-net/branch/master)
-[![NuGet](https://img.shields.io/nuget/v/Davenport.svg?maxAge=3600)](https://www.nuget.org/packages/Davenport/)
-[![license](https://img.shields.io/github/license/nozzlegear/davenport.net.svg?maxAge=3600)](https://raw.githubusercontent.com/nozzlegear/davenport.net/master/LICENSE)
-
 Davenport is the comfiest .NET wrapper for CouchDB. Its goal is to simplify interacting with the CouchDB API by wrapping things like getting, listing, creating, updating, finding, copying and deleting documents.
+
+|   |    |
+|---|----|
+|[![Build status](https://ci.appveyor.com/api/projects/status/8cy7l4f582fnuf9g/branch/master?svg=true)](https://ci.appveyor.com/project/nozzlegear/davenport-net/branch/master)|Project build status|
+|[![Davenport NuGet](https://img.shields.io/nuget/v/Davenport.svg?maxAge=3600)](https://www.nuget.org/packages/Davenport/)| Davenport package|
+|[![Davenport.Fsharp NuGet](https://img.shields.io/nuget/v/Davenport.Fsharp.svg?maxAge=3600)](https://www.nuget.org/packages/Davenport.Fsharp/)| Davenport.Fsharp package|
+|[![license](https://img.shields.io/github/license/nozzlegear/davenport.net.svg?maxAge=3600)](https://raw.githubusercontent.com/nozzlegear/davenport.net/master/LICENSE)| License|
 
 ## Installation
 
