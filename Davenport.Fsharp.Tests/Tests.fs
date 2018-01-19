@@ -10,6 +10,7 @@ type MyTestClass = {
     Foo: string
     Bar: bool
     Baz: int
+    Bat: int64
 }
 
 let defaultRecord = {
@@ -18,6 +19,7 @@ let defaultRecord = {
     Foo = "test value"
     Bar = true
     Baz = 11
+    Bat = 0L
 }
 
 let viewName = "only-bazs-greater-than-10"
@@ -334,5 +336,20 @@ let tests =
 
             Expect.isGreaterThan (Seq.length viewResult) 0 "View should return at least one result"
             Expect.isGreaterThanOrEqual (viewResult |> Seq.sumBy (fun d -> d.Value)) 10 "The sum of all doc values should be greater than 10"
+        }
+
+        testCaseAsync "Finds values serialized by Fable.JsonConverter" <| async {
+            // Fable.JsonConverter handles serialization much more differently than Json.Net.
+            // For instance, an int64 is serialized as '+1234567' string. The problem arises when
+            // using the find methods, because Davenport isn't serializing an FsDoc -- it's serializing
+            // a dictionary of find options. Previously these options would never get passed to the custom
+            // converter and therefore we'd get Json.Net searching for an int64 and couchdb only using strings.
+            let expected = 12345678987654321L
+            do! create ({ defaultRecord with Bat = expected }) client |> Async.Ignore
+
+            let! findResult = findByExpr <@ fun (d: MyTestClass) -> d.Bat = expected @> None client
+
+            Expect.isGreaterThan (Seq.length findResult) 0 "Should have returned at least one record."
+            Expect.all findResult (fun d -> d.Bat = expected) "Every returned doc should have a Bat property equal to the expected value."
         }
     ]

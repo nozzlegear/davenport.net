@@ -18,13 +18,17 @@ type FsDoc<'doctype>() =
 type FsConverter<'doctype>(idField: string, revField: string, customConverter: JsonConverter option) =
     inherit JsonConverter()
 
-    let dataConverter = Option.defaultWith (fun _ -> Fable.JsonConverter() :> JsonConverter) customConverter
+    member __.CustomConverter = Option.defaultWith (fun _ -> Fable.JsonConverter() :> JsonConverter) customConverter
 
-    override __.CanConvert objectType =
-        // TODO: Indicate that this jsonconverter will deserialize Davenport.Entities.ListedRows, else List requests will fail to deserialize.
-        objectType = typeof<FsDoc<'doctype>>
+    override x.CanConvert objectType =
+        // This converter will convert anything that is an FsDoc or anything that can be handled by Fable.JsonConverter
+        objectType = typeof<FsDoc<'doctype>> || x.CustomConverter.CanConvert objectType
 
-    override __.ReadJson(reader: JsonReader, objectType: System.Type, existingValue: obj, serializer: JsonSerializer) =
+    override x.ReadJson(reader: JsonReader, objectType: System.Type, existingValue: obj, serializer: JsonSerializer) =
+        if objectType <> typeof<FsDoc<'doctype>>
+        then x.CustomConverter.ReadJson(reader, objectType, existingValue, serializer)
+        else
+
         let j = JObject.Load reader
         let id: JToken option = Option.ofObj j.["_id"]
         let rev: JToken option = Option.ofObj j.["_rev"]
@@ -60,15 +64,16 @@ type FsConverter<'doctype>(idField: string, revField: string, customConverter: J
 
         output :> obj
 
-    override __.WriteJson(writer: JsonWriter, objValue: obj, serializer: JsonSerializer) =
-        if isNull objValue
-        then serializer.Serialize(writer, null)
+    override x.WriteJson(writer: JsonWriter, objValue: obj, serializer: JsonSerializer) =
+        // If the value is not an FsDoc use the Fable.JsonConverter to serialize it.
+        if objValue.GetType() <> typeof<FsDoc<'doctype>>
+        then x.CustomConverter.WriteJson(writer, objValue, serializer)
         else
+
+        writer.WriteStartObject()
 
         let doc = objValue :?> FsDoc<'doctype>
         let docType = typeof<'doctype>
-
-        writer.WriteStartObject()
 
         // Load the data object into a JObject
         let j = Option.get doc.Data |> JObject.FromObject
@@ -98,15 +103,6 @@ type FsConverter<'doctype>(idField: string, revField: string, customConverter: J
         // Merge the FsDoc's data property with the doc being written so they're at the same level.
         Seq.cast<JProperty> j
         |> Seq.filter (fun prop -> prop.Name <> idField && prop.Name <> revField)
-        |> Seq.iter (fun prop -> prop.WriteTo(writer, [|dataConverter|]))
-
-        // // Merge the FsDoc's data property with the doc being written so they're at the same level.
-        // doc.Data.GetType().GetProperties()
-        // |> Seq.filter (fun prop -> prop.Name <> idField && prop.Name <> revField)
-        // |> Seq.iter (fun prop ->
-        //     writer.WritePropertyName(prop.Name)
-        //     // Let the serializer figure out how to serialize the property value
-        //     serializer.Serialize(writer, prop.GetValue(doc.Data, null))
-        // )
+        |> Seq.iter (fun prop -> prop.WriteTo(writer, [|x.CustomConverter|]))
 
         writer.WriteEndObject()
