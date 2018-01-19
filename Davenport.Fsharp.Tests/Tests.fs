@@ -4,6 +4,11 @@ open System
 open Expecto
 open Davenport.Fsharp.Wrapper
 
+type MyUnion =
+    | Case1 of string
+    | Case2 of int
+    | Case3 of int64
+
 type MyTestClass = {
     MyId: string
     MyRev: string
@@ -11,6 +16,10 @@ type MyTestClass = {
     Bar: bool
     Baz: int
     Bat: int64
+    Opt: string option
+    Union: MyUnion
+    Date: DateTime
+    Dec: Decimal
 }
 
 let defaultRecord = {
@@ -20,6 +29,10 @@ let defaultRecord = {
     Bar = true
     Baz = 11
     Bat = 0L
+    Opt = None
+    Union = Case1 "Hello world"
+    Date = DateTime.UtcNow
+    Dec = 10.5m
 }
 
 let viewName = "only-bazs-greater-than-10"
@@ -34,12 +47,6 @@ let defaultDesignDocs =
     |> designDoc designDocName
     |> toSeq
 
-let client =
-    "localhost:5984"
-    |> database "davenport_net_fsharp"
-    |> idField "MyId"
-    |> revField "MyRev"
-
 let notNullOrEmpty (s: string) = String.IsNullOrEmpty s |> Expect.isFalse
 
 let asyncMap (fn: 'a -> 'b) (task: Async<'a>) = async {
@@ -50,6 +57,26 @@ let asyncMap (fn: 'a -> 'b) (task: Async<'a>) = async {
 
 [<Tests>]
 let tests =
+    let t = System.Environment.CommandLine
+    let debug = false
+    let fiddler = true
+    let client =
+        if fiddler then "localhost.fiddler:5984" else "localhost:5984"
+        |> database "davenport_net_fsharp"
+        |> idField "MyId"
+        |> revField "MyRev"
+
+    // Set debug to `true` below to start debugging.
+    // 1. Start the test suite (dotnet run)
+    // 2. Go to VS Code's Debug tab.
+    // 3. Choose ".NET Core Attach"
+    // 4. Choose one of the running processes. It's probably the one that says 'dotnet exec yadayada path to app'. Several processes may start and stop while the project is building.
+    if debug then
+        printfn "Waiting to attach debugger. Run .NET Core Attach under VS Code's debug menu."
+        while not(System.Diagnostics.Debugger.IsAttached) do
+          System.Threading.Thread.Sleep(100)
+        System.Diagnostics.Debugger.Break()
+
     printfn "Configuring database."
 
     // Configure the database before running tests
@@ -57,17 +84,6 @@ let tests =
     |> Async.RunSynchronously
 
     printfn "Database configured."
-
-    // Set `false` to `true` below to start debugging.
-    // 1. Start the test suite (dotnet run)
-    // 2. Go to VS Code's Debug tab.
-    // 3. Choose ".NET Core Attach"
-    // 4. Choose one of the running processes. It's probably the one that says 'dotnet exec yadayada path to app'. Several processes may start and stop while the project is building.
-    if false then
-        printfn "Waiting to attach debugger. Run .NET Core Attach under VS Code's debug menu."
-        while not(System.Diagnostics.Debugger.IsAttached) do
-          System.Threading.Thread.Sleep(100)
-        System.Diagnostics.Debugger.Break()
 
     testList "Davenport.Fsharp.Wrapper" [
         testCaseAsync "Creates docs" <| async {
@@ -144,7 +160,7 @@ let tests =
 
             do! create record client |> Async.Ignore
 
-            let map = Map.ofSeq ["Foo", EqualTo expected]
+            let map = Map.ofSeq ["Foo", [EqualTo expected]]
 
             let! mapCount = countBySelector map client
             let! totalCount = count client
@@ -233,7 +249,7 @@ let tests =
 
             do! create record client |> Async.Ignore
 
-            let map = Map.ofSeq ["Foo", EqualTo expected]
+            let map = Map.ofSeq ["Foo", [EqualTo expected]]
             let! found = findBySelector<MyTestClass> map None client
 
             Expect.isNonEmpty map "findByMap should have found at least one doc."
@@ -246,7 +262,7 @@ let tests =
             do! create ({defaultRecord with Foo = expected}) client |> Async.Ignore
             do! create defaultRecord client |> Async.Ignore
 
-            let map = Map.ofSeq ["Foo", NotEqualTo expected]
+            let map = Map.ofSeq ["Foo", [NotEqualTo expected]]
             let! found = findBySelector<MyTestClass> map None client
 
             Expect.isNonEmpty map "findByMap should have found at least one doc."
@@ -277,7 +293,7 @@ let tests =
 
             do! create ({defaultRecord with Foo = expected}) client |> Async.Ignore
 
-            let map = Map.ofSeq ["Foo", EqualTo expected]
+            let map = Map.ofSeq ["Foo", [EqualTo expected]]
             let! exists = existsBySelector map client
 
             Expect.isTrue exists ""
@@ -307,9 +323,8 @@ let tests =
 
         testCaseAsync "Warnings work" <| async {
             let mutable called = false
-            let handleWarning s =
+            let handleWarning _ =
                 called <- true
-                printfn "%s" s
 
             let clientWithWarning = client |> warning (Event.add handleWarning)
             let! created = create defaultRecord clientWithWarning
@@ -327,11 +342,9 @@ let tests =
         testCaseAsync "Creates design docs and gets view results" <| async {
             // Make sure the design docs exist
             do! createDesignDocs defaultDesignDocs client
+
             // Create at least one doc that would match
-            let! created = create ({defaultRecord with Baz = 15}) client
-
-            printfn "Created id is %s" created.Id
-
+            do! create ({defaultRecord with Baz = 15}) client |> Async.Ignore
             let! viewResult = executeView<int> designDocName viewName None client
 
             Expect.isGreaterThan (Seq.length viewResult) 0 "View should return at least one result"
@@ -351,5 +364,55 @@ let tests =
 
             Expect.isGreaterThan (Seq.length findResult) 0 "Should have returned at least one record."
             Expect.all findResult (fun d -> d.Bat = expected) "Every returned doc should have a Bat property equal to the expected value."
+        }
+
+        testCaseAsync "Can find values between int64" <| async {
+            let expected = 1516395484000L
+            let min = expected - 10000000000L
+            let max = expected + 10000000000L
+
+            // Create records that would be under the min range, over the max range, and between both
+            do! Async.Parallel [
+                    create ({defaultRecord with Bat = min - 1L}) client
+                    create ({defaultRecord with Bat = max + 1L}) client
+                    create ({defaultRecord with Bat = expected - 1L}) client
+                    create ({defaultRecord with Bat = expected + 1L}) client
+                ]|> Async.Ignore
+
+            // let! result = findByExpr<MyTestClass> <@ fun (c: MyTestClass) -> c.Bat > min @> None client
+            let selector = Map.ofSeq ["Bat", [GreaterThan min; LesserThan max]]
+            let! result = findBySelector<MyTestClass> selector None client
+
+            Expect.all result (fun c -> c.Bat > min && c.Bat < max) "All records returned should be greater than min value and lesser than max value."
+        }
+
+        testCaseAsync "Serializes and deserializes options and unions" <| async {
+            let expectedOpt = None
+            let expectedUnionStr = Case1 "testing union 1"
+            let expectedUnionInt = Case2 42
+            let expectedUnionInt64 = Case3 123456789L
+            let expectedDate = DateTime.UtcNow.AddHours -7.
+            let expectedDecimal = 23.75M
+
+            let! createdOpt = create ({ defaultRecord with Opt = expectedOpt }) client
+            let! createdUnionStr = create ({ defaultRecord with Union = expectedUnionStr }) client
+            let! createdUnionInt = create ({defaultRecord with Union = expectedUnionInt }) client
+            let! createdUnionInt64 = create ({defaultRecord with Union = expectedUnionInt64 }) client
+            let! createdDateTime = create ({defaultRecord with Date = expectedDate}) client
+            let! createdDecimal = create({defaultRecord with Dec = expectedDecimal}) client
+
+            let! opt = get createdOpt.Id (Some createdOpt.Rev) client |> asyncMap Option.get
+            let! unionStr = get createdUnionStr.Id (Some createdUnionStr.Rev) client |> asyncMap Option.get
+            let! unionInt = get createdUnionInt.Id (Some createdUnionInt.Rev) client |> asyncMap Option.get
+            let! unionInt64 = get createdUnionInt64.Id (Some createdUnionInt64.Rev) client |> asyncMap Option.get
+            let! dateTime = get createdDateTime.Id (Some createdDateTime.Rev) client |> asyncMap Option.get
+            let! decimal = get createdDecimal.Id (Some createdDecimal.Rev) client |> asyncMap Option.get
+
+            Expect.equal opt.Opt expectedOpt "Options should be equal"
+            Expect.equal unionStr.Union expectedUnionStr "Union str should be equal"
+            Expect.equal unionInt.Union expectedUnionInt "Union int should be equal"
+            Expect.equal unionInt64.Union expectedUnionInt64 "Union int64 should be equal"
+            Expect.equal dateTime.Date expectedDate "Date should be equal"
+            Expect.equal decimal.Dec expectedDecimal "Decimal should be equal"
         }
     ]
