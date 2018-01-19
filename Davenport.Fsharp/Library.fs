@@ -15,16 +15,6 @@ type Find =
     | LesserThan of obj
     | GreaterThanOrEqualTo of obj
     | LessThanOrEqualTo of obj
-    with
-    member x.ToFindExpression() =
-        match x with
-        | EqualTo x -> ExpressionType.Equal, x
-        | NotEqualTo x -> ExpressionType.NotEqual, x
-        | GreaterThan x -> ExpressionType.GreaterThan, x
-        | LesserThan x -> ExpressionType.LessThan, x
-        | GreaterThanOrEqualTo x -> ExpressionType.GreaterThanOrEqual, x
-        | LessThanOrEqualTo x -> ExpressionType.LessThanOrEqual, x
-        |> FindExpression
 
 type CouchProps = private {
     username: string option
@@ -90,8 +80,31 @@ let private listedRowToDoctypeRow<'doctype> (row: ListedRow<FsDoc<'doctype>>) =
 
     newRow
 
-let private convertMapToDict (map: Map<string, Find>) =
-    Map.map (fun _ (value: Find) -> value.ToFindExpression()) map
+let private convertMapToDict (map: Map<string, Find list>) =
+    let rec convert remaining (expression: FindExpression) =
+        match remaining with
+        | EqualTo x::tail ->
+            expression.EqualTo <- x
+            convert tail expression
+        | NotEqualTo x::tail ->
+            expression.NotEqualTo <- x
+            convert tail expression
+        | GreaterThan x::tail ->
+            expression.GreaterThan <- x
+            convert tail expression
+        | LesserThan x::tail ->
+            expression.LesserThan <- x
+            convert tail expression
+        | GreaterThanOrEqualTo x::tail ->
+            expression.GreaterThanOrEqualTo <- x
+            convert tail expression
+        | LessThanOrEqualTo x::tail ->
+            expression.LesserThanOrEqualTo <- x
+            convert tail expression
+        | [] -> expression
+
+    map
+    |> Map.map (fun _ list -> convert list (FindExpression()))
     |> Collections.Generic.Dictionary
 
 let private convertPostPutCopyResponse (r: PostPutCopyResponse) =
