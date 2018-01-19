@@ -1,7 +1,6 @@
 source https://www.nuget.org/api/v2
 framework: auto-detect
 
-nuget microsoft.fsharplu.json
 nuget flurl
 nuget flurl.http
 nuget xunit
