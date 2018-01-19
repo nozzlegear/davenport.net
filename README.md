@@ -220,8 +220,8 @@ class WrapperConverter : JsonConverter
             j.Remove("_rev");
         }
 
-        // Let the jsonSerializer parse the remaining data to "AnotherClass"
-        var data = j.ToObject<AnotherClass>(serializer);
+        // Let the other converters parse the remaining data to "AnotherClass"
+        var data = j.ToObject<AnotherClass>();
 
         // Return a CouchDocWrapper
         return new CouchDocWrapper()
@@ -308,7 +308,7 @@ To summarize, this means that some values in the CouchDB database may not be in 
 
 In practice, if you're using Davenport.Fsharp to serialize and deserialize the database's documents everything will work just fine. If you're using other tools to *also* interact with those documents (such as the admin UI or apps built with other languages), you'll need to be aware of how Fable.JsonConverter converts those types.
 
-If you run into problems with this I would strongly recommend building your own JsonConverter and passing it to the database configuration (see usage below). [You can look at the Infrastructure file to see how the `FsConverter` is implemented in Davenport](https://github.com/nozzlegear/davenport.net/blob/9d371a8482bb51ca1988dd6966da290bfc11f70b/Davenport.Fsharp/Infrastructure.fs#L18). Your custom converter **must be able to, at the very least, serialize and deserialize the `FsDoc<'doctype>` class.**
+If you run into problems with this I would strongly recommend building your own JsonConverter and passing it to the database configuration (see usage below). [You can look at the Infrastructure file to see how the `FsConverter` is implemented in Davenport](https://github.com/nozzlegear/davenport.net/blob/02436e8/Davenport.Fsharp/Infrastructure.fs#L18). Your custom converter **must be able to, at the very least, serialize and deserialize the `FsDoc<'doctype>` class.**
 
 ### Usage
 
@@ -352,11 +352,70 @@ let doc =
     | Some d -> d
     | None -> //No doc was found
 
-// Find docs by the value of their Foo property
-let! docs = client |> find <@ fun (d: MyDoc) -> d.Foo = "Hello world!" @> None
+// Find docs by the value of their Foo property. NOTE: Currently the expression parser can only parse simple
+// single condition statements , e.g. it can't combine d.Foo = "Hello world" && d.Bar = 5. To
+// Use more than one condition, use the findBySelector function instead.
+let! docs = client |> findByExpr <@ fun (d: MyDoc) -> d.Foo = "Hello world!" @> None
 // Or use a map
-let! docs = client |> find (Map.ofSeq ["Foo", EqualTo "Hello world!"]) None
+let! docs = client |> findBySelector (Map.ofSeq ["Foo", EqualTo "Hello world!"; ]) None
 ```
+
+## Finding by, Counting by and Exists by caveats
+
+Right now Davenport's expression parser can only parse simple single condition statements when searching with the Find By, Count By and Exists By methods/functions:
+
+```cs
+// This works
+var result = await client.FindByExpressionAsync(doc => doc.Foo == "Hello world");
+
+// This does not work
+var result = await client.FindByExpressionAsync(doc => doc.Foo == "Hello world" && doc.Bar > 5 && doc.Bar <= 15)
+```
+
+```fs
+// This works
+let! result = client |> findByExpr <@ fun (doc: DocType) -> doc.Foo = "Hello world" @> None
+
+// This does not work
+let! result = client |> findByExpr <@ fun (doc: DocType) -> doc.Foo = "Hello world" && doc.Bar > 5 && doc.Bar < 15 @> None
+```
+
+If you need to add more conditions to your searches you can instead use the `Find/Count/ExistsBySelectorAsync` (C#) or the `find/count/existsBySelector` (F#) functions. The same broken queries above could be written like this for each language:
+
+```cs
+// Find documents where Foo = "Hello world" and Bar > 5 and Bar <= 15
+var result = await client.FindBySelectorAsync(new Dictionary<string, FindExpression>()
+{
+    {
+        "Foo",
+        new FindExpression()
+        {
+            EqualTo = "Hello world"
+        }
+    },
+    {
+        "Bar",
+        new FindExpression()
+        {
+            // Find Bar where it's greater than five and less or equal to 15
+            GreaterThan = 5,
+            LesserThanOrEqualTo = 15
+        }
+    }
+});
+```
+
+```fs
+let selector =
+    [
+        "Foo", [EqualTo "Hello world"]
+        "Bar", [GreaterThan 5; LessThanOrEqualTo 15]
+    ]
+    |> Map.ofSeq
+let! result = client |> findBySelector selector None
+```
+
+As a final note, none of these methods currently support "or conditions". That is to say, you can't do a search where `Foo == "hello" || Foo == "world"`, but it's something on my radar.
 
 ## Warnings
 
