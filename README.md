@@ -308,7 +308,7 @@ To summarize, this means that some values in the CouchDB database may not be in 
 
 In practice, if you're using Davenport.Fsharp to serialize and deserialize the database's documents everything will work just fine. If you're using other tools to *also* interact with those documents (such as the admin UI or apps built with other languages), you'll need to be aware of how Fable.JsonConverter converts those types.
 
-If you run into problems with this I would strongly recommend building your own JsonConverter and passing it to the database configuration (see usage below). [You can look at the FsJsonConverter file to see how the `FsConverter` is implemented in Davenport](https://github.com/nozzlegear/davenport.net/blob/9d371a8482bb51ca1988dd6966da290bfc11f70b/Davenport.Fsharp/Infrastructure.fs#L18). Your custom converter **must be able to, at the very least, serialize and deserialize the `FsDoc<'doctype>` class.**
+If you run into problems with this I would strongly recommend building your own JsonConverter and passing it to the database configuration (see usage below). [You can look at the Infrastructure file to see how the `FsConverter` is implemented in Davenport](https://github.com/nozzlegear/davenport.net/blob/9d371a8482bb51ca1988dd6966da290bfc11f70b/Davenport.Fsharp/Infrastructure.fs#L18). Your custom converter **must be able to, at the very least, serialize and deserialize the `FsDoc<'doctype>` class.**
 
 ### Usage
 
