@@ -304,7 +304,7 @@ nuget davenport.fsharp
 
 **IMPORTANT**: The default JsonConverter used by the F# package uses the `Fable.JsonConverter` package internally to serialize things like Options, Union Types and so-on to a friendly JSON format that can then be easily deserialized by the same converter.
 
-In practice, this means that some values in the CouchDB database may not be in the same format or even the same type that you might be expecting. For example, the converter will convert the `int64` value `123456789L` to a string `"+123456789"`.
+To summarize, this means that some values in the CouchDB database may not be in the same format or even the same type that you might be expecting. For example, the converter will convert the `int64` value `123456789L` to a string `"+123456789"`.
 
 In practice, if you're using Davenport.Fsharp to serialize and deserialize the database's documents everything will work just fine. If you're using other tools to *also* interact with those documents (such as the admin UI or apps built with other languages), you'll need to be aware of how Fable.JsonConverter converts those types.
 
