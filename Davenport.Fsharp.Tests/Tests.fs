@@ -59,7 +59,7 @@ let asyncMap (fn: 'a -> 'b) (task: Async<'a>) = async {
 let tests =
     let t = System.Environment.CommandLine
     let debug = false
-    let fiddler = true
+    let fiddler = false
     let client =
         if fiddler then "localhost.fiddler:5984" else "localhost:5984"
         |> database "davenport_net_fsharp"
