@@ -133,6 +133,12 @@ let tests =
             Expect.equal defaultRecord.Baz doc.Baz ""
         }
 
+        ftestCaseAsync "Returns None for dogs that don't exist" <| async {
+            let! docResult = get<MyTestClass> (Guid.NewGuid().ToString()) None client
+
+            Expect.isNone docResult "DocResult should be None"
+        }
+
         testCaseAsync "Counts docs" <| async {
             do! create<MyTestClass> defaultRecord client |> Async.Ignore
 

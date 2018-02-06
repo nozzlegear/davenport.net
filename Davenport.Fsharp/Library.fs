@@ -113,6 +113,12 @@ let private convertPostPutCopyResponse (r: PostPutCopyResponse) =
       Rev = r.Rev
       Ok = Option.ofNullable r.Ok |> Option.defaultValue false }
 
+let rec private findDavenportExceptionOrRaise (exn: Exception) = 
+    match exn with 
+    | :? System.AggregateException as exn -> findDavenportExceptionOrRaise exn.InnerException 
+    | :? Davenport.Infrastructure.DavenportException as exn -> exn 
+    | _ -> raise exn
+
 let asyncMap (fn: 't -> 'u) task = async {
     let! result = task
 
@@ -276,9 +282,9 @@ let get<'doctype> id (rev: string option) props = async {
         match doc with
         | Choice1Of2 doc -> Option.get doc.Data |> Some // We want this to fail if, for some reason, the jsonconverter was unable to convert FsDoc.Data
         | Choice2Of2 exn ->
-            match exn with
-            | :? Davenport.Infrastructure.DavenportException as exn when exn.StatusCode = 404 -> None
-            | _ -> raise exn
+            match findDavenportExceptionOrRaise exn with 
+            | exn when exn.StatusCode = 404 -> None 
+            | exn -> raise exn
 }
 
 /// Lists all documents on the database.

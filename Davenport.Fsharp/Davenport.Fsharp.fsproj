@@ -4,7 +4,7 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <AssemblyName>Davenport.Fsharp</AssemblyName>
     <RootNamespace>Davenport.Fsharp</RootNamespace>
-    <Version>1.1.0</Version>
+    <Version>1.1.1</Version>
   </PropertyGroup>
   <PropertyGroup>
     <Description>Davenport is a CouchDB client for simplifying common tasks like get, list, create, update and delete. This package wraps the original C# package, making it much more friendly to the functional programming style of F#.</Description>
