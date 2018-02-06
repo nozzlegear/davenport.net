@@ -133,7 +133,7 @@ let tests =
             Expect.equal defaultRecord.Baz doc.Baz ""
         }
 
-        ftestCaseAsync "Returns None for dogs that don't exist" <| async {
+        testCaseAsync "Returns None for dogs that don't exist" <| async {
             let! docResult = get<MyTestClass> (Guid.NewGuid().ToString()) None client
 
             Expect.isNone docResult "DocResult should be None"
