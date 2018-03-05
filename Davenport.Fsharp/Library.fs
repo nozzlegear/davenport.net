@@ -52,7 +52,7 @@ let private toConfig<'doctype> (props: CouchProps) =
     let config = Davenport.Configuration(props.couchUrl, props.databaseName)
     config.Username <- Option.defaultValue "" props.username
     config.Password <- Option.defaultValue "" props.password
-    config.Converter <- FsConverter<'doctype>(props.id, props.rev, props.converter) :> JsonConverter
+    config.Converter <- Option.defaultWith (fun () -> FsConverter<'doctype>(props.id, props.rev, None) :> JsonConverter) props.converter
 
     props.onWarning
     |> Option.iter (fun handler -> handler config.Warning)
