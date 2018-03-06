@@ -374,3 +374,17 @@ let existsBySelector = convertMapToDict >> existsByDictionary
 /// Usage: existsByExpr<DocType> (<@ fun (c: DocType) -> c.SomeProp = SomeValue @>)
 /// NOTE: Davenport currently only supports simple 1 argument selectors.
 let existsByExpr<'doctype> = convertExprToMap<'doctype> >> existsByDictionary
+
+let unionize (fn: 'a -> 'b option) (computation: Async<'a>) = asyncMap fn computation
+
+let unionList (fn: 'a -> 'b option) (computation: Async<'a seq>) = 
+    let rec inner list output = 
+        match list with  
+        | el::rest -> 
+            fn el 
+            |> Option.map (fun r -> r::output)
+            |> Option.defaultValue output
+            |> inner rest
+        | [] -> output
+
+    asyncMap (fun r -> inner (List.ofSeq r) []) computation

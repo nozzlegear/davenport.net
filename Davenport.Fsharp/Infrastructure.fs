@@ -39,21 +39,20 @@ type FsConverter<'doctype>(idField: string, revField: string, customConverter: J
         let id: JToken option = Option.ofObj j.["_id"]
         let rev: JToken option = Option.ofObj j.["_rev"]
 
-        id
-        |> Option.iter (fun value ->
-            // Rename _id to idField
-            if idField <> "_id" then
-                j.Remove "_id" |> ignore
-                j.Add(idField, value)
-        )
+        // Rename the _id and _rev fields to whatever the type expects them to be
+        match id, idField = "_id" with 
+        | None, _
+        | Some _, true -> ()
+        | Some value, false -> 
+            j.Remove("_id") |> ignore 
+            j.Add(idField, value)
 
-        rev
-        |> Option.iter (fun value ->
-            // Rename _rev to revField
-            if revField <> "_rev" then
-                j.Remove "_rev" |> ignore
-                j.Add(revField, value)
-        )
+        match rev, revField = "_rev" with 
+        | None, _
+        | Some _, true -> ()
+        | Some value, false ->
+            j.Remove("_rev") |> ignore
+            j.Add(revField, value)
 
         let data = j.ToObject<'doctype>() // Warning: Adding serializer here causes Fable.JsonConverter to throw an exception when reading F# union types
         let output = FsDoc<'doctype>()

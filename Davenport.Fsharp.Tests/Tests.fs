@@ -55,13 +55,29 @@ let asyncMap (fn: 'a -> 'b) (task: Async<'a>) = async {
     return fn result
 }
 
+type FirstDoc = {
+    id: string
+    rev: string
+    hello: bool
+}
+
+type SecondDoc = {
+    id: string
+    rev: string
+    hello: int 
+}
+
+type EitherDoc = 
+    | Doc1 of FirstDoc
+    | Doc2 of SecondDoc
+
 [<Tests>]
 let tests =
-    let t = System.Environment.CommandLine
     let debug = false
     let fiddler = false
+    let url = if fiddler then "localhost.fiddler:5984" else System.Environment.GetEnvironmentVariable "COUCHDB_URL"
     let client =
-        if fiddler then "localhost.fiddler:5984" else "localhost:5984"
+        "localhost:5984"
         |> database "davenport_net_fsharp"
         |> idField "MyId"
         |> revField "MyRev"
@@ -77,7 +93,7 @@ let tests =
           System.Threading.Thread.Sleep(100)
         System.Diagnostics.Debugger.Break()
 
-    printfn "Configuring database."
+    printfn "Configuring database at url %s." url
 
     // Configure the database before running tests
     configureDatabase [] [] client
@@ -420,5 +436,33 @@ let tests =
             Expect.equal unionInt64.Union expectedUnionInt64 "Union int64 should be equal"
             Expect.equal dateTime.Date expectedDate "Date should be equal"
             Expect.equal decimal.Dec expectedDecimal "Decimal should be equal"
+        }
+
+        ftestCaseAsync "Converts result to union type" <| async {
+            let! firstDocResult = create<FirstDoc> ({ id = ""; rev = ""; hello = true }) client
+            let! secondDocResult = create<SecondDoc> ({ id = ""; rev = ""; hello = 117 }) client
+
+            let map (o: obj) =
+                match o with
+                | :? FirstDoc as x -> Doc1 x |> Some
+                | :? SecondDoc as x -> Doc2 x |> Some
+                | _ -> None
+
+            let! firstDoc = 
+                get firstDocResult.Id (Some firstDocResult.Rev) client
+                |> asyncMap (Option.bind map)
+            
+            Expect.isSome firstDoc "Result should not be None"
+            Expect.isTrue (firstDoc |> function | Some (Doc1 _) -> true | _ -> false) "Result should be FirstDoc union type." 
+            
+            let firstDoc = 
+                match firstDoc with 
+                | Some (Doc1 x) -> x
+                | _ -> failwith "Was not Some (Doc1 x)"
+
+            Expect.isTrue (firstDoc.GetType() = typeof<FirstDoc>) "firstDoc type mismatch"
+            Expect.isTrue firstDoc.hello "firstDoc.hello should equal true"
+            Expect.isNotEmpty firstDoc.id "firstDoc.id should not be empty"
+            Expect.isNotEmpty firstDoc.rev "firstDoc.rev should not be empty"
         }
     ]
