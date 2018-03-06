@@ -10,6 +10,16 @@ type FsPostPutCopyResponse = {
     Ok: bool
 }
 
+type DocType = string 
+
+type DocObject = obj 
+
+type DocResult = DocType * DocObject
+
+type Document = 
+    | SingleDocument of DocResult
+    | MultipleDocuments of DocResult list
+
 /// This type is combined with the custom json converter to allow consumers of this package to pass any F# record type to Davenport without turning their records into classes that inherit couchdoc.
 type FsDoc<'doctype>() =
     inherit Davenport.Entities.CouchDoc()
@@ -25,16 +35,14 @@ type FsConverter<'doctype>(idField: string, revField: string, customConverter: J
 
     override x.CanConvert objectType =
         // Only convert objects of the FsDoc<'doctype> type, or objects that the custom converter can convert
-        objectType = typeof<FsDoc<'doctype>> || x.CustomConverter.CanConvert objectType
+        match objectType with 
+        | t when t = typeof<Document> -> true
+        | t when t = typeof<FsDoc<'doctype>> -> true
+        | t when x.CustomConverter.CanConvert t -> true
+        | _ -> false
+        // objectType = typeof<FsDoc<'doctype>> || x.CustomConverter.CanConvert objectType
 
-    override x.ReadJson(reader: JsonReader, objectType: System.Type, existingValue: obj, serializer: JsonSerializer) =
-        if objectType <> typeof<FsDoc<'doctype>>
-        then
-            // Since this method will only be called if the type is FsDoc<'doctype> or a type that can be converted by the
-            // CustomConverter, we can safely use that converter here to read the value.
-            x.CustomConverter.ReadJson(reader, objectType, existingValue, serializer)
-        else
-
+    member x.ReadJsonAsFsDoc(reader: JsonReader, objectType: System.Type, existingValue: obj, serializer: JsonSerializer) = 
         let j = JObject.Load reader
         let id: JToken option = Option.ofObj j.["_id"]
         let rev: JToken option = Option.ofObj j.["_rev"]
@@ -68,6 +76,16 @@ type FsConverter<'doctype>(idField: string, revField: string, customConverter: J
         output.Data <- Some data
 
         output :> obj
+
+    member x.ReadJsonAsCouchDocUnion(reader: JsonReader, objectType: System.Type, existingValue: obj, serializer: JsonSerializer) = 
+        existingValue
+
+    override x.ReadJson(reader: JsonReader, objectType: System.Type, existingValue: obj, serializer: JsonSerializer) =
+        match objectType with 
+        | t when t = typeof<FsDoc<'doctype>> -> x.ReadJsonAsFsDoc
+        | t when t = typeof<Document> ->x.ReadJsonAsCouchDocUnion
+        | _ -> x.CustomConverter.ReadJson
+        <| (reader, objectType, existingValue, serializer)
 
     override x.WriteJson(writer: JsonWriter, objValue: obj, serializer: JsonSerializer) =
         // If the value is not an FsDoc use the Fable.JsonConverter to serialize it.

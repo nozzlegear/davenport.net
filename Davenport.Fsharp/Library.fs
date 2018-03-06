@@ -7,6 +7,7 @@ open System
 open System.Linq.Expressions
 open Microsoft.FSharp.Quotations
 open Microsoft.FSharp.Linq.RuntimeHelpers
+open Davenport.Fsharp.Infrastructure
 
 type Find =
     | EqualTo of obj
@@ -271,8 +272,8 @@ let executeView<'returnType> designDocName viewName (viewOptions: ViewOptions op
     |> Async.AwaitTask
 
 /// Gets the document with the given id. If a revision is given, that specific version will be returned.
-let get<'doctype> id (rev: string option) props = async {
-    let client = toClient<'doctype> props
+let get id (rev: string option) props = async {
+    let client = toClient<Document> props
     let! doc =
         client.GetAsync(id, Option.toObj rev)
         |> Async.AwaitTask

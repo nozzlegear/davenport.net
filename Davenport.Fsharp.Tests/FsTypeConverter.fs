@@ -13,32 +13,60 @@ let private fableConverter = Fable.JsonConverter()
 // Maybe a second list of [UnionType, obj -> UnionType] tuples? The first list of tuples converts the individual docs, the second
 // list of tuples transforms the docs into union types? Return an option to skip that transformation?
 
-type SupportedTypeName = string
+type TypeName = string
 
-type SupportedType = SupportedTypeName * System.Type
+type SupportedTypeConfig = private {
+    ``type``: System.Type
+    typeName: TypeName
+    idField: string option 
+    revField: string option
+}
 
 type ObjectType = 
     | SystemType of System.Type 
     | StringType of string
     | JtokenOptionType of JToken option
 
-type FsTypeConverter(idField: string, revField: string, supportedTypes: SupportedType list) = 
+type CouchResult =  TypeName * Newtonsoft.Json.Linq.JObject
+
+type FsTypeConverter(supportedTypes: SupportedTypeConfig list) = 
     inherit JsonConverter()
 
     member __.CustomConverter = fableConverter :> JsonConverter
 
-    member private x.CanConvertDirectly = function  
+    member private x.CanConvertDirectly t = 
+        match t with  
         | SystemType objectType -> 
             supportedTypes
-            |> Seq.exists (fun (_, t) -> t = objectType)
+            |> Seq.exists (fun t -> t.``type`` = objectType)
         | StringType objectType ->
             supportedTypes 
-            |> Seq.exists (fun (t, _) -> t = objectType)
+            |> Seq.exists (fun t -> t.typeName = objectType)
         | JtokenOptionType (Some s) -> 
             s.Value<string>()
             |> StringType
             |> x.CanConvertDirectly 
         | JtokenOptionType None -> false 
+
+    member private x.GetSupportedType t = 
+        match x.CanConvertDirectly t with 
+        | false -> None
+        | true ->
+            match t with 
+            | SystemType objectType ->
+                supportedTypes
+                |> Seq.find (fun t -> t.``type`` = objectType)
+                |> Some
+            | StringType objectType -> 
+                supportedTypes
+                |> Seq.find (fun t -> t.typeName = objectType)
+                |> Some
+            | JtokenOptionType (Some s) ->
+                s.Value<string>()
+                |> StringType
+                |> x.GetSupportedType
+            | JtokenOptionType None -> 
+                failwithf "Cannot determine supported type for %A" t
 
     override x.CanConvert objectType = 
         x.CanConvertDirectly (SystemType objectType) || x.CustomConverter.CanConvert objectType
@@ -53,30 +81,45 @@ type FsTypeConverter(idField: string, revField: string, supportedTypes: Supporte
         else 
 
         let docType = 
-            docTypeToken 
-            |> Option.get 
-            |> fun t -> t.Value<string>()
+            JtokenOptionType docTypeToken 
+            |> x.GetSupportedType
+            |> Option.get
+
         let id: JToken option = Option.ofObj j.["_id"]
         let rev: JToken option = Option.ofObj j.["_rev"]
 
         // Rename the _id and _rev fields to whatever the type expects them to be
-        match id, idField = "_id" with 
-        | None, _
-        | Some _, true -> ()
-        | Some value, false -> 
+        match id, docType.idField with 
+        | None, _ -> ()
+        | _, None -> ()
+        | _, Some fieldName when fieldName = "_id" -> ()
+        | Some value, Some fieldName -> 
             j.Remove("_id") |> ignore 
-            j.Add(idField, value)
+            j.Add(fieldName, value)
 
-        match rev, revField = "_rev" with 
-        | None, _
-        | Some _, true -> ()
-        | Some value, false ->
+        match rev, docType.revField with 
+        | None, _ -> ()
+        | _, None -> ()
+        | _, Some fieldName when fieldName = "_rev" -> ()
+        | Some value, Some fieldName ->
             j.Remove("_rev") |> ignore
-            j.Add(revField, value)
+            j.Add(fieldName, value)
 
+        let output: CouchResult = docType.typeName, j
+
+        // 2018-03-06 16:50 
+        // Current intended usage:
+        // singleDocType typeof<RandomType> "random-type"
+        // |> ...configure other client stuff
+        // |> get id rev
+        // |> fun (typeName, jtoken, defaultConverter) -> if typeName == "random-type" then jtoken.ToObject<RandomType>()
+        // for custom deserialization
+        // OR
+        // |> deserialize<RandomType> for default deserialization
+
+        // 2018-03-05 
         // Trying to figure out how to get from this point, where we know the string type that was written by x.WriteJson,
         // to converting the result to a union type.
-
         // Maybe add a `multipleDocTypes` function to the library itself, and that function accepts a list of the TypeString * System.Type * Id field * Rev field
         // to map all the types it will deal with. Then the original FsConverter receives those types (if it's not in multiple doc mode the converter still receives the
         // list, just with one single element.)

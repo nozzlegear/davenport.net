@@ -56,14 +56,14 @@ let asyncMap (fn: 'a -> 'b) (task: Async<'a>) = async {
 }
 
 type FirstDoc = {
-    id: string
-    rev: string
+    MyId: string
+    MyRev: string
     hello: bool
 }
 
 type SecondDoc = {
-    id: string
-    rev: string
+    MyId: string
+    MyRev: string
     hello: int 
 }
 
@@ -77,7 +77,7 @@ let tests =
     let fiddler = false
     let url = if fiddler then "localhost.fiddler:5984" else System.Environment.GetEnvironmentVariable "COUCHDB_URL"
     let client =
-        "localhost:5984"
+        url
         |> database "davenport_net_fsharp"
         |> idField "MyId"
         |> revField "MyRev"
@@ -96,8 +96,8 @@ let tests =
     printfn "Configuring database at url %s." url
 
     // Configure the database before running tests
-    configureDatabase [] [] client
-    |> Async.RunSynchronously
+    // configureDatabase [] [] client
+    // |> Async.RunSynchronously
 
     printfn "Database configured."
 
@@ -439,14 +439,16 @@ let tests =
         }
 
         ftestCaseAsync "Converts result to union type" <| async {
-            let! firstDocResult = create<FirstDoc> ({ id = ""; rev = ""; hello = true }) client
-            let! secondDocResult = create<SecondDoc> ({ id = ""; rev = ""; hello = 117 }) client
+            let! firstDocResult = create<FirstDoc> ({ MyId = ""; MyRev = ""; hello = true }) client
+            let! secondDocResult = create<SecondDoc> ({ MyId = ""; MyRev = ""; hello = 117 }) client
 
             let map (o: obj) =
                 match o with
                 | :? FirstDoc as x -> Doc1 x |> Some
                 | :? SecondDoc as x -> Doc2 x |> Some
-                | _ -> None
+                | _ -> 
+                    printfn "%A" o
+                    None
 
             let! firstDoc = 
                 get firstDocResult.Id (Some firstDocResult.Rev) client
@@ -462,7 +464,7 @@ let tests =
 
             Expect.isTrue (firstDoc.GetType() = typeof<FirstDoc>) "firstDoc type mismatch"
             Expect.isTrue firstDoc.hello "firstDoc.hello should equal true"
-            Expect.isNotEmpty firstDoc.id "firstDoc.id should not be empty"
-            Expect.isNotEmpty firstDoc.rev "firstDoc.rev should not be empty"
+            Expect.isNotEmpty firstDoc.MyId "firstDoc.id should not be empty"
+            Expect.isNotEmpty firstDoc.MyRev "firstDoc.rev should not be empty"
         }
     ]
