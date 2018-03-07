@@ -124,7 +124,7 @@ type FsTypeConverter(supportedTypes: SupportedTypeConfig list) =
         // to map all the types it will deal with. Then the original FsConverter receives those types (if it's not in multiple doc mode the converter still receives the
         // list, just with one single element.)
 
-        Map.empty :> obj
+        output :> obj
 
     override x.WriteJson(writer: JsonWriter, objValue: obj, serializer: JsonSerializer) =
         let objectType = objValue.GetType()
@@ -136,13 +136,16 @@ type FsTypeConverter(supportedTypes: SupportedTypeConfig list) =
 
         writer.WriteStartObject()
 
-        let typeName, _ = 
-            supportedTypes 
-            |> Seq.find (fun (_, t) -> t = objectType)
-
+        let docType = 
+            SystemType objectType
+            |> x.GetSupportedType
+            |> Option.get
+        let idField = Option.defaultValue "_id" docType.idField
+        let revField = Option.defaultValue "_rev" docType.revField
+            
         // Write the type directly to the document so we can use it when reading json to determine which type it should be parsed to.
         writer.WritePropertyName "type"
-        writer.WriteValue typeName
+        writer.WriteValue docType.typeName
 
         // Convert the object to a JObject so we can pluck out fields
         let j = JObject.FromObject objValue

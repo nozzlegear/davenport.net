@@ -7,7 +7,9 @@ open System
 open System.Linq.Expressions
 open Microsoft.FSharp.Quotations
 open Microsoft.FSharp.Linq.RuntimeHelpers
-open Davenport.Fsharp.Infrastructure
+open System.Net.Http
+open System.Net.Http.Headers
+open System.Net
 
 type Find =
     | EqualTo of obj
@@ -17,50 +19,105 @@ type Find =
     | GreaterThanOrEqualTo of obj
     | LessThanOrEqualTo of obj
 
-type CouchProps = private {
-    username: string option
-    password: string option
-    converter: JsonConverter option
-    databaseName: string
-    couchUrl: string
-    id: string
-    rev: string
-    onWarning: (IEvent<EventHandler<string>,string> -> unit) option
-}
+type private Data = 
+    | JsonString of string 
+    | JsonObject of obj
 
-type ViewProps = private {
-    map: string option
-    reduce: string option
-}
+type private QuerystringSegment = 
+    | QS of string * string
 
-let private defaultCouchProps() = {
-        username = None
-        password = None
-        converter = None
-        databaseName = ""
-        couchUrl = ""
-        id = "_id"
-        rev = "_rev"
-        onWarning = None
+type CouchProps = 
+    private { 
+        username: string option
+        password: string option
+        converter: JsonConverter option
+        databaseName: string
+        couchUrl: string
+        id: string
+        rev: string
+        onWarning: (IEvent<EventHandler<string>,string> -> unit) option }
+    with 
+    static member internal Default = 
+        { username = None 
+          password = None 
+          converter = None 
+          databaseName = ""
+          couchUrl = ""
+          id = "_id"
+          rev = "_rev" 
+          onWarning = None }
+
+type ViewProps = 
+    private {
+        map: string option
+        reduce: string option
     }
+    with
+    static member internal Default = { map = None; reduce = None }
 
-let private defaultViewProps() = {
-    map = None
-    reduce = None
-}
+// let private toConfig<'doctype> (props: CouchProps) =
+//     let config = Davenport.Configuration(props.couchUrl, props.databaseName)
+//     config.Username <- Option.defaultValue "" props.username
+//     config.Password <- Option.defaultValue "" props.password
+//     config.Converter <- Option.defaultWith (fun () -> FsConverter<'doctype>(props.id, props.rev, None) :> JsonConverter) props.converter
 
-let private toConfig<'doctype> (props: CouchProps) =
-    let config = Davenport.Configuration(props.couchUrl, props.databaseName)
-    config.Username <- Option.defaultValue "" props.username
-    config.Password <- Option.defaultValue "" props.password
-    config.Converter <- Option.defaultWith (fun () -> FsConverter<'doctype>(props.id, props.rev, None) :> JsonConverter) props.converter
+//     props.onWarning
+//     |> Option.iter (fun handler -> handler config.Warning)
 
-    props.onWarning
-    |> Option.iter (fun handler -> handler config.Warning)
+//     config
 
-    config
+// let private toClient<'doctype> = toConfig<'doctype> >> Davenport.Client<FsDoc<'doctype>>
 
-let private toClient<'doctype> = toConfig<'doctype> >> Davenport.Client<FsDoc<'doctype>>
+let private httpClient = new HttpClient()
+
+let internal makeUrl pathSegments querySegments = 
+    let rec combinePaths (remaining: string list) output = 
+        match remaining with 
+        | segment::rest -> combinePaths rest (output@[segment.TrimEnd '/'])
+        | [] -> output
+
+    let rec combineQuery (remaining: QuerystringSegment list) output = 
+        match remaining with 
+        | QS (key, value)::rest -> combineQuery rest output@[sprintf "%s=%s" (WebUtility.UrlEncode key) (WebUtility.UrlEncode value)]
+        | [] -> output
+
+    let ub = 
+        String.Join("/", combinePaths pathSegments [])
+        |> System.UriBuilder
+    
+    ub.Query <- String.Join("&", combineQuery querySegments [])
+    ub.Scheme <- 
+        match ub.Scheme with 
+        | "" 
+        | " "
+        | "localhost" // When a URL starts with localhost and doesn't have a scheme, System.Uri thinks localhost *is* the scheme
+        | null -> System.Uri.UriSchemeHttp 
+        | s -> 
+            printfn "UB scheme is %s" s
+            ub.Scheme 
+
+    ub.ToString()
+    
+
+let prepareRequest (props: CouchProps) path (rev: string option) = 
+    let url = makeUrl [props.couchUrl; props.databaseName; path]
+    let req = new HttpRequestMessage()
+    
+    match props.username, props.password with 
+    | None, None -> ()
+    | _, _ -> 
+        let username = Option.defaultValue "" props.username
+        let password = Option.defaultValue "" props.password
+        req.Headers.Authorization <- AuthenticationHeaderValue("Basic", System.Convert.ToBase64String <| sprintf "%s:%s" username password)
+        
+    match rev with 
+    | None -> ()
+    | Some rev -> 
+    ()
+
+let sendRequest req method (content: Data) = ()
+
+let throwIfError req result rawBody = ()
 
 /// Converts an F# expression to a LINQ expression, then converts that LINQ expression to a Map<string, Find> due to an incompatibility with the FsDoc and the types expected by Find, Exists and CountByExpression functions.
 let private convertExprToMap<'a> (expr : Expr<'a -> bool>) =
@@ -136,7 +193,7 @@ let asyncMapSeq (fn: 't -> 'u) task = async {
 let toSeq x = Seq.ofList [x]
 
 /// Used to create a DesignDoc view.
-let mapFunction func = { defaultViewProps() with map = Some func }
+let mapFunction func = { ViewProps.Default with map = Some func }
 
 /// Used to create a DesignDoc view.
 let reduceFunction func props = { props with reduce = Some func }
@@ -157,7 +214,7 @@ let designDoc name (views: View seq) =
     d
 
 let database name couchUrl =
-    { defaultCouchProps() with databaseName = name; couchUrl = couchUrl }
+    { CouchProps.Default with databaseName = name; couchUrl = couchUrl }
 
 let username username config = { config with username = Some username }
 
