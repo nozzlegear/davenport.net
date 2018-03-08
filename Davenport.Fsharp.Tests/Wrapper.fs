@@ -1,4 +1,4 @@
-module Tests
+module Davenport.Fsharp.Tests.Wrapper
 
 open System
 open Expecto
@@ -102,6 +102,14 @@ let tests =
     printfn "Database configured."
 
     testList "Davenport.Fsharp.Wrapper" [
+        testCaseAsync "Gets a doc in the new fashion" <| async {
+            let! created = create defaultRecord client
+            let! json = get created.Id (Some created.Rev) client
+            let deserialized = json |> mapDoc<MyTestClass>
+
+            ()
+        }
+
         testCaseAsync "Creates docs" <| async {
             let! doc = create<MyTestClass> defaultRecord client
 

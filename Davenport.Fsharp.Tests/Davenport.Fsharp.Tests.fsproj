@@ -6,7 +6,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="FsTypeConverter.fs" />
-    <Compile Include="Tests.fs" />
+    <Compile Include="Infrastructure.fs" />
+    <Compile Include="Wrapper.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
   <ItemGroup>

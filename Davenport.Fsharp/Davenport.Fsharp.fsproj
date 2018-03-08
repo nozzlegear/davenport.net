@@ -16,6 +16,7 @@
     <PackageTags>couchdb,couch,davenport,database,fsharp,functional,f#</PackageTags>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Converters.fs" />
     <Compile Include="Infrastructure.fs" />
     <Compile Include="Library.fs" />
   </ItemGroup>

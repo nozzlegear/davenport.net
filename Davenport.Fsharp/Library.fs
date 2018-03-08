@@ -10,50 +10,7 @@ open Microsoft.FSharp.Linq.RuntimeHelpers
 open System.Net.Http
 open System.Net.Http.Headers
 open System.Net
-
-type Find =
-    | EqualTo of obj
-    | NotEqualTo of obj
-    | GreaterThan of obj
-    | LesserThan of obj
-    | GreaterThanOrEqualTo of obj
-    | LessThanOrEqualTo of obj
-
-type private Data = 
-    | JsonString of string 
-    | JsonObject of obj
-
-type private QuerystringSegment = 
-    | QS of string * string
-
-type CouchProps = 
-    private { 
-        username: string option
-        password: string option
-        converter: JsonConverter option
-        databaseName: string
-        couchUrl: string
-        id: string
-        rev: string
-        onWarning: (IEvent<EventHandler<string>,string> -> unit) option }
-    with 
-    static member internal Default = 
-        { username = None 
-          password = None 
-          converter = None 
-          databaseName = ""
-          couchUrl = ""
-          id = "_id"
-          rev = "_rev" 
-          onWarning = None }
-
-type ViewProps = 
-    private {
-        map: string option
-        reduce: string option
-    }
-    with
-    static member internal Default = { map = None; reduce = None }
+open Davenport.Fsharp.Converters
 
 // let private toConfig<'doctype> (props: CouchProps) =
 //     let config = Davenport.Configuration(props.couchUrl, props.databaseName)
@@ -68,67 +25,6 @@ type ViewProps =
 
 // let private toClient<'doctype> = toConfig<'doctype> >> Davenport.Client<FsDoc<'doctype>>
 
-let private httpClient = new HttpClient()
-
-let internal makeUrl pathSegments querySegments = 
-    let rec combinePaths (remaining: string list) output = 
-        match remaining with 
-        | segment::rest -> combinePaths rest (output@[segment.TrimEnd '/'])
-        | [] -> output
-
-    let rec combineQuery (remaining: QuerystringSegment list) output = 
-        match remaining with 
-        | QS (key, value)::rest -> combineQuery rest output@[sprintf "%s=%s" (WebUtility.UrlEncode key) (WebUtility.UrlEncode value)]
-        | [] -> output
-
-    let ub = 
-        String.Join("/", combinePaths pathSegments [])
-        |> System.UriBuilder
-    
-    ub.Query <- String.Join("&", combineQuery querySegments [])
-    ub.Scheme <- 
-        match ub.Scheme with 
-        | "" 
-        | " "
-        | "localhost" // When a URL starts with localhost and doesn't have a scheme, System.Uri thinks localhost *is* the scheme
-        | null -> System.Uri.UriSchemeHttp 
-        | s -> 
-            printfn "UB scheme is %s" s
-            ub.Scheme 
-
-    ub.ToString()
-    
-
-let prepareRequest (props: CouchProps) path (rev: string option) = 
-    let url = makeUrl [props.couchUrl; props.databaseName; path]
-    let req = new HttpRequestMessage()
-    
-    match props.username, props.password with 
-    | None, None -> ()
-    | _, _ -> 
-        let username = Option.defaultValue "" props.username
-        let password = Option.defaultValue "" props.password
-        req.Headers.Authorization <- AuthenticationHeaderValue("Basic", System.Convert.ToBase64String <| sprintf "%s:%s" username password)
-        
-    match rev with 
-    | None -> ()
-    | Some rev -> 
-    ()
-
-let sendRequest req method (content: Data) = ()
-
-let throwIfError req result rawBody = ()
-
-/// Converts an F# expression to a LINQ expression, then converts that LINQ expression to a Map<string, Find> due to an incompatibility with the FsDoc and the types expected by Find, Exists and CountByExpression functions.
-let private convertExprToMap<'a> (expr : Expr<'a -> bool>) =
-    /// Source: https://stackoverflow.com/a/23390583
-    let linq = LeafExpressionConverter.QuotationToExpression expr
-    let call = linq :?> MethodCallExpression
-    let lambda = call.Arguments.[0] :?> LambdaExpression
-
-    Expression.Lambda<Func<'a, bool>>(lambda.Body, lambda.Parameters)
-    |> Davenport.Infrastructure.ExpressionParser.Parse
-
 let private listedRowToDoctypeRow<'doctype> (row: ListedRow<FsDoc<'doctype>>) =
     let newRow = ListedRow<'doctype>()
     newRow.Doc <- Option.get row.Doc.Data
@@ -137,45 +33,6 @@ let private listedRowToDoctypeRow<'doctype> (row: ListedRow<FsDoc<'doctype>>) =
     newRow.Value <- row.Value
 
     newRow
-
-let private convertMapToDict (map: Map<string, Find list>) =
-    let rec convert remaining (expression: FindExpression) =
-        match remaining with
-        | EqualTo x::tail ->
-            expression.EqualTo <- x
-            convert tail expression
-        | NotEqualTo x::tail ->
-            expression.NotEqualTo <- x
-            convert tail expression
-        | GreaterThan x::tail ->
-            expression.GreaterThan <- x
-            convert tail expression
-        | LesserThan x::tail ->
-            expression.LesserThan <- x
-            convert tail expression
-        | GreaterThanOrEqualTo x::tail ->
-            expression.GreaterThanOrEqualTo <- x
-            convert tail expression
-        | LessThanOrEqualTo x::tail ->
-            expression.LesserThanOrEqualTo <- x
-            convert tail expression
-        | [] -> expression
-
-    map
-    |> Map.map (fun _ list -> convert list (FindExpression()))
-    |> Collections.Generic.Dictionary
-
-let private convertPostPutCopyResponse (r: PostPutCopyResponse) =
-    // Convert 'Ok' prop to false if it's null.
-    { Id = r.Id
-      Rev = r.Rev
-      Ok = Option.ofNullable r.Ok |> Option.defaultValue false }
-
-let rec private findDavenportExceptionOrRaise (exn: Exception) = 
-    match exn with 
-    | :? System.AggregateException as exn -> findDavenportExceptionOrRaise exn.InnerException 
-    | :? Davenport.Infrastructure.DavenportException as exn -> exn 
-    | _ -> raise exn
 
 let asyncMap (fn: 't -> 'u) task = async {
     let! result = task
@@ -329,21 +186,23 @@ let executeView<'returnType> designDocName viewName (viewOptions: ViewOptions op
     |> Async.AwaitTask
 
 /// Gets the document with the given id. If a revision is given, that specific version will be returned.
-let get id (rev: string option) props = async {
-    let client = toClient<Document> props
-    let! doc =
-        client.GetAsync(id, Option.toObj rev)
-        |> Async.AwaitTask
-        |> Async.Catch
+// let get id (rev: string option) props = async {
+//     let client = toClient<Document> props
+//     let! doc =
+//         client.GetAsync(id, Option.toObj rev)
+//         |> Async.AwaitTask
+//         |> Async.Catch
 
-    return
-        match doc with
-        | Choice1Of2 doc -> Option.get doc.Data |> Some // We want this to fail if, for some reason, the jsonconverter was unable to convert FsDoc.Data
-        | Choice2Of2 exn ->
-            match findDavenportExceptionOrRaise exn with 
-            | exn when exn.StatusCode = 404 -> None 
-            | exn -> raise exn
-}
+//     return
+//         match doc with
+//         | Choice1Of2 doc -> Option.get doc.Data |> Some // We want this to fail if, for some reason, the jsonconverter was unable to convert FsDoc.Data
+//         | Choice2Of2 exn ->
+//             match findDavenportExceptionOrRaise exn with 
+//             | exn when exn.StatusCode = 404 -> None 
+//             | exn -> raise exn
+// }
+
+let get id rev = executeRequest HttpMethod.Get id (revMap rev) None
 
 /// Lists all documents on the database.
 let listWithDocs<'doctype> (listOptions: ListOptions option) props = async {
