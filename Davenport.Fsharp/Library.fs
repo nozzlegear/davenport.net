@@ -11,6 +11,7 @@ open System.Net.Http
 open System.Net.Http.Headers
 open System.Net
 open Davenport.Fsharp.Converters
+open Davenport.Fsharp.Types
 
 // let private toConfig<'doctype> (props: CouchProps) =
 //     let config = Davenport.Configuration(props.couchUrl, props.databaseName)
@@ -25,6 +26,18 @@ open Davenport.Fsharp.Converters
 
 // let private toClient<'doctype> = toConfig<'doctype> >> Davenport.Client<FsDoc<'doctype>>
 
+let private defaultProps =  
+    { username = None 
+      password = None 
+      converter = FsConverter []
+      databaseName = ""
+      couchUrl = ""
+      id = "_id"
+      rev = "_rev" 
+      onWarning = None }
+
+let private defaultViewProps = { map = None; reduce = None }
+
 let private listedRowToDoctypeRow<'doctype> (row: ListedRow<FsDoc<'doctype>>) =
     let newRow = ListedRow<'doctype>()
     newRow.Doc <- Option.get row.Doc.Data
@@ -34,23 +47,8 @@ let private listedRowToDoctypeRow<'doctype> (row: ListedRow<FsDoc<'doctype>>) =
 
     newRow
 
-let asyncMap (fn: 't -> 'u) task = async {
-    let! result = task
-
-    return fn result
-}
-
-let asyncMapSeq (fn: 't -> 'u) task = async {
-    let! result = task
-
-    return Seq.map fn result
-}
-
-/// Creates a sequence with a length of one out of the object given.
-let toSeq x = Seq.ofList [x]
-
 /// Used to create a DesignDoc view.
-let mapFunction func = { ViewProps.Default with map = Some func }
+let mapFunction func = { defaultViewProps with map = Some func }
 
 /// Used to create a DesignDoc view.
 let reduceFunction func props = { props with reduce = Some func }
@@ -71,7 +69,7 @@ let designDoc name (views: View seq) =
     d
 
 let database name couchUrl =
-    { CouchProps.Default with databaseName = name; couchUrl = couchUrl }
+    { defaultProps with databaseName = name; couchUrl = couchUrl }
 
 let username username config = { config with username = Some username }
 
@@ -202,7 +200,24 @@ let executeView<'returnType> designDocName viewName (viewOptions: ViewOptions op
 //             | exn -> raise exn
 // }
 
-let get id rev = executeRequest HttpMethod.Get id (revMap rev) None
+let mapDoc (fn: Document) (computation: Async<string>) = 
+    // This will receive the async task from e.g. `get`, plus accept an arbitrary function that will
+    // receive a (typeName: string -> jtoken -> useDefaultDeserializer: unit -> 'a)
+    ""
+
+let mapDocList (fn: DocumentList) (computation: Async<string>) = 
+    ""
+
+let getRaw id rev = executeRequest HttpMethod.Get id (qsFromRev rev) None
+
+let get id rev props = 
+    getRaw id rev props
+    |> asyncMap (stringToDocument props.converter)
+
+let allDocsRaw qs = 
+    executeRequest HttpMethod.Get "_all_docs" qs None
+
+let countRaw = () // TODO: Use the allDocs function with a limit of 0 to get the total rows.
 
 /// Lists all documents on the database.
 let listWithDocs<'doctype> (listOptions: ListOptions option) props = async {

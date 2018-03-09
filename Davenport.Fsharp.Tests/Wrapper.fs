@@ -1,8 +1,9 @@
 module Davenport.Fsharp.Tests.Wrapper
 
 open System
-open Expecto
 open Davenport.Fsharp.Wrapper
+open Expecto
+open Expecto.Flip
 
 type MyUnion =
     | Case1 of string
@@ -47,7 +48,7 @@ let defaultDesignDocs =
     |> designDoc designDocName
     |> toSeq
 
-let notNullOrEmpty (s: string) = String.IsNullOrEmpty s |> Expect.isFalse
+let notNullOrEmpty (s: string) = String.IsNullOrEmpty s >> Expect.isFalse
 
 let asyncMap (fn: 'a -> 'b) (task: Async<'a>) = async {
     let! result = task
@@ -102,9 +103,16 @@ let tests =
     printfn "Database configured."
 
     testList "Davenport.Fsharp.Wrapper" [
+        testCaseAsync "Gets a document's raw json" <| async {
+            let! created = create defaultRecord client
+            let! json = getRaw created.Id (Some created.Rev) client
+
+            String.IsNullOrEmpty json
+            |> Expect.isFalse "JSON string should not be empty"
+        }
         testCaseAsync "Gets a doc in the new fashion" <| async {
             let! created = create defaultRecord client
-            let! json = get created.Id (Some created.Rev) client
+            let! json = getRaw created.Id (Some created.Rev) client
             let deserialized = json |> mapDoc<MyTestClass>
 
             ()

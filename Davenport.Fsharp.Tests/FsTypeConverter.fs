@@ -15,6 +15,14 @@ let private fableConverter = Fable.JsonConverter()
 
 type TypeName = string
 
+type DocData = JToken 
+
+type CouchObject = TypeName * DocData
+
+type Document = 
+    | Doc of CouchObject
+    | DocList of CouchObject list
+
 type SupportedTypeConfig = private {
     ``type``: System.Type
     typeName: TypeName
@@ -39,6 +47,7 @@ type FsTypeConverter(supportedTypes: SupportedTypeConfig list) =
         | SystemType objectType -> 
             supportedTypes
             |> Seq.exists (fun t -> t.``type`` = objectType)
+            || objectType = typeof<Document>
         | StringType objectType ->
             supportedTypes 
             |> Seq.exists (fun t -> t.typeName = objectType)
@@ -69,7 +78,8 @@ type FsTypeConverter(supportedTypes: SupportedTypeConfig list) =
                 failwithf "Cannot determine supported type for %A" t
 
     override x.CanConvert objectType = 
-        x.CanConvertDirectly (SystemType objectType) || x.CustomConverter.CanConvert objectType
+        x.CanConvertDirectly (SystemType objectType) 
+        || x.CustomConverter.CanConvert objectType
 
     override x.ReadJson(reader: JsonReader, objectType: System.Type, existingValue: obj, serializer: JsonSerializer) = 
         let j = JObject.Load reader 
@@ -105,26 +115,29 @@ type FsTypeConverter(supportedTypes: SupportedTypeConfig list) =
             j.Remove("_rev") |> ignore
             j.Add(fieldName, value)
 
-        let output: CouchResult = docType.typeName, j
+        if objectType = typeof<Document> then 
+            let output: CouchResult = docType.typeName, j
 
-        // 2018-03-06 16:50 
-        // Current intended usage:
-        // singleDocType typeof<RandomType> "random-type"
-        // |> ...configure other client stuff
-        // |> get id rev
-        // |> fun (typeName, jtoken, defaultConverter) -> if typeName == "random-type" then jtoken.ToObject<RandomType>()
-        // for custom deserialization
-        // OR
-        // |> deserialize<RandomType> for default deserialization
+            // 2018-03-06 16:50 
+            // Current intended usage:
+            // singleDocType typeof<RandomType> "random-type"
+            // |> ...configure other client stuff
+            // |> get id rev
+            // |> fun (typeName, jtoken, defaultConverter) -> if typeName == "random-type" then jtoken.ToObject<RandomType>()
+            // for custom deserialization
+            // OR
+            // |> deserialize<RandomType> for default deserialization
 
-        // 2018-03-05 
-        // Trying to figure out how to get from this point, where we know the string type that was written by x.WriteJson,
-        // to converting the result to a union type.
-        // Maybe add a `multipleDocTypes` function to the library itself, and that function accepts a list of the TypeString * System.Type * Id field * Rev field
-        // to map all the types it will deal with. Then the original FsConverter receives those types (if it's not in multiple doc mode the converter still receives the
-        // list, just with one single element.)
+            // 2018-03-05 
+            // Trying to figure out how to get from this point, where we know the string type that was written by x.WriteJson,
+            // to converting the result to a union type.
+            // Maybe add a `multipleDocTypes` function to the library itself, and that function accepts a list of the TypeString * System.Type * Id field * Rev field
+            // to map all the types it will deal with. Then the original FsConverter receives those types (if it's not in multiple doc mode the converter still receives the
+            // list, just with one single element.)
 
-        output :> obj
+            output :> obj
+        else 
+            j.ToObject(objectType)
 
     override x.WriteJson(writer: JsonWriter, objValue: obj, serializer: JsonSerializer) =
         let objectType = objValue.GetType()

@@ -15,60 +15,24 @@ open System.Net.Http
 open System.Net.Http.Headers
 open System.Net
 open Davenport.Fsharp.Converters
-open Davenport.Infrastructure
+open Davenport.Fsharp.Types
 
-type CouchProps = 
-    private { 
-        username: string option
-        password: string option
-        converter: JsonConverter
-        databaseName: string
-        couchUrl: string
-        id: string
-        rev: string
-        onWarning: (IEvent<EventHandler<string>,string> -> unit) option }
-    with 
-    static member internal Default = 
-        { username = None 
-          password = None 
-          converter = FsConverter("id", "rev", None)
-          databaseName = ""
-          couchUrl = ""
-          id = "_id"
-          rev = "_rev" 
-          onWarning = None }
+let internal asyncMap (fn: 't -> 'u) task = async {
+    let! result = task
 
-type ViewProps = 
-    private {
-        map: string option
-        reduce: string option
-    }
-    with
-    static member internal Default = { map = None; reduce = None }
-
-/// Translates the C# PostPutCopyResponse, which contains a nullable bool Ok prop, to F# removing the nullable bool.
-type FsPostPutCopyResponse = {
-    Id: string
-    Rev: string
-    Ok: bool
+    return fn result
 }
 
-type Data = 
-    | JsonString of string 
-    | JsonObject of obj
+let internal asyncMapSeq (fn: 't -> 'u) task = async {
+    let! result = task
 
-type Find =
-    | EqualTo of obj
-    | NotEqualTo of obj
-    | GreaterThan of obj
-    | LesserThan of obj
-    | GreaterThanOrEqualTo of obj
-    | LessThanOrEqualTo of obj
+    return Seq.map fn result
+}
 
 /// <summary>
 /// Converts an F# expression to a LINQ expression, then converts that LINQ expression to a Map<string, Find> due to an incompatibility with the FsDoc and the types expected by Find, Exists and CountByExpression functions.
 /// </summary>
-let private convertExprToMap<'a> (expr : Expr<'a -> bool>) =
+let convertExprToMap<'a> (expr : Expr<'a -> bool>) =
     /// Source: https://stackoverflow.com/a/23390583
     let linq = LeafExpressionConverter.QuotationToExpression expr
     let call = linq :?> MethodCallExpression
@@ -110,7 +74,7 @@ let convertPostPutCopyResponse (r: PostPutCopyResponse) =
       Rev = r.Rev
       Ok = Option.ofNullable r.Ok |> Option.defaultValue false }
 
-let rec private findDavenportExceptionOrRaise (exn: Exception) = 
+let rec findDavenportExceptionOrRaise (exn: Exception) = 
     match exn with 
     | :? System.AggregateException as exn -> findDavenportExceptionOrRaise exn.InnerException 
     | :? Davenport.Infrastructure.DavenportException as exn -> exn 
@@ -139,14 +103,16 @@ let makeUrl pathSegments (querystring: Map<string, string>) =
         |> fun s -> String.Join("&", s)
 
     ub.ToString()
-    
+   
+// Because of the way http connections work, it's best to have one HttpClient instance for the whole application.
+// https://blogs.msdn.microsoft.com/alazarev/2017/12/29/disposable-finalizers-and-httpclient/
 let private httpClient = new HttpClient()
 
 let toJson converter object = JsonConvert.SerializeObject(object, [|converter|])
 
 let ofJson<'a> converter json = JsonConvert.DeserializeObject<'a>(json, [|converter|])
 
-let revMap (rev: string option) =
+let qsFromRev (rev: string option) =
     rev
     |> Option.map (fun rev -> ["rev", rev :> obj])
     |> Option.defaultValue []
@@ -198,17 +164,12 @@ let executeRequest method path (qs: Map<string, obj>) (body: 'a option) (props: 
                 sprintf "Error with %s request for CouchDB database %s at %s. %i %s"
                     method.Method props.databaseName url code response.ReasonPhrase
 
-            let ex = DavenportException(message)
-            ex.StatusCode <- code
-            ex.StatusText <- response.ReasonPhrase
-            ex.ResponseBody <- rawBody
-            ex.Url <- url
-
-            raise ex
+            DavenportException(message, code, response.ReasonPhrase, rawBody, url)
+            |> raise
 
         return rawBody
     }
 
-let mapDoc () = ""
+let stringToDocument = ofJson<Document>
 
-let mapDocSync () = ""
+let stringToDocumentList = ofJson<DocumentList>
