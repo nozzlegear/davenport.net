@@ -40,6 +40,8 @@ let viewName = "only-bazs-greater-than-10"
 
 let designDocName = "list"
 
+let toSeq a = Seq.ofList [a]
+
 let defaultDesignDocs =
     mapFunction "function (doc) { if (doc.Baz > 10) { emit(doc._id, doc); } }"
     |> reduceFunction "_count"
@@ -80,6 +82,7 @@ let tests =
     let client =
         url
         |> database "davenport_net_fsharp"
+        |> warning (Event.add (fun s -> printfn "%s" s))
         |> idField "MyId"
         |> revField "MyRev"
 
@@ -110,6 +113,7 @@ let tests =
             String.IsNullOrEmpty json
             |> Expect.isFalse "JSON string should not be empty"
         }
+
         testCaseAsync "Gets a doc in the new fashion" <| async {
             let! created = create defaultRecord client
             let! json = getRaw created.Id (Some created.Rev) client

@@ -118,12 +118,70 @@ let qsFromRev (rev: string option) =
     |> Option.defaultValue []
     |> Map.ofSeq
 
-let executeRequest method path (qs: Map<string, obj>) (body: 'a option) (props: CouchProps) = 
+let qsFromListOptions (options: ListOption list) = 
+    let rec inner remaining qs = 
+        match remaining with 
+        | Limit l::rest -> 
+            Map.add "limit" (l :> obj) qs
+            |> inner rest
+        | Key k::rest ->
+            Map.add "key" k qs
+            |> inner rest
+        | Keys k::rest ->
+            Map.add "keys" (k :> obj) qs
+            |> inner rest
+        | StartKey k::rest ->
+            Map.add "start_key" k qs
+            |> inner rest
+        | EndKey k::rest ->
+            Map.add "end_key" k qs
+            |> inner rest
+        | InclusiveEnd i::rest ->
+            Map.add "inclusive_end" (i :> obj) qs
+            |> inner rest
+        | Descending d::rest ->
+            Map.add "descending" (d :> obj) qs
+            |> inner rest
+        | Skip s::rest ->
+            Map.add "skip" (s :> obj) qs
+            |> inner rest
+        | [] -> qs
+
+    inner options Map.empty
+
+let request path props = { 
+    querystring = None
+    headers = None 
+    body = None
+    couchProps = props
+    path = path
+}
+
+let querystring qs props = { props with querystring = Some qs }
+
+let headers headers props = { props with headers = Some headers }
+
+let body body props = { props with body = Some body }
+
+let send (method: Method) (request: RequestProps) = 
+    let props = request.couchProps
+
     // JsonSerialize any query string value.
     let url = 
-        qs
-        |> Map.map (fun _ value -> toJson props.converter value)
-        |> makeUrl [props.couchUrl; props.databaseName; path]
+        match request.querystring with
+        | Some qs -> Map.map (fun _ value -> toJson props.converter value) qs
+        | None -> Map.empty
+        |> makeUrl [props.couchUrl; props.databaseName; request.path]
+
+    let method = 
+        match method with 
+        | Get -> HttpMethod.Get
+        | Post -> HttpMethod.Post
+        | Put -> HttpMethod.Put
+        | Delete -> HttpMethod.Delete
+        | Head -> HttpMethod.Head
+        | Copy -> HttpMethod "Copy"
+
     let req = new HttpRequestMessage(method, url)
     
     match props.username, props.password with 
@@ -138,7 +196,7 @@ let executeRequest method path (qs: Map<string, obj>) (body: 'a option) (props: 
 
         req.Headers.Authorization <- AuthenticationHeaderValue("Basic", combined)
         
-    match body with 
+    match request.body with 
     | None -> ()
     | Some body -> 
         let message = 
@@ -148,6 +206,10 @@ let executeRequest method path (qs: Map<string, obj>) (body: 'a option) (props: 
 
         message.Headers.ContentType <- MediaTypeHeaderValue "application/json"
         req.Content <- message
+
+    match request.headers with 
+    | None -> ()
+    | Some headers -> Map.iter(fun key value -> req.Headers.Add(key, [value])) headers
 
     async {
         let! response = 
@@ -173,3 +235,5 @@ let executeRequest method path (qs: Map<string, obj>) (body: 'a option) (props: 
 let stringToDocument = ofJson<Document>
 
 let stringToDocumentList = ofJson<DocumentList>
+
+let stringToPostPutCopyResponse = ofJson<PostPutCopyResponse>

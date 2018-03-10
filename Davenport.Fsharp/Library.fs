@@ -1,17 +1,9 @@
 module Davenport.Fsharp.Wrapper
 
 open Davenport.Fsharp.Infrastructure
-open Davenport.Entities
-open Newtonsoft.Json
-open System
-open System.Linq.Expressions
-open Microsoft.FSharp.Quotations
-open Microsoft.FSharp.Linq.RuntimeHelpers
-open System.Net.Http
-open System.Net.Http.Headers
-open System.Net
 open Davenport.Fsharp.Converters
 open Davenport.Fsharp.Types
+open Newtonsoft.Json.Linq
 
 // let private toConfig<'doctype> (props: CouchProps) =
 //     let config = Davenport.Configuration(props.couchUrl, props.databaseName)
@@ -34,39 +26,7 @@ let private defaultProps =
       couchUrl = ""
       id = "_id"
       rev = "_rev" 
-      onWarning = None }
-
-let private defaultViewProps = { map = None; reduce = None }
-
-let private listedRowToDoctypeRow<'doctype> (row: ListedRow<FsDoc<'doctype>>) =
-    let newRow = ListedRow<'doctype>()
-    newRow.Doc <- Option.get row.Doc.Data
-    newRow.Id <- row.Id
-    newRow.Key <- row.Key
-    newRow.Value <- row.Value
-
-    newRow
-
-/// Used to create a DesignDoc view.
-let mapFunction func = { defaultViewProps with map = Some func }
-
-/// Used to create a DesignDoc view.
-let reduceFunction func props = { props with reduce = Some func }
-
-/// Creates a DesignDoc view object.
-let view name (props: ViewProps) =
-    let v = View()
-    v.Name <- name
-    v.MapFunction <- Option.toObj props.map
-    v.ReduceFunction <- Option.toObj props.reduce
-    v
-
-/// Creates a DesignDoc object for use with the `configureDatabase` and `createDesignDocs` functions.
-let designDoc name (views: View seq) =
-    let d = DesignDocConfig()
-    d.Name <- name
-    d.Views <- views
-    d
+      onWarning = Event<string>() }
 
 let database name couchUrl =
     { defaultProps with databaseName = name; couchUrl = couchUrl }
@@ -79,126 +39,11 @@ let idField name props = { props with id = name }
 
 let revField name props = { props with rev = name }
 
-let converter converter props = { props with converter = Some converter }
+let converter converter props = { props with converter = converter }
 
-let warning handler props = { props with onWarning = Some handler }
-
-let getCouchVersion props =
-    toConfig props
-    |> Davenport.Configuration.GetVersionAsync
-    |> Async.AwaitTask
-
-let isVersion2OrAbove = Davenport.Configuration.IsVersion2OrAbove
-
-/// Creates a CouchDB database if it doesn't exist.
-let createDatabase props =
-    toConfig props
-    |> Davenport.Configuration.CreateDatabaseAsync
-    |> Async.AwaitTask
-
-/// Creates the given design docs. Will check that each view in each design doc has functions that perfectly match the ones found in the database, and update them if they don't match.
-/// Will throw an ArgumentException if no design docs are given.
-let createDesignDocs (docs: Davenport.Entities.DesignDocConfig seq) props =
-    let config = toConfig props
-
-    Davenport.Configuration.CreateDesignDocsAsync(config, docs)
-    |> Async.AwaitTask
-
-/// Creates indexes for the given fields. This makes querying with the Find methods and selectors faster.
-/// Will throw an ArgumentException if no indexes are given.
-let createIndexes (indexes: string seq) props =
-    let config = toConfig props
-
-    Davenport.Configuration.CreateDatabaseIndexesAsync(config, indexes)
-    |> Async.AwaitTask
-
-/// Combines the createDatabase, createDesignDocs and createIndexes functions, running all three at once.
-let configureDatabase (designDocs: Davenport.Entities.DesignDocConfig seq) (indexes: string seq) props = async {
-    let config = toConfig props
-
-    do!
-        Davenport.Configuration.ConfigureDatabaseAsync<FsDoc<obj>>(config, indexes, designDocs)
-        |> Async.AwaitTask
-        |> Async.Ignore
-}
-
-/// Deletes the database. This cannot be undone!
-let deleteDatabase props =
-    let client = toClient props
-
-    client.DeleteDatabaseAsync()
-    |> Async.AwaitTask
-
-/// Creates the given document and assigns a random id. If you want to choose the id, use the createWithId.
-let create<'doctype> data props =
-    let client = toClient<'doctype> props
-    let doc = FsDoc()
-    doc.Data <- Some data
-
-    client.PostAsync doc
-    |> Async.AwaitTask
-    |> asyncMap convertPostPutCopyResponse
-
-/// Creates the document using the given id. This will result in a 409 conflict error if the id is already taken.
-let createWithId<'doctype> id data props =
-    let client = toClient<'doctype> props
-    let doc = FsDoc()
-    doc.Data <- Some data
-
-    // Passing a null rev to the PutAsync function will create the doc using the specified id.
-    client.PutAsync(id, doc, null)
-    |> Async.AwaitTask
-    |> asyncMap convertPostPutCopyResponse
-
-/// Updates the document with the given id and revision.
-let update<'doctype> id rev data props =
-    let client = toClient<'doctype> props
-    let doc = FsDoc()
-    doc.Data <- Some data
-
-    client.PutAsync(id, doc, rev)
-    |> Async.AwaitTask
-    |> asyncMap convertPostPutCopyResponse
-
-/// Copies the document with the oldId and assigns the newId to the copy.
-let copy oldId newId props =
-    let client = toClient props
-
-    client.CopyAsync(oldId, newId)
-    |> Async.AwaitTask
-    |> asyncMap convertPostPutCopyResponse
-
-/// Deletes the document with the given id and revision.
-let delete id rev props =
-    let client = toClient props
-
-    client.DeleteAsync(id, rev)
-    |> Async.AwaitTask
-
-/// Executes the view with the given designDocName and viewName.
-let executeView<'returnType> designDocName viewName (viewOptions: ViewOptions option) props =
-    let client = toClient props
-    let options = Option.toObj viewOptions
-
-    client.ViewAsync<'returnType>(designDocName, viewName, options)
-    |> Async.AwaitTask
-
-/// Gets the document with the given id. If a revision is given, that specific version will be returned.
-// let get id (rev: string option) props = async {
-//     let client = toClient<Document> props
-//     let! doc =
-//         client.GetAsync(id, Option.toObj rev)
-//         |> Async.AwaitTask
-//         |> Async.Catch
-
-//     return
-//         match doc with
-//         | Choice1Of2 doc -> Option.get doc.Data |> Some // We want this to fail if, for some reason, the jsonconverter was unable to convert FsDoc.Data
-//         | Choice2Of2 exn ->
-//             match findDavenportExceptionOrRaise exn with 
-//             | exn when exn.StatusCode = 404 -> None 
-//             | exn -> raise exn
-// }
+let warning handler (props: CouchProps) = 
+    Event.add handler props.onWarning.Publish
+    props
 
 let mapDoc (fn: Document) (computation: Async<string>) = 
     // This will receive the async task from e.g. `get`, plus accept an arbitrary function that will
@@ -208,46 +53,92 @@ let mapDoc (fn: Document) (computation: Async<string>) =
 let mapDocList (fn: DocumentList) (computation: Async<string>) = 
     ""
 
-let getRaw id rev = executeRequest HttpMethod.Get id (qsFromRev rev) None
+let getRaw id rev = 
+    request id
+    >> querystring (qsFromRev rev)
+    >> send Get
 
 let get id rev props = 
     getRaw id rev props
     |> asyncMap (stringToDocument props.converter)
 
-let allDocsRaw qs = 
-    executeRequest HttpMethod.Get "_all_docs" qs None
+let allDocsRaw includeDocs options = 
+    let includeDocs = 
+        match includeDocs with 
+        | WithDocs -> true
+        | WithoutDocs -> false
 
-let countRaw = () // TODO: Use the allDocs function with a limit of 0 to get the total rows.
+    let qs = 
+        qsFromListOptions options
+        |> Map.add "include_docs" (includeDocs :> obj)
 
-/// Lists all documents on the database.
-let listWithDocs<'doctype> (listOptions: ListOptions option) props = async {
-    let client = toClient<'doctype> props
-    let options = Option.toObj listOptions
+    request "_all_docs"
+    >> querystring qs
+    >> send Get
 
-    let! result =
-        client.ListWithDocsAsync options
-        |> Async.AwaitTask
+let allDocs includeDocs options props = 
+    allDocsRaw includeDocs options props 
+    |> asyncMap (stringToDocumentList props.converter)
 
-    let newRows =
-        result.Rows
-        |> Seq.map listedRowToDoctypeRow<'doctype>
+let count = 
+    allDocs WithoutDocs [Limit 0] 
+    >> asyncMap (fun (totalRows, _, _) -> totalRows)
 
-    let response = ListResponse<'doctype>()
-    response.DesignDocs <- result.DesignDocs
-    response.Offset <- result.Offset
-    response.Rows <- newRows
-    response.TotalRows <- result.TotalRows
+let countByExpression () = failwith "Not implemented"
 
-    return response
-}
+let countByObject () = failwith "Not implemented"
 
-/// Lists all documents on the database, but does not return the documents themselves.
-let listWithoutDocs (listOptions: ListOptions option) props =
-    let client = toClient props
-    let options = Option.toObj listOptions
+let countBySelector () = failwith "Not implemented"
 
-    client.ListWithoutDocsAsync options
-    |> Async.AwaitTask
+let create document props = 
+    request "" props
+    |> body document
+    |> send Post
+    |> asyncMap (stringToPostPutCopyResponse props.converter)
+
+let createWithId id document props = 
+    request id props
+    |> body document 
+    |> send Put
+    |> asyncMap (stringToPostPutCopyResponse props.converter)
+
+let update id rev document props = 
+    request id props
+    |> querystring (qsFromRev rev)
+    |> body document
+    |> send Put
+    |> asyncMap (stringToPostPutCopyResponse props.converter)
+
+let exists id rev =
+    request id 
+    >> querystring (qsFromRev rev)
+    >> send Head
+    >> Async.Catch
+    // Doc exists if CouchDB didn't throw an error status code
+    >> asyncMap (function | Choice1Of2 _ -> true | Choice2Of2 _ -> false) 
+
+let existsByExpression () = failwith "Not implemented"
+
+let existsByObject () = failwith "Not implemneted"
+
+let existsBySelector () = failwith "Not implemented"
+
+let copy oldId newId props = 
+    request oldId props
+    |> headers (Map.ofSeq ["Destination", newId])
+    |> send Copy
+    |> asyncMap (stringToPostPutCopyResponse props.converter)
+
+let delete id rev (props: CouchProps) = 
+    if Option.isNone rev
+    then props.onWarning.Trigger <| sprintf "No revision given for delete method with id %s. This may cause a document conflict error." id
+
+    request id props
+    |> querystring (qsFromRev rev)
+    |> send Delete
+    |> asyncMap ignore
+
+let view designDocName viewName options props = failwith "Not implemented"
 
 let private findByDictionary<'doctype> selector (findOptions: FindOptions option) props =
     let client = toClient<'doctype> props
@@ -265,13 +156,6 @@ let findBySelector<'doctype> = convertMapToDict >> findByDictionary<'doctype>
 /// NOTE: Davenport currently only supports simple 1 argument selectors.
 let findByExpr<'doctype> = convertExprToMap<'doctype> >> findByDictionary<'doctype>
 
-/// Returns a count of all documents, *including design documents*.
-let count props =
-    let client = toClient props
-
-    client.CountAsync()
-    |> Async.AwaitTask
-
 let private countByDictionary selector props =
     let client = toClient props
 
@@ -285,13 +169,6 @@ let countBySelector = convertMapToDict >> countByDictionary
 /// Usage: countByExpr<DocType> (<@ fun (c: DocType) -> c.SomeProp = SomeValue @>)
 /// NOTE: Davenport currently only supports simple 1 argument selectors.
 let countByExpr<'doctype> = convertExprToMap<'doctype> >> countByDictionary
-
-/// Checks whether a document with the given id exists. If a revision is given, it will check whether that specific version exists.
-let exists id (rev: string option) props =
-    let client = toClient props
-
-    client.ExistsAsync(id, Option.toObj rev)
-    |> Async.AwaitTask
 
 let private existsByDictionary selector props =
     let client = toClient props
@@ -307,16 +184,84 @@ let existsBySelector = convertMapToDict >> existsByDictionary
 /// NOTE: Davenport currently only supports simple 1 argument selectors.
 let existsByExpr<'doctype> = convertExprToMap<'doctype> >> existsByDictionary
 
-let unionize (fn: 'a -> 'b option) (computation: Async<'a>) = asyncMap fn computation
+let bulkInsert () = failwith "Not implemented"
 
-let unionList (fn: 'a -> 'b option) (computation: Async<'a seq>) = 
-    let rec inner list output = 
-        match list with  
-        | el::rest -> 
-            fn el 
-            |> Option.map (fun r -> r::output)
-            |> Option.defaultValue output
-            |> inner rest
-        | [] -> output
+let getCouchVersion props =
+    request "" props
+    |> send Get 
+    |> asyncMap (ofJson<JToken> props.converter >> fun t -> t.Value<string> "version" )
 
-    asyncMap (fun r -> inner (List.ofSeq r) []) computation
+let isVersion2OrAbove = 
+    getCouchVersion
+    >> asyncMap (fun str ->
+        let version = System.Convert.ToInt32(str.Split('.').[0])
+
+        version >= 2
+    )
+
+/// <summary>
+/// Creates a CouchDB database if it doesn't exist.
+/// </summary>
+let createDatabase props =
+    request "" props
+    |> send Put 
+    |> Async.Catch
+    |> asyncMap (
+        function
+        | Choice1Of2 _ -> Created
+        | Choice2Of2 (:? DavenportException as exn) when exn.StatusCode = 412 -> AlreadyExisted
+        | Choice2Of2 exn -> raise exn
+    )
+
+/// <summary>
+/// Deletes the database. This cannot be undone!
+/// </summary>
+let deleteDatabase =
+    request ""
+    >> send Delete
+    >> asyncMap ignore
+
+/// <summary>
+/// Creates the given design docs. This is a dumb function and will overwrite the data of any design doc that shares its id.
+/// </summary>
+let createOrUpdateDesignDoc ((id, views): DesignDoc) props =
+    let viewData = 
+        views
+        |> Seq.map (fun (name, map, reduce) ->
+            match reduce with 
+            | None -> Map.empty
+            | Some reduce -> Map.add "reduce" reduce Map.empty
+            |> Map.add "name" name
+            |> Map.add "map" map
+            |> fun view -> name, view
+        )
+        |> Map.ofSeq
+
+    let data = 
+        [
+            "views", viewData :> obj
+            // Javascript is currently the only supported language
+            "language", "javascript" :> obj
+        ]
+        |> Map.ofSeq
+
+    request (sprintf "_design/%s" id) props
+    |> body data
+    |> send Put
+    |> asyncMap ignore
+
+/// <summary>
+/// Creates indexes for the given fields. This makes querying with the Find methods and selectors faster.
+/// Will throw an ArgumentException if no indexes are given.
+/// </summary>
+let createIndexes (indexes: string seq) props =
+    let indexData =
+        [
+            "name", (sprintf "%s-indexes" props.databaseName) :> obj
+            "fields", (Map.ofSeq [ "fields", indexes ]) :> obj
+        ]
+        |> Map.ofSeq
+        
+    request "_index" props
+    |> body indexData
+    |> send Post

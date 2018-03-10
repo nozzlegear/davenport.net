@@ -14,7 +14,13 @@ type TotalRows = int
 
 type Offset = int
 
-type DocumentList = TotalRows -> Offset -> Document list
+type DocumentList = TotalRows * Offset * Document list
+
+type Id = string
+
+type Rev = string
+
+type Okay = bool
 
 type SupportedTypeConfig = {
     ``type``: System.Type
@@ -39,7 +45,7 @@ type CouchProps =
         couchUrl: string
         id: string
         rev: string
-        onWarning: (IEvent<EventHandler<string>,string> -> unit) option }
+        onWarning: Event<string> }
 
 type ViewProps = 
     internal {
@@ -47,16 +53,27 @@ type ViewProps =
         reduce: string option
     }
 
-/// Translates the C# PostPutCopyResponse, which contains a nullable bool Ok prop, to F# removing the nullable bool.
-type FsPostPutCopyResponse = {
-    Id: string
-    Rev: string
-    Ok: bool
+type internal Method = 
+    | Get
+    | Post
+    | Put
+    | Delete
+    | Head
+    | Copy
+
+type internal RequestProps = {
+    querystring: Map<string, obj> option
+    headers: Map<string, string> option
+    body: obj option
+    couchProps: CouchProps
+    path: string
 }
 
-type Data = 
-    | JsonString of string 
-    | JsonObject of obj
+type CreateDatabaseResult = 
+    | Created
+    | AlreadyExisted
+
+type PostPutCopyResponse = Id * Rev * Okay
 
 type Find =
     | EqualTo of obj
@@ -65,6 +82,38 @@ type Find =
     | LesserThan of obj
     | GreaterThanOrEqualTo of obj
     | LessThanOrEqualTo of obj
+
+type ListOption = 
+    | Limit of int 
+    | Key of obj
+    | Keys of obj list
+    | StartKey of obj
+    | EndKey of obj
+    | InclusiveEnd of bool
+    | Descending of bool
+    | Skip of int
+
+type FindOption = 
+    | Fields of string list 
+    | Sort of obj list 
+    | Limit of int list 
+    | Skip of int list
+    | UseIndex of obj
+    | Selector of string
+
+type IncludeDocs = 
+    | WithDocs
+    | WithoutDocs
+
+type ViewName = string
+
+type MapFunction = string
+
+type ReduceFunction = string
+
+type View = ViewName * MapFunction * ReduceFunction option
+
+type DesignDoc = Id * View list
 
 type DavenportException (msg, statusCode, statusReason, responseBody, requestUrl) = 
     inherit System.Exception(msg)    
