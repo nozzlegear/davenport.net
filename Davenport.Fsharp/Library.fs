@@ -122,7 +122,41 @@ let delete id rev (props: CouchProps) =
     |> send Delete
     |> asyncMap ignore
 
-let view designDocName viewName options props = failwith "Not implemented"
+/// <summary>
+/// Queries a view and returns the unparsed JSON string. 
+/// NOTE: This function forces the `reduce` parameter to FALSE, i.e. it will NOT reduce. Use the `reduce` or `reduceRaw` functions instead.
+/// </summary>
+let viewRaw designDocName viewName options props = 
+    (sprintf "_design/%s/_view/%s" designDocName viewName, props)
+    ||> request
+    |> querystring (mapFromListOptions options |> Map.add "reduce" (false :> obj))
+    |> send Get
+
+/// <summary>
+/// Queries a view. 
+/// NOTE: This function forces the `reduce` parameter to FALSE, i.e. it will NOT reduce. Use the `reduce` or `reduceRaw` functions instead.
+/// </summary>
+let view designDocName viewName options props = 
+    viewRaw designDocName viewName options props
+    |> asyncMap (ofJson<JToken> props.converter >> fun token -> token.SelectToken("rows").ToObject<ViewDoc list>())
+
+/// <summary>
+/// Queries a view and reduces it, returning the raw JSON string.
+/// NOTE: This function forces the `reduce` parameter to TRUE< i.e. will ALWAYS reduce. Use the `view` or `ViewRaw` functions to query a view's docs instead.
+/// </summary>
+let reduceRaw designDocName viewName options props = 
+    (sprintf "_design/%s/_view/%s" designDocName viewName, props)
+    ||> request
+    |> querystring (mapFromListOptions options |> Map.add "reduce" (true :> obj))
+    |> send Get
+
+/// <summary>
+/// Queries a view and reduces it.
+/// NOTE: This function forces the `reduce` parameter to TRUE< i.e. will ALWAYS reduce. Use the `view` or `ViewRaw` functions to query a view's docs instead.
+/// </summary>
+let reduce designDocName viewName options props = 
+    reduceRaw designDocName viewName options props
+    |> asyncMap (stringToReduction props.converter)
 
 let findRaw selector findOptions =
     let data = 

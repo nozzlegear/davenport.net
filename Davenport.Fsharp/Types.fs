@@ -25,6 +25,14 @@ type DocumentList = TotalRows * Offset * Document list
 
 type FoundList = Warning option * Document list
 
+type ViewKey = 
+    | Key of obj
+    | KeyList of obj list
+
+type ViewDoc = ViewKey * Document
+
+type Reduction = TypeName option * DocData
+
 type SupportedTypeConfig = {
     ``type``: System.Type
     typeName: TypeName
@@ -95,6 +103,9 @@ type ListOption =
     | InclusiveEnd of bool
     | Descending of bool
     | Skip of int
+    | Reduce of bool
+    | Group of bool
+    | GroupLevel of int
 
 type FindOption = 
     | Fields of string list 
@@ -103,6 +114,8 @@ type FindOption =
     | Skip of int list
     | UseIndex of obj
     | Selector of string
+
+
 
 type IncludeDocs = 
     | WithDocs

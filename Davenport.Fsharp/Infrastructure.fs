@@ -137,6 +137,15 @@ let mapFromListOptions (options: ListOption list) =
         | ListOption.Skip s::rest ->
             Map.add "skip" (s :> obj) qs
             |> inner rest
+        | Reduce r::rest ->
+            Map.add "reduce" (r :> obj) qs
+            |> inner rest
+        | Group g::rest ->
+            Map.add "group" (g :> obj) qs
+            |> inner rest
+        | GroupLevel l::rest ->
+            Map.add "group_level" (l :> obj) qs
+            |> inner rest
         | [] -> qs
 
     inner options Map.empty
@@ -258,3 +267,7 @@ let stringToPostPutCopyResponse = ofJson<PostPutCopyResponse>
 let stringToFoundList = ofJson<FoundList>
 
 let stringToBulkResponseList = ofJson<BulkResponse list>
+
+let stringToViewDoc = ofJson<ViewDoc list>
+
+let stringToReduction = ofJson<Reduction>
