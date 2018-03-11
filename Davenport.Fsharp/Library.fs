@@ -81,7 +81,7 @@ let allDocs includeDocs options props =
     |> asyncMap (stringToDocumentList props.converter)
 
 let count = 
-    allDocs WithoutDocs [Limit 0] 
+    allDocs WithoutDocs [ListLimit 0] 
     >> asyncMap (fun (totalRows, _, _) -> totalRows)
 
 let countByExpression () = failwith "Not implemented"
@@ -162,33 +162,11 @@ let find selector (findOptions: FindOption list) props = async {
     return docs
 }
 
-let private countByDictionary selector props =
-    let client = toClient props
-
-    client.CountBySelectorAsync selector
-    |> Async.AwaitTask
-
 /// Retrieves a count of all documents matching the given selector.
 let countBySelector = convertMapToDict >> countByDictionary
 
-/// Retrieves a count of all documents matching the given selector.
-/// Usage: countByExpr<DocType> (<@ fun (c: DocType) -> c.SomeProp = SomeValue @>)
-/// NOTE: Davenport currently only supports simple 1 argument selectors.
-let countByExpr<'doctype> = convertExprToMap<'doctype> >> countByDictionary
-
-let private existsByDictionary selector props =
-    let client = toClient props
-
-    client.ExistsBySelectorAsync selector
-    |> Async.AwaitTask
-
 /// Checks that a document matching the given selector exists.
 let existsBySelector = convertMapToDict >> existsByDictionary
-
-/// Checks that a document matching the given selector exists.
-/// Usage: existsByExpr<DocType> (<@ fun (c: DocType) -> c.SomeProp = SomeValue @>)
-/// NOTE: Davenport currently only supports simple 1 argument selectors.
-let existsByExpr<'doctype> = convertExprToMap<'doctype> >> existsByDictionary
 
 let bulkInsert () = failwith "Not implemented"
 
