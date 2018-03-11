@@ -55,7 +55,7 @@ let mapDocList (fn: DocumentList) (computation: Async<string>) =
 
 let getRaw id rev = 
     request id
-    >> querystring (qsFromRev rev)
+    >> querystring (mapFromRev rev)
     >> send Get
 
 let get id rev props = 
@@ -69,7 +69,7 @@ let allDocsRaw includeDocs options =
         | WithoutDocs -> false
 
     let qs = 
-        qsFromListOptions options
+        mapFromListOptions options
         |> Map.add "include_docs" (includeDocs :> obj)
 
     request "_all_docs"
@@ -104,14 +104,14 @@ let createWithId id document props =
 
 let update id rev document props = 
     request id props
-    |> querystring (qsFromRev rev)
+    |> querystring (mapFromRev rev)
     |> body document
     |> send Put
     |> asyncMap (stringToPostPutCopyResponse props.converter)
 
 let exists id rev =
     request id 
-    >> querystring (qsFromRev rev)
+    >> querystring (mapFromRev rev)
     >> send Head
     >> Async.Catch
     // Doc exists if CouchDB didn't throw an error status code
@@ -134,27 +134,33 @@ let delete id rev (props: CouchProps) =
     then props.onWarning.Trigger <| sprintf "No revision given for delete method with id %s. This may cause a document conflict error." id
 
     request id props
-    |> querystring (qsFromRev rev)
+    |> querystring (mapFromRev rev)
     |> send Delete
     |> asyncMap ignore
 
 let view designDocName viewName options props = failwith "Not implemented"
 
-let private findByDictionary<'doctype> selector (findOptions: FindOptions option) props =
-    let client = toClient<'doctype> props
-    let options = Option.toObj findOptions
+let findRaw selector findOptions =
+    let data = 
+        mapFromFindOptions findOptions
+        |> Map.add "selector" (convertFindsToMap selector :> obj)
 
-    client.FindBySelectorAsync (selector, options)
-    |> Async.AwaitTask
-    |> asyncMapSeq (fun doc -> Option.get doc.Data)
+    request "_find"
+    >> body data
+    >> send Get
 
+/// <summary>
 /// Searches for documents matching the given selector.
-let findBySelector<'doctype> = convertMapToDict >> findByDictionary<'doctype>
+/// </summary>
+let find selector (findOptions: FindOption list) props = async {
+    let! (warning, docs) = 
+        findRaw selector findOptions props
+        |> asyncMap (stringToFoundList props.converter)
 
-/// Searches for documents matching the given selector.
-/// Usage: findByExpr<DocType> (<@ fun (c: DocType) -> c.SomeProp = SomeValue @>)
-/// NOTE: Davenport currently only supports simple 1 argument selectors.
-let findByExpr<'doctype> = convertExprToMap<'doctype> >> findByDictionary<'doctype>
+    Option.iter props.onWarning.Trigger warning
+
+    return docs
+}
 
 let private countByDictionary selector props =
     let client = toClient props

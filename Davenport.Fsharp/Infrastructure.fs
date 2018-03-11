@@ -41,38 +41,30 @@ let convertExprToMap<'a> (expr : Expr<'a -> bool>) =
     Expression.Lambda<Func<'a, bool>>(lambda.Body, lambda.Parameters)
     |> Davenport.Infrastructure.ExpressionParser.Parse
 
-let convertMapToDict (map: Map<string, Find list>) =
-    let rec convert remaining (expression: FindExpression) =
+let convertFindsToMap (finds: Map<string, Find list>) =
+    let rec convert remaining m =
         match remaining with
-        | EqualTo x::tail ->
-            expression.EqualTo <- x
-            convert tail expression
-        | NotEqualTo x::tail ->
-            expression.NotEqualTo <- x
-            convert tail expression
-        | GreaterThan x::tail ->
-            expression.GreaterThan <- x
-            convert tail expression
-        | LesserThan x::tail ->
-            expression.LesserThan <- x
-            convert tail expression
-        | GreaterThanOrEqualTo x::tail ->
-            expression.GreaterThanOrEqualTo <- x
-            convert tail expression
-        | LessThanOrEqualTo x::tail ->
-            expression.LesserThanOrEqualTo <- x
-            convert tail expression
-        | [] -> expression
+        | EqualTo x::rest ->
+            Map.add "$eq" x m
+            |> convert rest
+        | NotEqualTo x::rest ->
+            Map.add "$ne" x m
+            |> convert rest
+        | GreaterThan x::rest ->
+            Map.add "$gt" x m
+            |> convert rest
+        | LesserThan x::rest ->
+            Map.add "$lt" x m
+            |> convert rest
+        | GreaterThanOrEqualTo x::rest ->
+            Map.add "$gte" x m
+            |> convert rest
+        | LessThanOrEqualTo x::rest ->
+            Map.add "$lte" x m
+            |> convert rest
+        | [] -> m
 
-    map
-    |> Map.map (fun _ list -> convert list (FindExpression()))
-    |> Collections.Generic.Dictionary
-
-let convertPostPutCopyResponse (r: PostPutCopyResponse) =
-    // Convert 'Ok' prop to false if it's null.
-    { Id = r.Id
-      Rev = r.Rev
-      Ok = Option.ofNullable r.Ok |> Option.defaultValue false }
+    Map.map (fun _ list -> convert list Map.empty) finds
 
 let rec findDavenportExceptionOrRaise (exn: Exception) = 
     match exn with 
@@ -112,16 +104,16 @@ let toJson converter object = JsonConvert.SerializeObject(object, [|converter|])
 
 let ofJson<'a> converter json = JsonConvert.DeserializeObject<'a>(json, [|converter|])
 
-let qsFromRev (rev: string option) =
+let mapFromRev (rev: string option) =
     rev
     |> Option.map (fun rev -> ["rev", rev :> obj])
     |> Option.defaultValue []
     |> Map.ofSeq
 
-let qsFromListOptions (options: ListOption list) = 
+let mapFromListOptions (options: ListOption list) = 
     let rec inner remaining qs = 
         match remaining with 
-        | Limit l::rest -> 
+        | ListLimit l::rest -> 
             Map.add "limit" (l :> obj) qs
             |> inner rest
         | Key k::rest ->
@@ -142,11 +134,36 @@ let qsFromListOptions (options: ListOption list) =
         | Descending d::rest ->
             Map.add "descending" (d :> obj) qs
             |> inner rest
-        | Skip s::rest ->
+        | ListOption.Skip s::rest ->
             Map.add "skip" (s :> obj) qs
             |> inner rest
         | [] -> qs
 
+    inner options Map.empty
+
+let mapFromFindOptions (options: FindOption list) = 
+    let rec inner remaining qs = 
+        match remaining with 
+        | Fields f::rest ->
+            Map.add "fields" (f :> obj) qs
+            |> inner rest
+        | Sort s::rest ->
+            Map.add "sort" (s :> obj) qs
+            |> inner rest
+        | FindLimit l::rest ->
+            Map.add "limit" (l :> obj) qs
+            |> inner rest
+        | FindOption.Skip s::rest ->
+            Map.add "skip" (s :> obj) qs
+            |> inner rest
+        | UseIndex i::rest ->
+            Map.add "use_index" i qs
+            |> inner rest
+        | Selector s::rest ->
+            Map.add "selector" (s :> obj) qs
+            |> inner rest
+        | [] -> qs
+    
     inner options Map.empty
 
 let request path props = { 
@@ -237,3 +254,5 @@ let stringToDocument = ofJson<Document>
 let stringToDocumentList = ofJson<DocumentList>
 
 let stringToPostPutCopyResponse = ofJson<PostPutCopyResponse>
+
+let stringToFoundList = ofJson<FoundList>

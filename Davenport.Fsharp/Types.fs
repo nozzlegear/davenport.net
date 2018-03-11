@@ -2,7 +2,18 @@ module Davenport.Fsharp.Types
 
 open Newtonsoft.Json.Linq
 open Newtonsoft.Json
-open System
+
+type TotalRows = int
+
+type Offset = int
+
+type Warning = string
+
+type Id = string
+
+type Rev = string
+
+type Okay = bool
 
 type TypeName = string
 
@@ -10,17 +21,9 @@ type DocData = JToken
 
 type Document = TypeName * DocData
 
-type TotalRows = int
-
-type Offset = int
-
 type DocumentList = TotalRows * Offset * Document list
 
-type Id = string
-
-type Rev = string
-
-type Okay = bool
+type FoundList = Warning option * Document list
 
 type SupportedTypeConfig = {
     ``type``: System.Type
@@ -53,7 +56,7 @@ type ViewProps =
         reduce: string option
     }
 
-type internal Method = 
+type Method = 
     | Get
     | Post
     | Put
@@ -61,7 +64,7 @@ type internal Method =
     | Head
     | Copy
 
-type internal RequestProps = {
+type RequestProps = {
     querystring: Map<string, obj> option
     headers: Map<string, string> option
     body: obj option
@@ -84,7 +87,7 @@ type Find =
     | LessThanOrEqualTo of obj
 
 type ListOption = 
-    | Limit of int 
+    | ListLimit of int 
     | Key of obj
     | Keys of obj list
     | StartKey of obj
@@ -96,7 +99,7 @@ type ListOption =
 type FindOption = 
     | Fields of string list 
     | Sort of obj list 
-    | Limit of int list 
+    | FindLimit of int list 
     | Skip of int list
     | UseIndex of obj
     | Selector of string
