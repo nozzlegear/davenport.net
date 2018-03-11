@@ -80,16 +80,6 @@ let allDocs includeDocs options props =
     allDocsRaw includeDocs options props 
     |> asyncMap (stringToDocumentList props.converter)
 
-let count = 
-    allDocs WithoutDocs [ListLimit 0] 
-    >> asyncMap (fun (totalRows, _, _) -> totalRows)
-
-let countByExpression () = failwith "Not implemented"
-
-let countByObject () = failwith "Not implemented"
-
-let countBySelector () = failwith "Not implemented"
-
 let create document props = 
     request "" props
     |> body document
@@ -116,12 +106,6 @@ let exists id rev =
     >> Async.Catch
     // Doc exists if CouchDB didn't throw an error status code
     >> asyncMap (function | Choice1Of2 _ -> true | Choice2Of2 _ -> false) 
-
-let existsByExpression () = failwith "Not implemented"
-
-let existsByObject () = failwith "Not implemneted"
-
-let existsBySelector () = failwith "Not implemented"
 
 let copy oldId newId props = 
     request oldId props
@@ -162,11 +146,29 @@ let find selector (findOptions: FindOption list) props = async {
     return docs
 }
 
-/// Retrieves a count of all documents matching the given selector.
-let countBySelector = convertMapToDict >> countByDictionary
+let count = 
+    allDocs WithoutDocs [ListLimit 0] 
+    >> asyncMap (fun (totalRows, _, _) -> totalRows)
 
+/// <summary>
+/// Retrieves a count of all documents matching the given selector.
+/// NOTE: Internally this uses the Find API and may be slower than normal operations. Performance may be improved by using indexes.
+/// </summary>
+let countBySelector selector = 
+    // Selectors must use the Find API, which means they must return documents too. Limit the bandwidth by just returning _id.
+    find selector [Fields ["_id"]]
+    >> asyncMap Seq.length
+
+/// <summary>
 /// Checks that a document matching the given selector exists.
-let existsBySelector = convertMapToDict >> existsByDictionary
+/// NOTE: Internally this uses the Find API and may be slower than normal operations. Performance may be improved by using indexes.
+/// </summary>
+let existsBySelector selector = 
+    // Selectors must use the Find API, which means they must return documents too. Limit the bandwidth by just returning _id.
+    find selector [Fields ["_id"]]
+    >> Async.Catch
+    // Doc exists if CouchDB didn't throw an error status code
+    >> asyncMap (function | Choice1Of2 _ -> true | Choice2Of2 _ -> false) 
 
 let bulkInsert () = failwith "Not implemented"
 
