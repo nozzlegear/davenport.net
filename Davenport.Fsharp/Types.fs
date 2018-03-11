@@ -108,6 +108,10 @@ type IncludeDocs =
     | WithDocs
     | WithoutDocs
 
+type BulkMode = 
+    | AllowNewEdits
+    | NoNewEdits
+
 type ViewName = string
 
 type MapFunction = string
@@ -117,6 +121,20 @@ type ReduceFunction = string
 type View = ViewName * MapFunction * ReduceFunction option
 
 type DesignDoc = Id * View list
+
+type BulkErrorType = 
+    | Conflict
+    | Forbidden
+    | Unauthorized
+    | Other of string
+
+type BulkErrorReason = string
+
+type BulkDocumentError = Id * BulkErrorType * BulkErrorReason
+
+type BulkResponse = 
+    | Inserted of PostPutCopyResponse
+    | Failed of BulkDocumentError
 
 type DavenportException (msg, statusCode, statusReason, responseBody, requestUrl) = 
     inherit System.Exception(msg)    

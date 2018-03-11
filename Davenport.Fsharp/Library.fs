@@ -170,7 +170,32 @@ let existsBySelector selector =
     // Doc exists if CouchDB didn't throw an error status code
     >> asyncMap (function | Choice1Of2 _ -> true | Choice2Of2 _ -> false) 
 
-let bulkInsert () = failwith "Not implemented"
+/// <summary>
+/// Inserts, updates or deletes multiple documents at the same time. 
+/// 
+/// Omitting the id property from a document will cause CouchDB to generate the id itself.
+/// 
+/// When updating a document, the `_rev` property is required.
+/// 
+/// To delete a document, set the `_deleted` property to `true`. 
+/// 
+/// Note that CouchDB will return in the response an id and revision for every document passed as content to a bulk insert, even for those that were just deleted.  
+/// 
+/// If the `_rev` does not match the current version of the document, then that particular document will not be saved and will be reported as a conflict, but this does not prevent other documents in the batch from being saved. 
+/// 
+/// If the new edits are *not* allowed (to push existing revisions instead of creating new ones) the response will not include entries for any of the successful revisions (since their rev IDs are already known to the sender), only for the ones that had errors. Also, the `"conflict"` error will never appear, since in this mode conflicts are allowed. 
+/// </summary>
+let bulkInsert mode (docs: 'a list) props = 
+    let qs = 
+        match mode with 
+        | AllowNewEdits -> Map.ofSeq ["new_edits", true :> obj]
+        | NoNewEdits -> Map.empty
+    
+    request "_bulk_docs" props
+    |> querystring qs
+    |> body (Map.ofSeq ["new_edits", docs :> obj])
+    |> send Post
+    |> asyncMap (stringToBulkResponseList props.converter)
 
 let getCouchVersion props =
     request "" props

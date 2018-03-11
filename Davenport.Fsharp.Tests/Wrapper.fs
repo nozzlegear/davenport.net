@@ -122,6 +122,10 @@ let tests =
             ()
         }
 
+        testCaseAsync "Bulk insert" <| async {
+            skiptest "Not implemented"
+        }
+
         testCaseAsync "Creates docs" <| async {
             let! doc = create<MyTestClass> defaultRecord client
 

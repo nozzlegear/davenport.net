@@ -256,3 +256,5 @@ let stringToDocumentList = ofJson<DocumentList>
 let stringToPostPutCopyResponse = ofJson<PostPutCopyResponse>
 
 let stringToFoundList = ofJson<FoundList>
+
+let stringToBulkResponseList = ofJson<BulkResponse list>
