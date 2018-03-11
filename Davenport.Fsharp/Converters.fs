@@ -95,6 +95,13 @@ type FsConverter(supportedTypes: SupportedTypeConfig list) =
         if objectType = typeof<Document> then 
             let output: CouchResult = docType.typeName, j
 
+            // 2018-03-10
+            // Thinking it would be really easy to handle the typenames by making the Davenport methods
+            // require a union type of InsertedDoc (typename: string * data: obj). We don't need to care about
+            // the deserialized data type because the dev will be able determine that using the type string.
+            // It could even use a union type for the data object, letting users pass a raw json string or an
+            // object that will be stringified by the converter.
+
             // 2018-03-06 16:50 
             // Current intended usage:
             // singleDocType typeof<RandomType> "random-type"

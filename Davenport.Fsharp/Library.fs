@@ -5,19 +5,6 @@ open Davenport.Fsharp.Converters
 open Davenport.Fsharp.Types
 open Newtonsoft.Json.Linq
 
-// let private toConfig<'doctype> (props: CouchProps) =
-//     let config = Davenport.Configuration(props.couchUrl, props.databaseName)
-//     config.Username <- Option.defaultValue "" props.username
-//     config.Password <- Option.defaultValue "" props.password
-//     config.Converter <- Option.defaultWith (fun () -> FsConverter<'doctype>(props.id, props.rev, None) :> JsonConverter) props.converter
-
-//     props.onWarning
-//     |> Option.iter (fun handler -> handler config.Warning)
-
-//     config
-
-// let private toClient<'doctype> = toConfig<'doctype> >> Davenport.Client<FsDoc<'doctype>>
-
 let private defaultProps =  
     { username = None 
       password = None 
