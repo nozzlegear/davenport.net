@@ -3,6 +3,20 @@ module Davenport.Types
 open Newtonsoft.Json.Linq
 open Newtonsoft.Json
 
+type TypeName = string
+
+type IdFieldName = string
+
+type RevFieldName = string
+
+type FieldMapping = Map<TypeName, IdFieldName * RevFieldName>
+
+[<AbstractClass>]
+type ICouchConverter() = 
+    inherit JsonConverter()
+    abstract AddFieldMappings: FieldMapping -> unit
+    abstract GetFieldMappings: unit -> FieldMapping
+
 type TotalRows = int
 
 type Offset = int
@@ -15,8 +29,6 @@ type Rev = string
 
 type Okay = bool
 
-type TypeName = string option
-
 type DocData = JToken 
 
 type Document = TypeName * DocData
@@ -27,11 +39,7 @@ type FoundList = Warning option * Document list
 
 type SerializableData<'a> = 'a
 
-type IdFieldName = string
-
-type RevFieldName = string
-
-type InsertedDocument<'a> = IdFieldName * RevFieldName * TypeName * SerializableData<'a>
+type InsertedDocument<'a> = TypeName option * SerializableData<'a>
 
 type ViewKey = 
     | Key of obj
@@ -39,13 +47,13 @@ type ViewKey =
 
 type ViewDoc = ViewKey * Document
 
-type CouchResult =  TypeName * Newtonsoft.Json.Linq.JObject
+type CouchResult =  TypeName option * Newtonsoft.Json.Linq.JObject
 
 type CouchProps = 
     internal { 
         username: string option
         password: string option
-        converter: JsonConverter
+        converter: ICouchConverter
         databaseName: string
         couchUrl: string
         onWarning: Event<string> }

@@ -8,7 +8,7 @@ open Newtonsoft.Json.Linq
 let private defaultProps =  
     { username = None 
       password = None 
-      converter = FsConverter()
+      converter = DefaultConverter Map.empty
       databaseName = ""
       couchUrl = ""
       onWarning = Event<string>() }
@@ -23,6 +23,10 @@ let password password config = { config with password = Some password }
 let converter converter props = 
     failwith "TODO: Use the converter.CanConvert function to check that the converter implements all necessary conversions."
     { props with converter = converter }
+
+let fieldMappings mapping (props: CouchProps) = 
+    props.converter.AddFieldMappings mapping
+    props
 
 let warning handler (props: CouchProps) = 
     Event.add handler props.onWarning.Publish

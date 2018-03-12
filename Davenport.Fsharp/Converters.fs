@@ -7,10 +7,10 @@ open Types
 // The Fable JsonConverter uses a cache, so it's best to just instantiate it once.
 let fableConverter = Fable.JsonConverter()
 
-let writeInsertedDocument (writer: JsonWriter) (doc: InsertedDocument<_>) (serializer: JsonSerializer) = 
+let writeInsertedDocument (fieldMappings: FieldMapping) (writer: JsonWriter) (doc: InsertedDocument<_>) (serializer: JsonSerializer) = 
     writer.WriteStartObject()
 
-    let (idField, revField, typeName, docValue) = doc
+    let (typeName, docValue) = doc
     let docValueType = doc.GetType()
     let j = JObject.FromObject(docValue, serializer)
 
@@ -20,6 +20,12 @@ let writeInsertedDocument (writer: JsonWriter) (doc: InsertedDocument<_>) (seria
         writer.WriteValue typeName
     )
 
+    let (idField, revField) =
+        match typeName with 
+        | None -> None
+        | Some typeName -> Map.tryFind typeName fieldMappings
+        |> Option.defaultValue ("_id", "_rev")
+
     [
         j.[idField], idField, "_id", "Id";
         j.[revField], revField, "_rev", "Rev";
@@ -27,7 +33,7 @@ let writeInsertedDocument (writer: JsonWriter) (doc: InsertedDocument<_>) (seria
     |> Seq.iter (fun (token, givenFieldName, canonFieldName, readableFieldName) ->
         match isNull token with 
         | true -> 
-            sprintf "%s field '%s' was not found on type %s." readableFieldName givenFieldName docValueType.FullName
+            sprintf "%s field '%s' was not found on type %s. If you want to map it to a custom field on your type, use Davenport's `converterSettings` function to pass a list of field mappings." readableFieldName givenFieldName docValueType.FullName
             |> System.ArgumentException
             |> raise
         | false ->
@@ -44,6 +50,19 @@ let writeInsertedDocument (writer: JsonWriter) (doc: InsertedDocument<_>) (seria
     |> Seq.iter (fun prop -> prop.WriteTo(writer))       
 
     writer.WriteEndObject()
+
+// 2018-03-12
+// Current problem: It's now set up to easily pass the Id and Rev field names when writing to JSON, but
+// this converter currently has no way to know what to parse them back to. That is to say, it knows what 
+// they're named when writing json, but it doesn't know what they're named when reading json.
+// 
+// Easiest solution to this, I think, is having some sane defaults. We can read the _id and _rev properties
+// and also add them to Id and Rev, id and rev, ID and REV, _ID and _REV as long as they don't exist. When 
+// deserialized the JsonConverter will just discard the unnecessary ones.
+//
+// We could then extend those defaults with a field on the couchProps that ofJson and toJson already get.
+// Those two functions will have to somehow assemble/disassemble those fields. Maybe some kind of Union
+// type, CustomFields of (fieldName: string list) * (json: string).
 
 // 2018-03-10
 // Thinking it would be really easy to handle the typenames by making the Davenport methods
@@ -69,8 +88,16 @@ let writeInsertedDocument (writer: JsonWriter) (doc: InsertedDocument<_>) (seria
 // to map all the types it will deal with. Then the original FsConverter receives those types (if it's not in multiple doc mode the converter still receives the
 // list, just with one single element.)
 
-type FsConverter() = 
-    inherit JsonConverter()
+type DefaultConverter (_fieldMappings: FieldMapping) = 
+    inherit ICouchConverter()
+
+    let mutable fieldMappings: FieldMapping = _fieldMappings
+
+    override __.AddFieldMappings mapping = 
+        // Merge the new mapping into the old one, overwriting old keys if necessary.
+        fieldMappings <- Map.fold (fun state key value -> Map.add key value state) fieldMappings mapping
+
+    override __.GetFieldMappings() = fieldMappings
 
     override __.CanConvert objectType = 
         [
@@ -120,7 +147,7 @@ type FsConverter() =
         // else 
         //     j.ToObject(objectType)
 
-    override __.WriteJson(writer: JsonWriter, objValue: obj, serializer: JsonSerializer) =
+    override x.WriteJson(writer: JsonWriter, objValue: obj, serializer: JsonSerializer) =
         match objValue with 
-        | :? InsertedDocument<obj> as inserted -> writeInsertedDocument writer inserted serializer
+        | :? InsertedDocument<obj> as inserted -> writeInsertedDocument (x.GetFieldMappings()) writer inserted serializer
         | _ -> failwithf "FsConverter.WriteJson: Unsupported object type %A." (objValue.GetType())

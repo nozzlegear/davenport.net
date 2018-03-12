@@ -17,7 +17,7 @@ type MyDoc = {
 
 [<Tests>]
 let tests =
-    let converter = FsConverter()
+    let converter = DefaultConverter (Map.ofSeq ["my-type", ("Id", "Rev")])
     let toJson data = JsonConvert.SerializeObject(data, [|converter :> JsonConverter|])
 
     testList "Davenport.Fsharp.Converters" [
@@ -29,7 +29,7 @@ let tests =
                 Bar = 17
                 Hello = "world"
             }
-            let inserted: InsertedDocument<MyDoc> = "Id", "Rev", Some "my-type", doc
+            let inserted: InsertedDocument<MyDoc> = Some "my-type", doc
             
             toJson inserted
             |> Expect.equal "Should serialize to expected string" "{}"
