@@ -1,4 +1,4 @@
-module Davenport.Fsharp.Types
+module Davenport.Types 
 
 open Newtonsoft.Json.Linq
 open Newtonsoft.Json
@@ -15,7 +15,7 @@ type Rev = string
 
 type Okay = bool
 
-type TypeName = string
+type TypeName = string option
 
 type DocData = JToken 
 
@@ -25,25 +25,19 @@ type DocumentList = TotalRows * Offset * Document list
 
 type FoundList = Warning option * Document list
 
+type SerializableData<'a> = 'a
+
+type IdFieldName = string
+
+type RevFieldName = string
+
+type InsertedDocument<'a> = IdFieldName * RevFieldName * TypeName * SerializableData<'a>
+
 type ViewKey = 
     | Key of obj
     | KeyList of obj list
 
 type ViewDoc = ViewKey * Document
-
-type Reduction = TypeName option * DocData
-
-type SupportedTypeConfig = {
-    ``type``: System.Type
-    typeName: TypeName
-    idField: string option 
-    revField: string option
-}
-
-type ObjectType = 
-    | SystemType of System.Type 
-    | StringType of string
-    | JtokenOptionType of JToken option
 
 type CouchResult =  TypeName * Newtonsoft.Json.Linq.JObject
 
@@ -54,8 +48,6 @@ type CouchProps =
         converter: JsonConverter
         databaseName: string
         couchUrl: string
-        id: string
-        rev: string
         onWarning: Event<string> }
 
 type ViewProps = 

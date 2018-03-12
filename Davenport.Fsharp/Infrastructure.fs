@@ -1,21 +1,10 @@
-module Davenport.Fsharp.Infrastructure
+module Davenport.Infrastructure
 
 open System
-open System.Net
 open System.Net.Http
 open Newtonsoft.Json
 open System.Net.Http.Headers
-open Davenport.Entities
-open Newtonsoft.Json
-open System
-open System.Linq.Expressions
-open Microsoft.FSharp.Quotations
-open Microsoft.FSharp.Linq.RuntimeHelpers
-open System.Net.Http
-open System.Net.Http.Headers
-open System.Net
-open Davenport.Fsharp.Converters
-open Davenport.Fsharp.Types
+open Types
 
 let internal asyncMap (fn: 't -> 'u) task = async {
     let! result = task
@@ -29,17 +18,17 @@ let internal asyncMapSeq (fn: 't -> 'u) task = async {
     return Seq.map fn result
 }
 
-/// <summary>
-/// Converts an F# expression to a LINQ expression, then converts that LINQ expression to a Map<string, Find> due to an incompatibility with the FsDoc and the types expected by Find, Exists and CountByExpression functions.
-/// </summary>
-let convertExprToMap<'a> (expr : Expr<'a -> bool>) =
-    /// Source: https://stackoverflow.com/a/23390583
-    let linq = LeafExpressionConverter.QuotationToExpression expr
-    let call = linq :?> MethodCallExpression
-    let lambda = call.Arguments.[0] :?> LambdaExpression
+// /// <summary>
+// /// Converts an F# expression to a LINQ expression, then converts that LINQ expression to a Map<string, Find> due to an incompatibility with the FsDoc and the types expected by Find, Exists and CountByExpression functions.
+// /// </summary>
+// let convertExprToMap<'a> (expr : Expr<'a -> bool>) =
+//     /// Source: https://stackoverflow.com/a/23390583
+//     let linq = LeafExpressionConverter.QuotationToExpression expr
+//     let call = linq :?> MethodCallExpression
+//     let lambda = call.Arguments.[0] :?> LambdaExpression
     
-    Expression.Lambda<Func<'a, bool>>(lambda.Body, lambda.Parameters)
-    |> Davenport.Infrastructure.ExpressionParser.Parse
+//     Expression.Lambda<Func<'a, bool>>(lambda.Body, lambda.Parameters)
+//     |> Davenport.Infrastructure.ExpressionParser.Parse
 
 let convertFindsToMap (finds: Map<string, Find list>) =
     let rec convert remaining m =
@@ -69,7 +58,7 @@ let convertFindsToMap (finds: Map<string, Find list>) =
 let rec findDavenportExceptionOrRaise (exn: Exception) = 
     match exn with 
     | :? System.AggregateException as exn -> findDavenportExceptionOrRaise exn.InnerException 
-    | :? Davenport.Infrastructure.DavenportException as exn -> exn 
+    | :? DavenportException as exn -> exn 
     | _ -> raise exn
 
 let (|StartsWithLocalhost|_|) (s: string) = 
@@ -100,9 +89,9 @@ let makeUrl pathSegments (querystring: Map<string, string>) =
 // https://blogs.msdn.microsoft.com/alazarev/2017/12/29/disposable-finalizers-and-httpclient/
 let private httpClient = new HttpClient()
 
-let toJson converter object = JsonConvert.SerializeObject(object, [|converter|])
+let toJson converter object = JsonConvert.SerializeObject(object, [|converter; Converters.fableConverter :> JsonConverter|])
 
-let ofJson<'a> converter json = JsonConvert.DeserializeObject<'a>(json, [|converter|])
+let ofJson<'a> converter json = JsonConvert.DeserializeObject<'a>(json, [|converter; Converters.fableConverter :> JsonConverter|])
 
 let mapFromRev (rev: string option) =
     rev
@@ -269,5 +258,3 @@ let stringToFoundList = ofJson<FoundList>
 let stringToBulkResponseList = ofJson<BulkResponse list>
 
 let stringToViewDoc = ofJson<ViewDoc list>
-
-let stringToReduction = ofJson<Reduction>

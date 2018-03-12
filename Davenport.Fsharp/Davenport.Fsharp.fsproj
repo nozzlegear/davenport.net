@@ -2,8 +2,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <AssemblyName>Davenport.Fsharp</AssemblyName>
-    <RootNamespace>Davenport.Fsharp</RootNamespace>
+    <AssemblyName>Davenport</AssemblyName>
     <Version>1.1.1</Version>
   </PropertyGroup>
   <PropertyGroup>
@@ -20,9 +19,6 @@
     <Compile Include="Converters.fs" />
     <Compile Include="Infrastructure.fs" />
     <Compile Include="Library.fs" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\Davenport\davenport.csproj" />
   </ItemGroup>
   <Import Project="..\.paket\Paket.Restore.targets" />
 </Project>
