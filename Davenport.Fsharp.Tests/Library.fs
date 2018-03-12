@@ -82,7 +82,7 @@ let tests =
     let client =
         url
         |> database "davenport_net_fsharp"
-        |> warning (Event.add (fun s -> printfn "%s" s))
+        |> warning (printfn "%s")
 
     // Set debug to `true` below to start debugging.
     // 1. Start the test suite (dotnet run)
@@ -458,35 +458,5 @@ let tests =
             Expect.equal unionInt64.Union expectedUnionInt64 "Union int64 should be equal"
             Expect.equal dateTime.Date expectedDate "Date should be equal"
             Expect.equal decimal.Dec expectedDecimal "Decimal should be equal"
-        }
-
-        ftestCaseAsync "Converts result to union type" <| async {
-            let! firstDocResult = create<FirstDoc> ({ MyId = ""; MyRev = ""; hello = true }) client
-            let! secondDocResult = create<SecondDoc> ({ MyId = ""; MyRev = ""; hello = 117 }) client
-
-            let map (o: obj) =
-                match o with
-                | :? FirstDoc as x -> Doc1 x |> Some
-                | :? SecondDoc as x -> Doc2 x |> Some
-                | _ -> 
-                    printfn "%A" o
-                    None
-
-            let! firstDoc = 
-                get firstDocResult.Id (Some firstDocResult.Rev) client
-                |> asyncMap (Option.bind map)
-            
-            Expect.isSome firstDoc "Result should not be None"
-            Expect.isTrue (firstDoc |> function | Some (Doc1 _) -> true | _ -> false) "Result should be FirstDoc union type." 
-            
-            let firstDoc = 
-                match firstDoc with 
-                | Some (Doc1 x) -> x
-                | _ -> failwith "Was not Some (Doc1 x)"
-
-            Expect.isTrue (firstDoc.GetType() = typeof<FirstDoc>) "firstDoc type mismatch"
-            Expect.isTrue firstDoc.hello "firstDoc.hello should equal true"
-            Expect.isNotEmpty firstDoc.MyId "firstDoc.id should not be empty"
-            Expect.isNotEmpty firstDoc.MyRev "firstDoc.rev should not be empty"
         }
     ]
