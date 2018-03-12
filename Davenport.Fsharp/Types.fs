@@ -31,7 +31,7 @@ type Okay = bool
 
 type DocData = JToken 
 
-type Document = TypeName * DocData
+type Document = TypeName option * DocData
 
 type DocumentList = TotalRows * Offset * Document list
 

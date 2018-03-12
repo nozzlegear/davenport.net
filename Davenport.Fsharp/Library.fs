@@ -24,7 +24,10 @@ let converter converter props =
     failwith "TODO: Use the converter.CanConvert function to check that the converter implements all necessary conversions."
     { props with converter = converter }
 
-let fieldMappings mapping (props: CouchProps) = 
+/// <summary>
+/// Map custom field names to the CouchDB _id and _rev fields. This can be used multiple times. Any key that is already set and also exists in the new mapping will be overwritten.
+/// </summary>
+let mapFields mapping (props: CouchProps) = 
     props.converter.AddFieldMappings mapping
     props
 
@@ -73,7 +76,7 @@ let createWithId id (document: InsertedDocument<'a>) props =
 
 let update id rev (document: InsertedDocument<'a>) props = 
     request id props
-    |> querystring (mapFromRev rev)
+    |> querystring (mapFromRev (Some rev))
     |> body document
     |> send Put
     |> asyncMap (stringToPostPutCopyResponse props.converter)
@@ -92,14 +95,11 @@ let copy oldId newId props =
     |> send Copy
     |> asyncMap (stringToPostPutCopyResponse props.converter)
 
-let delete id rev (props: CouchProps) = 
-    if Option.isNone rev
-    then props.onWarning.Trigger <| sprintf "No revision given for delete method with id %s. This may cause a document conflict error." id
-
-    request id props
-    |> querystring (mapFromRev rev)
-    |> send Delete
-    |> asyncMap ignore
+let delete id rev = 
+    request id
+    >> querystring (mapFromRev (Some rev))
+    >> send Delete
+    >> asyncMap ignore
 
 /// <summary>
 /// Queries a view and returns the unparsed JSON string. 
@@ -137,7 +137,7 @@ let reduce designDocName viewName options props =
     reduceRaw designDocName viewName options props
     |> asyncMap (stringToDocument props.converter)
 
-let findRaw selector findOptions =
+let findRaw findOptions selector =
     let data = 
         mapFromFindOptions findOptions
         |> Map.add "selector" (convertFindsToMap selector :> obj)
@@ -149,9 +149,9 @@ let findRaw selector findOptions =
 /// <summary>
 /// Searches for documents matching the given selector.
 /// </summary>
-let find selector (findOptions: FindOption list) props = async {
+let find (findOptions: FindOption list) selector props = async {
     let! (warning, docs) = 
-        findRaw selector findOptions props
+        findRaw findOptions selector props
         |> asyncMap (stringToFoundList props.converter)
 
     Option.iter props.onWarning.Trigger warning
@@ -169,7 +169,7 @@ let count =
 /// </summary>
 let countBySelector selector = 
     // Selectors must use the Find API, which means they must return documents too. Limit the bandwidth by just returning _id.
-    find selector [Fields ["_id"]]
+    find [Fields ["_id"]] selector
     >> asyncMap Seq.length
 
 /// <summary>
@@ -178,7 +178,7 @@ let countBySelector selector =
 /// </summary>
 let existsBySelector selector = 
     // Selectors must use the Find API, which means they must return documents too. Limit the bandwidth by just returning _id.
-    find selector [Fields ["_id"]]
+    find [Fields ["_id"]] selector
     >> Async.Catch
     // Doc exists if CouchDB didn't throw an error status code
     >> asyncMap (function | Choice1Of2 _ -> true | Choice2Of2 _ -> false) 

@@ -2,6 +2,7 @@ module Davenport.Fsharp.Tests.Library
 
 open System
 open Davenport.Fsharp
+open Davenport.Types
 open Expecto
 open Expecto.Flip
 
@@ -10,8 +11,11 @@ type MyUnion =
     | Case2 of int
     | Case3 of int64
 
-type MyTestClass = {
-    MyId: string
+[<Literal>]
+let MyTestClassType = "my-test-class"
+
+type MyTestClass = 
+  { MyId: string
     MyRev: string
     Foo: string
     Bar: bool
@@ -20,8 +24,19 @@ type MyTestClass = {
     Opt: string option
     Union: MyUnion
     Date: DateTime
-    Dec: Decimal
-}
+    Dec: Decimal }
+  with 
+  static member typeName = MyTestClassType
+
+[<Literal>]
+let MyOtherClassType = "my-other-class"
+
+type MyOtherClass = 
+    { DocId: string
+      Revision: string 
+      hello: bool }
+    with 
+    static member typeName = MyOtherClassType
 
 let defaultRecord = {
     MyId = ""
@@ -36,11 +51,24 @@ let defaultRecord = {
     Dec = 10.5m
 }
 
-let viewName = "only-bazs-greater-than-10"
+let defaultSecondRecord = {
+    DocId = ""
+    Revision = ""
+    hello = true
+}
 
-let designDocName = "list"
+type DatabaseDoc = 
+    | FirstDoc of MyTestClass
+    | SecondDoc of MyOtherClass
 
-let toSeq a = Seq.ofList [a]
+let insertable (doc: DatabaseDoc) : InsertedDocument<obj> =
+    match doc with 
+    | FirstDoc d -> Some MyTestClass.typeName, d :> obj
+    | SecondDoc d -> Some MyTestClass.typeName, d :> obj
+
+let defaultInsert = defaultRecord |> FirstDoc |> insertable
+
+let defaultSecondInsert = defaultSecondRecord |> SecondDoc |> insertable
 
 // let defaultDesignDocs =
 //     mapFunction "function (doc) { if (doc.Baz > 10) { emit(doc._id, doc); } }"
@@ -58,21 +86,36 @@ let asyncMap (fn: 'a -> 'b) (task: Async<'a>) = async {
     return fn result
 }
 
-type FirstDoc = {
-    MyId: string
-    MyRev: string
-    hello: bool
-}
+let mapDoc ((typeName, data): Document) = 
+    match typeName with 
+    | Some MyOtherClassType -> 
+        data.ToObject<MyOtherClass>()
+        |> SecondDoc
+    | Some MyTestClassType -> 
+        data.ToObject<MyTestClass>()
+        |> FirstDoc
+    | Some _
+    | None -> failwithf "Failed to map unknown document %A" data
 
-type SecondDoc = {
-    MyId: string
-    MyRev: string
-    hello: int 
-}
+let mapFirstDoc = mapDoc >> function 
+    | FirstDoc d -> d
+    | SecondDoc _ -> failwith "Expected FirstDoc."
 
-type EitherDoc = 
-    | Doc1 of FirstDoc
-    | Doc2 of SecondDoc
+let mapSecondDoc = mapDoc >> function 
+    | FirstDoc _ -> failwith "Expected SecondDoc."
+    | SecondDoc d -> d
+
+let mapListToFirstDocs docs =
+    docs
+    |> Seq.map (fun d -> try mapFirstDoc d |> Some with _ -> None)
+    |> Seq.filter Option.isSome
+    |> Seq.map Option.get    
+
+let mapListToSecondDocs docs = 
+    docs
+    |> Seq.map (fun d -> try mapSecondDoc d |> Some with _ -> None)
+    |> Seq.filter Option.isSome
+    |> Seq.map Option.get
 
 [<Tests>]
 let tests =
@@ -82,9 +125,10 @@ let tests =
     let client =
         url
         |> database "davenport_net_fsharp"
+        |> mapFields (Map.ofSeq [MyTestClass.typeName, ("MyId", "MyRev"); MyOtherClass.typeName, ("DocId", "Revision")])
         |> warning (printfn "%s")
 
-    // Set debug to `true` below to start debugging.
+    // Set debug to `true` to start debugging.
     // 1. Start the test suite (dotnet run)
     // 2. Go to VS Code's Debug tab.
     // 3. Choose ".NET Core Attach"
@@ -95,29 +139,45 @@ let tests =
           System.Threading.Thread.Sleep(100)
         System.Diagnostics.Debugger.Break()
 
-    printfn "Configuring database at url %s." url
+    printfn "Creating database at url %s." url
 
-    // Configure the database before running tests
-    // configureDatabase [] [] client
-    // |> Async.RunSynchronously
+    createDatabase client
+    |> Async.RunSynchronously
+    |> ignore
 
-    printfn "Database configured."
+    printfn "Database created."
 
     testList "Davenport.Fsharp.Wrapper" [
         testCaseAsync "Gets a document's raw json" <| async {
-            let! created = create defaultRecord client
-            let! json = getRaw created.Id (Some created.Rev) client
+            let! (createdId, createdRev, _) = create defaultInsert client
+            let! json = getRaw createdId (Some createdRev) client
 
             String.IsNullOrEmpty json
             |> Expect.isFalse "JSON string should not be empty"
         }
 
-        testCaseAsync "Gets a doc in the new fashion" <| async {
-            let! created = create defaultRecord client
-            let! json = getRaw created.Id (Some created.Rev) client
-            let deserialized = json |> mapDoc<MyTestClass>
+        testCaseAsync "Gets a document of the first type" <| async {
+            let! (createdId, createdRev, _) = create defaultInsert client
+            let! doc = 
+                get createdId (Some createdRev) client
+                |> asyncMap mapFirstDoc
 
-            ()
+            notNullOrEmpty "Id should not be empty" doc.MyId
+            notNullOrEmpty "Rev should not be empty" doc.MyRev
+            Expect.equal "" defaultRecord.Foo doc.Foo
+            Expect.equal "" defaultRecord.Bar doc.Bar
+            Expect.equal "" defaultRecord.Baz doc.Baz
+        }
+
+        testCaseAsync "Gets a document of the second type" <| async {
+            let! (createdId, createdRev, _) = create defaultSecondInsert client
+            let! doc = 
+                get createdId (Some createdRev) client
+                |> asyncMap mapSecondDoc
+
+            notNullOrEmpty "Id should not be empty" doc.DocId
+            notNullOrEmpty "Rev should not be empty" doc.Revision
+            Expect.equal ".hello should match" defaultSecondRecord.hello doc.hello
         }
 
         testCaseAsync "Bulk insert" <| async {
@@ -125,244 +185,277 @@ let tests =
         }
 
         testCaseAsync "Creates docs" <| async {
-            let! doc = create<MyTestClass> defaultRecord client
+            let! (docId, docRev, ok) = create defaultInsert client
 
-            notNullOrEmpty doc.Id "Id was empty"
-            notNullOrEmpty doc.Rev "Rev was empty"
-            Expect.isTrue doc.Ok ""
+            notNullOrEmpty "Id was empty" docId
+            notNullOrEmpty "Rev was empty" docRev
+            Expect.isTrue "" ok
         }
 
         testCaseAsync "Creates docs with specific ids" <| async {
             let myId = sprintf "specific_id_%s" (Guid.NewGuid().ToString())
-            let! doc = createWithId myId defaultRecord client
+            let! (docId, docRev, ok) = createWithId myId defaultInsert client
 
-            Expect.equal doc.Id myId "Created id and supplied id did not match"
-            notNullOrEmpty doc.Rev "Rev was empty"
-            Expect.isTrue doc.Ok ""
+            Expect.equal "Created id and supplied id did not match" docId myId
+            notNullOrEmpty "Rev was empty" docRev
+            Expect.isTrue "" ok
         }
 
-        testCaseAsync "Gets docs" <| async {
-            let! created = create<MyTestClass> defaultRecord client
-            let! docResult = get<MyTestClass> created.Id None client
+        testCaseAsync "Gets docs without a revision" <| async {
+            let! (createdId, _, _) = create defaultInsert client
+            let! doc = 
+                get createdId None client
+                |> asyncMap mapFirstDoc
 
-            Expect.isSome docResult "DocResult is None"
-
-            let doc = Option.get docResult
-
-            Expect.equal created.Id doc.MyId ""
-            Expect.equal created.Rev doc.MyRev ""
-            Expect.equal defaultRecord.Foo doc.Foo ""
-            Expect.equal defaultRecord.Bar doc.Bar ""
-            Expect.equal defaultRecord.Baz doc.Baz ""
+            notNullOrEmpty "Id should not be empty" doc.MyId
+            notNullOrEmpty "Rev should not be empty" doc.MyRev
+            Expect.equal "" defaultRecord.Foo doc.Foo
+            Expect.equal "" defaultRecord.Bar doc.Bar
+            Expect.equal "" defaultRecord.Baz doc.Baz
         }
 
-        testCaseAsync "Gets docs with revision" <| async {
-            let! created = create<MyTestClass> defaultRecord client
-            let! docResult = get<MyTestClass> created.Id (Some created.Rev) client
+        testCaseAsync "Throws 404 for docs that don't exist" <| async {
+            let! exists = 
+                get (Guid.NewGuid().ToString()) None client
+                |> Async.Catch
+                |> asyncMap (function | Choice2Of2 (:? DavenportException as exn) when exn.StatusCode = 404 -> false | _ -> true)
 
-            Expect.isSome docResult "DocResult is None"
-
-            let doc = Option.get docResult
-
-            Expect.equal created.Id doc.MyId ""
-            Expect.equal created.Rev doc.MyRev ""
-            Expect.equal defaultRecord.Foo doc.Foo ""
-            Expect.equal defaultRecord.Bar doc.Bar ""
-            Expect.equal defaultRecord.Baz doc.Baz ""
-        }
-
-        testCaseAsync "Returns None for dogs that don't exist" <| async {
-            let! docResult = get<MyTestClass> (Guid.NewGuid().ToString()) None client
-
-            Expect.isNone docResult "DocResult should be None"
+            Expect.isFalse "Should be false" exists
         }
 
         testCaseAsync "Counts docs" <| async {
-            do! create<MyTestClass> defaultRecord client |> Async.Ignore
+            do! create defaultInsert client |> Async.Ignore
 
             let! count = count client
 
-            Expect.isGreaterThan count 0 "Count was 0."
+            Expect.isGreaterThan "Count should be greater than 0" (count, 0)
         }
 
-        testCaseAsync "Counts docs with an expression" <| async {
-            let expected = "counts_with_expression"
-            let record = { defaultRecord with Foo = expected }
+        // testCaseAsync "Counts docs with an expression" <| async {
+        //     let expected = "counts_with_expression"
+        //     let record = { defaultRecord with Foo = expected }
 
-            do! create<MyTestClass> record client |> Async.Ignore
+        //     do! create<MyTestClass> record client |> Async.Ignore
 
-            let! exprCount = countByExpr (<@ fun (r: MyTestClass) -> r.Foo = expected @>) client
-            let! totalCount = count client
+        //     let! exprCount = countByExpr (<@ fun (r: MyTestClass) -> r.Foo = expected @>) client
+        //     let! totalCount = count client
 
-            Expect.isGreaterThan exprCount 0 "Count was 0."
-            Expect.isLessThanOrEqual exprCount totalCount "Filtered count was not less than or equal to the count of all docs."
-        }
+        //     Expect.isGreaterThan exprCount 0 "Count was 0."
+        //     Expect.isLessThanOrEqual exprCount totalCount "Filtered count was not less than or equal to the count of all docs."
+        // }
 
-        testCaseAsync "Counts docs with a map" <| async {
+        testCaseAsync "Counts docs with a selector" <| async {
             let expected = "counts_with_map"
-            let record = { defaultRecord with Foo = expected }
+            let insert = 
+                { defaultRecord with Foo = expected }
+                |> FirstDoc 
+                |> insertable
 
-            do! create record client |> Async.Ignore
+            do! create insert client |> Async.Ignore
 
             let map = Map.ofSeq ["Foo", [EqualTo expected]]
 
             let! mapCount = countBySelector map client
             let! totalCount = count client
 
-            Expect.isGreaterThan mapCount 0 "Count was 0"
-            Expect.isLessThanOrEqual mapCount totalCount "Filtered count was not less than or equal to the count of all docs."
+            Expect.isGreaterThan "Count should be greater than 0" (mapCount, 0)
+            Expect.isLessThanOrEqual "Filtered count was not less than or equal to the count of all docs." (mapCount, totalCount)
         }
 
         testCaseAsync "Updates docs" <| async {
-            let! created = create defaultRecord client
+            let! (createdId, createdRev, _) = create defaultInsert client
             let! retrieved =
-                get created.Id (Some created.Rev) client
-                |> asyncMap Option.get
+                get createdId (Some createdRev) client
+                |> asyncMap mapFirstDoc
 
             let newFoo = "updated_with_davenport_fsharp_wrapper"
-            let! updateResult = update created.Id created.Rev ({ retrieved with Foo = newFoo}) client
+            let newData = 
+                { retrieved with Foo = newFoo }
+                |> FirstDoc
+                |> insertable
+            let! (id, rev, ok) = update createdId createdRev newData client
 
-            Expect.isTrue updateResult.Ok "Update result is not Ok."
+            Expect.isTrue "Update result is not Ok." ok
 
             let! updated =
-                get updateResult.Id (Some updateResult.Rev) client
-                |> asyncMap Option.get
+                get id (Some rev) client
+                |> asyncMap mapFirstDoc
 
             Expect.equal updated.Foo newFoo "Failed to update doc's Foo property."
         }
 
         testCaseAsync "Deletes docs" <| async {
-            let! created = create defaultRecord client
+            let! (id, rev, _) = create defaultInsert client
 
-            do! delete created.Id created.Rev client
+            do! delete id rev client
         }
 
-        testCaseAsync "Lists with docs" <| async {
+        testCaseAsync "Retrieves all docs" <| async {
             // Create at least one doc to list
-            do! create defaultRecord client |> Async.Ignore
+            do! create defaultInsert client |> Async.Ignore
 
-            let! list = listWithDocs<MyTestClass> None client
+            let! (totalRows, offset, docs) = allDocs WithDocs [] client
 
-            Expect.equal list.Offset 0 "List offset is not 0."
-            Expect.isNonEmpty list.Rows "List is empty."
-            Expect.all list.Rows (fun r -> r.Doc.GetType() = typeof<MyTestClass>) "All docs should be of type MyTestClass"
-            Expect.all list.Rows (fun r -> not <| r.Id.StartsWith "_design") "No doc should start with _design"
-            Expect.all list.Rows (fun r -> not <| String.IsNullOrEmpty r.Doc.MyId) "No doc should have an empty id"
-            Expect.all list.Rows (fun r -> not <| String.IsNullOrEmpty r.Doc.MyRev) "No doc should have an empty rev"
+            Expect.equal "List offset is not 0." offset 0
+            Expect.isTrue "Total rows should be greater than 0" (totalRows > 0)
+            Expect.isNonEmpty "List is empty." docs
+
+            let mappedDocs = 
+                docs
+                |> Seq.map (fun d -> try mapDoc d |> Some with _ -> None)
+                |> Seq.filter Option.isSome
+                |> Seq.map Option.get
+            
+            let hasId d = 
+                match d with
+                | FirstDoc d -> d.MyId
+                | SecondDoc d -> d.DocId
+                |> String.IsNullOrEmpty
+                |> not
+
+            let hasRev d = 
+                match d with 
+                | FirstDoc d -> d.MyRev
+                | SecondDoc d -> d.Revision
+                |> String.IsNullOrEmpty 
+                |> not
+
+            Expect.all "No doc should have an empty id" hasId mappedDocs
+            Expect.all "No doc should have an empty rev" hasRev mappedDocs
         }
 
         testCaseAsync "Lists without docs" <| async {
-            // Create at least one doc to list
-            do! create defaultRecord client |> Async.Ignore
+            skiptest "Test not implemented. Must make list function return document revisions"
+            // // Create at least one doc to list
+            // do! create defaultRecord client |> Async.Ignore
 
-            let! list = listWithoutDocs None client
+            // let! list = listWithoutDocs None client
 
-            Expect.equal list.Offset 0 "List offset is not 0."
-            Expect.isNonEmpty list.Rows "List is empty"
-            Expect.all list.Rows (fun r -> r.Doc.GetType() = typeof<Davenport.Entities.Revision>) "All docs should be of type Revision"
-            Expect.all list.Rows (fun r -> not <| r.Id.StartsWith "_design") "No doc should start with _design"
-            Expect.all list.Rows (fun r -> not <| String.IsNullOrEmpty r.Doc.Rev) "All docs should have a Rev property"
+            // Expect.equal list.Offset 0 "List offset is not 0."
+            // Expect.isNonEmpty list.Rows "List is empty"
+            // Expect.all list.Rows (fun r -> r.Doc.GetType() = typeof<Davenport.Entities.Revision>) "All docs should be of type Revision"
+            // Expect.all list.Rows (fun r -> not <| r.Id.StartsWith "_design") "No doc should start with _design"
+            // Expect.all list.Rows (fun r -> not <| String.IsNullOrEmpty r.Doc.Rev) "All docs should have a Rev property"
         }
 
-        testCaseAsync "Finds docs with an expression" <| async {
-            let expected = "finds_docs_with_expression"
+        // testCaseAsync "Finds docs with an expression" <| async {
+        //     let expected = "finds_docs_with_expression"
 
-            do! create {defaultRecord with Foo = expected} client |> Async.Ignore
+        //     do! create {defaultRecord with Foo = expected} client |> Async.Ignore
 
-            let! found = findByExpr <@ fun (c: MyTestClass) -> c.Foo = expected @> None client
+        //     let! found = findByExpr <@ fun (c: MyTestClass) -> c.Foo = expected @> None client
 
-            Expect.isNonEmpty found "findByExpr should have found at least one doc."
-            Expect.all found (fun c -> c.Foo = expected) "All docs returned by findByExpr should have the expected Foo value."
-        }
+        //     Expect.isNonEmpty found "findByExpr should have found at least one doc."
+        //     Expect.all found (fun c -> c.Foo = expected) "All docs returned by findByExpr should have the expected Foo value."
+        // }
 
-        testCaseAsync "Finds docs with a notequal expression" <| async {
-            let expected = "finds_docs_with_a_notequal_expression"
+        // testCaseAsync "Finds docs with a notequal expression" <| async {
+        //     let expected = "finds_docs_with_a_notequal_expression"
 
-            do! create ({defaultRecord with Foo = expected}) client |> Async.Ignore
-            do! create defaultRecord client |> Async.Ignore
+        //     do! create ({defaultRecord with Foo = expected}) client |> Async.Ignore
+        //     do! create defaultRecord client |> Async.Ignore
 
-            let! found = findByExpr <@ fun (c: MyTestClass) -> c.Foo <> expected @> None client
+        //     let! found = findByExpr <@ fun (c: MyTestClass) -> c.Foo <> expected @> None client
 
-            Expect.isNonEmpty found "findByExpr should have found at least one doc."
-            Expect.all found (fun c -> c.Foo <> expected) "All docs returned should not have a Foo value equal to the search value."
-        }
+        //     Expect.isNonEmpty found "findByExpr should have found at least one doc."
+        //     Expect.all found (fun c -> c.Foo <> expected) "All docs returned should not have a Foo value equal to the search value."
+        // }
 
         testCaseAsync "Finds docs with a map" <| async {
             let expected = "finds_with_map"
-            let record = { defaultRecord with Foo = expected }
+            let insert = 
+                { defaultRecord with Foo = expected }
+                |> FirstDoc
+                |> insertable
 
-            do! create record client |> Async.Ignore
+            do! create insert client |> Async.Ignore
 
-            let map = Map.ofSeq ["Foo", [EqualTo expected]]
-            let! found = findBySelector<MyTestClass> map None client
+            let map = Map.ofSeq ["Foo", [EqualTo expected]; "type", [EqualTo MyTestClass.typeName]]
+            let! found = 
+                find [] map client
+                |> asyncMap mapListToFirstDocs
 
-            Expect.isNonEmpty map "findByMap should have found at least one doc."
-            Expect.all found (fun c -> c.Foo = expected) "All docs returned should have the expected Foo value."
+            Expect.isTrue "Should have found at least one MyTestClass doc" (Seq.length found > 0)
+            Expect.all "All docs returned should have the expected Foo value." (fun c -> c.Foo = expected) found
         }
 
         testCaseAsync "Finds docs with a notequal map" <| async {
             let expected = "finds_docs_with_a_notequal_map"
+            let insert = 
+                { defaultRecord with Foo = expected }
+                |> FirstDoc
+                |> insertable
 
-            do! create ({defaultRecord with Foo = expected}) client |> Async.Ignore
-            do! create defaultRecord client |> Async.Ignore
+            do! create insert client |> Async.Ignore
+            do! create defaultInsert client |> Async.Ignore
 
-            let map = Map.ofSeq ["Foo", [NotEqualTo expected]]
-            let! found = findBySelector<MyTestClass> map None client
+            let map = Map.ofSeq ["Foo", [NotEqualTo expected]; "type", [EqualTo MyTestClass.typeName]]
+            let! found = 
+                find [] map client
+                |> asyncMap mapListToFirstDocs
 
-            Expect.isNonEmpty map "findByMap should have found at least one doc."
-            Expect.all found (fun c -> c.Foo <> expected) "All docs returned should not have a Foo value equal to the search value."
+            Expect.isNonEmpty "findByMap should have found at least MyTestClass doc." found
+            Expect.all "All docs returned should not have a Foo value equal to the search value." (fun c -> c.Foo <> expected) found
         }
 
         testCaseAsync "Doc exists" <| async {
-            let! created = create defaultRecord client
-            let! existsWithRev = exists created.Id (Some created.Rev) client
-            let! existsWithoutRev = exists created.Id None client
+            let! id, rev, _ = create defaultInsert client
+            let! existsWithRev = exists id (Some rev) client
+            let! existsWithoutRev = exists id None client
 
-            Expect.isTrue existsWithoutRev "Exists without rev should be true"
-            Expect.isTrue existsWithRev "Exists with rev should be true"
+            Expect.isTrue "Exists without rev should be true" existsWithoutRev
+            Expect.isTrue "Exists with rev should be true" existsWithRev
         }
 
-        testCaseAsync "Doc exists by expression" <| async {
-            let expected = "doc_exists_by_expr"
+        // testCaseAsync "Doc exists by expression" <| async {
+        //     let expected = "doc_exists_by_expr"
 
-            do! create ({defaultRecord with Foo = expected}) client |> Async.Ignore
+        //     do! create ({defaultRecord with Foo = expected}) client |> Async.Ignore
 
-            let! exists = existsByExpr <@ fun (c: MyTestClass) -> c.Foo = expected @> client
+        //     let! exists = existsByExpr <@ fun (c: MyTestClass) -> c.Foo = expected @> client
 
-            Expect.isTrue exists ""
-        }
+        //     Expect.isTrue exists ""
+        // }
 
-        testCaseAsync "Doc exists by map" <| async {
-            let expected = "doc_exists_by_map"
+        testCaseAsync "Doc exists by selector" <| async {
+            let expected = "doc_exists_by_selector"
+            let insert = 
+                { defaultRecord with Foo = expected }
+                |> FirstDoc
+                |> insertable
 
-            do! create ({defaultRecord with Foo = expected}) client |> Async.Ignore
+            do! create insert client |> Async.Ignore
 
             let map = Map.ofSeq ["Foo", [EqualTo expected]]
             let! exists = existsBySelector map client
 
-            Expect.isTrue exists ""
+            Expect.isTrue "" exists
         }
 
         testCaseAsync "Copies docs" <| async {
             let uuid = sprintf "a-unique-string-%i" DateTime.UtcNow.Millisecond
-            let! created = create defaultRecord client
-            let! copy = copy created.Id uuid client
+            let! id, _, _ = create defaultInsert client
+            let! id, _, ok = copy id uuid client
 
-            Expect.isTrue copy.Ok ""
-            Expect.equal copy.Id uuid "The copied document's id should have equaled the expected uuid."
+            Expect.isTrue "" ok
+            Expect.equal "The copied document's id should have equaled the expected uuid." id uuid
         }
 
         testCaseAsync "Creates and deletes databases" <| async {
             let name = "davenport_fsharp_delete_me"
             let client = "localhost:5984" |> database name
 
-            do! createDatabase client
+            do! createDatabase client |> Async.Ignore
+
             // Create the database again to ensure it doesn't fail if the database already existed
-            do! createDatabase client
+            let! createResult = createDatabase client
 
-            let! deleteResponse =  deleteDatabase client
+            match createResult with 
+            | AlreadyExisted -> true
+            | Created -> false
+            |> Expect.isTrue "Should have returned an 'AlreadyExisted' union type."
 
-            Expect.isTrue deleteResponse.Ok "DeleteResponse.Ok should have been true."
+            do! deleteDatabase client
         }
 
         testCaseAsync "Warnings work" <| async {
@@ -370,22 +463,26 @@ let tests =
             let handleWarning _ =
                 called <- true
 
-            let clientWithWarning = client |> warning (Event.add handleWarning)
-            let! created = create defaultRecord clientWithWarning
+            let clientWithWarning = client |> warning handleWarning
+            let! id, _, _ = create defaultInsert clientWithWarning
 
-            // To get a warning, attempt to delete a document without a revision. This will throw an error, but not before firing the warning event.
+            // To get a warning, attempt to find a document by searching for a field that doesn't have an index.
             do!
                 clientWithWarning
-                |> delete created.Id null
+                |> find [] (Map.ofSeq ["my-dude-that-doesn't-exist", [EqualTo "henlo"]])
                 |> Async.Catch
                 |> Async.Ignore
 
-            Expect.isTrue called "Warning event was not called"
+            Expect.isTrue "Warning event was not called" called
         }
 
         testCaseAsync "Creates design docs and gets view results" <| async {
             // Make sure the design docs exist
-            do! createDesignDocs defaultDesignDocs client
+            let views: View list = [
+                "my-view", "function (doc) { if (doc.Baz > 10) { emit(doc._id, doc); } }", None
+            ]
+            let designDoc = "_design/henlo", views
+            do! createOrUpdateDesignDoc defaultDesignDocs client
 
             // Create at least one doc that would match
             do! create ({defaultRecord with Baz = 15}) client |> Async.Ignore
