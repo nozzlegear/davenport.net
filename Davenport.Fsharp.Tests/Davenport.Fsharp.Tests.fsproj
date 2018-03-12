@@ -5,9 +5,9 @@
     <TargetFramework>netcoreapp2.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="FsTypeConverter.fs" />
+    <Compile Include="Converters.fs" />
     <Compile Include="Infrastructure.fs" />
-    <Compile Include="Wrapper.fs" />
+    <Compile Include="Library.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
   <ItemGroup>

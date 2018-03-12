@@ -1,7 +1,7 @@
-module Davenport.Fsharp.Tests.Wrapper
+module Davenport.Fsharp.Tests.Library
 
 open System
-open Davenport.Fsharp.Wrapper
+open Davenport.Fsharp
 open Expecto
 open Expecto.Flip
 
@@ -42,15 +42,15 @@ let designDocName = "list"
 
 let toSeq a = Seq.ofList [a]
 
-let defaultDesignDocs =
-    mapFunction "function (doc) { if (doc.Baz > 10) { emit(doc._id, doc); } }"
-    |> reduceFunction "_count"
-    |> view viewName
-    |> toSeq
-    |> designDoc designDocName
-    |> toSeq
+// let defaultDesignDocs =
+//     mapFunction "function (doc) { if (doc.Baz > 10) { emit(doc._id, doc); } }"
+//     |> reduceFunction "_count"
+//     |> view viewName
+//     |> toSeq
+//     |> designDoc designDocName
+//     |> toSeq
 
-let notNullOrEmpty (s: string) = String.IsNullOrEmpty s >> Expect.isFalse
+let notNullOrEmpty message = String.IsNullOrEmpty >> Expect.isFalse message
 
 let asyncMap (fn: 'a -> 'b) (task: Async<'a>) = async {
     let! result = task
@@ -83,8 +83,6 @@ let tests =
         url
         |> database "davenport_net_fsharp"
         |> warning (Event.add (fun s -> printfn "%s" s))
-        |> idField "MyId"
-        |> revField "MyRev"
 
     // Set debug to `true` below to start debugging.
     // 1. Start the test suite (dotnet run)
