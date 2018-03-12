@@ -1,18 +1,16 @@
-module Davenport.Fsharp.Wrapper
+module Davenport.Fsharp
 
-open Davenport.Fsharp.Infrastructure
-open Davenport.Fsharp.Converters
-open Davenport.Fsharp.Types
+open Davenport.Infrastructure
+open Davenport.Converters
+open Davenport.Types
 open Newtonsoft.Json.Linq
 
 let private defaultProps =  
     { username = None 
       password = None 
-      converter = FsConverter []
+      converter = FsConverter()
       databaseName = ""
       couchUrl = ""
-      id = "_id"
-      rev = "_rev" 
       onWarning = Event<string>() }
 
 let database name couchUrl =
@@ -22,23 +20,13 @@ let username username config = { config with username = Some username }
 
 let password password config = { config with password = Some password }
 
-let idField name props = { props with id = name }
-
-let revField name props = { props with rev = name }
-
-let converter converter props = { props with converter = converter }
+let converter converter props = 
+    failwith "TODO: Use the converter.CanConvert function to check that the converter implements all necessary conversions."
+    { props with converter = converter }
 
 let warning handler (props: CouchProps) = 
     Event.add handler props.onWarning.Publish
     props
-
-let mapDoc (fn: Document) (computation: Async<string>) = 
-    // This will receive the async task from e.g. `get`, plus accept an arbitrary function that will
-    // receive a (typeName: string -> jtoken -> useDefaultDeserializer: unit -> 'a)
-    ""
-
-let mapDocList (fn: DocumentList) (computation: Async<string>) = 
-    ""
 
 let getRaw id rev = 
     request id
@@ -67,19 +55,19 @@ let allDocs includeDocs options props =
     allDocsRaw includeDocs options props 
     |> asyncMap (stringToDocumentList props.converter)
 
-let create document props = 
+let create (document: InsertedDocument<'a>) props = 
     request "" props
     |> body document
     |> send Post
     |> asyncMap (stringToPostPutCopyResponse props.converter)
 
-let createWithId id document props = 
+let createWithId id (document: InsertedDocument<'a>) props = 
     request id props
     |> body document 
     |> send Put
     |> asyncMap (stringToPostPutCopyResponse props.converter)
 
-let update id rev document props = 
+let update id rev (document: InsertedDocument<'a>) props = 
     request id props
     |> querystring (mapFromRev rev)
     |> body document
@@ -143,7 +131,7 @@ let reduceRaw designDocName viewName options props =
 /// </summary>
 let reduce designDocName viewName options props = 
     reduceRaw designDocName viewName options props
-    |> asyncMap (stringToReduction props.converter)
+    |> asyncMap (stringToDocument props.converter)
 
 let findRaw selector findOptions =
     let data = 
@@ -206,7 +194,7 @@ let existsBySelector selector =
 /// 
 /// If the new edits are *not* allowed (to push existing revisions instead of creating new ones) the response will not include entries for any of the successful revisions (since their rev IDs are already known to the sender), only for the ones that had errors. Also, the `"conflict"` error will never appear, since in this mode conflicts are allowed. 
 /// </summary>
-let bulkInsert mode (docs: 'a list) props = 
+let bulkInsert mode (docs: InsertedDocument<_> list) props = 
     let qs = 
         match mode with 
         | AllowNewEdits -> Map.ofSeq ["new_edits", true :> obj]
