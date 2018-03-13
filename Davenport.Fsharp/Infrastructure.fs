@@ -249,12 +249,10 @@ let send (method: Method) (request: RequestProps) =
 
 let stringToDocument = ofJson<Document>
 
-let stringToDocumentList = ofJson<DocumentList>
+let stringToViewResult = ofJson<ViewResult>
 
 let stringToPostPutCopyResponse = ofJson<PostPutCopyResponse>
 
 let stringToFoundList = ofJson<FoundList>
 
 let stringToBulkResponseList = ofJson<BulkResponse list>
-
-let stringToViewDoc = ofJson<ViewDoc list>

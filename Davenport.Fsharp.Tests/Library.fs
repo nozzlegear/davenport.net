@@ -86,6 +86,12 @@ let asyncMap (fn: 'a -> 'b) (task: Async<'a>) = async {
     return fn result
 }
 
+let asyncBind (fn: 'a -> Async<'b>) (task: Async<'a>) = async {
+    let! result = task
+
+    return! fn result
+}
+
 let mapDoc ((typeName, data): Document) = 
     match typeName with 
     | Some MyOtherClassType -> 
@@ -300,9 +306,15 @@ let tests =
             Expect.isTrue "Total rows should be greater than 0" (totalRows > 0)
             Expect.isNonEmpty "List is empty." docs
 
+            let tryMapDoc = function 
+                | _, _, _, Some d ->
+                    try mapDoc d |> Some with _ -> None
+                | _, _, _, _ ->
+                    None
+
             let mappedDocs = 
                 docs
-                |> Seq.map (fun d -> try mapDoc d |> Some with _ -> None)
+                |> Seq.map tryMapDoc
                 |> Seq.filter Option.isSome
                 |> Seq.map Option.get
             
@@ -477,19 +489,35 @@ let tests =
         }
 
         testCaseAsync "Creates design docs and gets view results" <| async {
+            let docName = "_design/davenport_net_fsharp"
+            let viewName = "only-bazs-greater-than-10"
+
             // Make sure the design docs exist
-            let views: View list = [
-                "my-view", "function (doc) { if (doc.Baz > 10) { emit(doc._id, doc); } }", None
-            ]
-            let designDoc = "_design/henlo", views
-            do! createOrUpdateDesignDoc defaultDesignDocs client
+            do! 
+                Map.empty
+                |> Map.add viewName ("function (doc) { if (doc.Baz > 10 { emit(doc._id, doc) }) }", None) 
+                |> DesignDoc.doc docName
+                |> createOrUpdateDesignDoc
+                <| client
 
             // Create at least one doc that would match
-            do! create ({defaultRecord with Baz = 15}) client |> Async.Ignore
-            let! viewResult = executeView<int> designDocName viewName None client
+            do!
+                { defaultRecord with Baz = 15 }
+                |> FirstDoc
+                |> insertable
+                |> create
+                <| client
+                |> Async.Ignore
 
-            Expect.isGreaterThan (Seq.length viewResult) 0 "View should return at least one result"
-            Expect.isGreaterThanOrEqual (viewResult |> Seq.sumBy (fun d -> d.Value)) 10 "The sum of all doc values should be greater than 10"
+            let! total, offset, docs = view docName viewName [] client
+
+            let docValues = 
+                docs 
+                |> Seq.map (fun (_, _, value, _) -> value.ToObject<int>())
+
+            Expect.isGreaterThan "View should return at least one result" (total, 0)
+            Expect.isGreaterThan "Offset should be at least 0" (offset, -1)
+            Expect.isGreaterThanOrEqual "The sum of all doc values should be greater than 10" (Seq.sum docValues, 10)
         }
 
         testCaseAsync "Finds values serialized by Fable.JsonConverter" <| async {
@@ -499,12 +527,23 @@ let tests =
             // a dictionary of find options. Previously these options would never get passed to the custom
             // converter and therefore we'd get Json.Net searching for an int64 and couchdb only using strings.
             let expected = 12345678987654321L
-            do! create ({ defaultRecord with Bat = expected }) client |> Async.Ignore
+            do! 
+                { defaultRecord with Bat = expected }
+                |> FirstDoc
+                |> insertable
+                |> create
+                <| client
+                |> Async.Ignore
 
-            let! findResult = findByExpr <@ fun (d: MyTestClass) -> d.Bat = expected @> None client
-
-            Expect.isGreaterThan (Seq.length findResult) 0 "Should have returned at least one record."
-            Expect.all findResult (fun d -> d.Bat = expected) "Every returned doc should have a Bat property equal to the expected value."
+            let! findResult = 
+                Map.empty
+                |> Map.add "Bat" [EqualTo expected]
+                |> find []
+                <| client
+                |> asyncMap mapListToFirstDocs
+                
+            Expect.isGreaterThan "Should have returned at least one record." (Seq.length findResult, 0)
+            Expect.all "Every returned doc should have a Bat property equal to the expected value." (fun d -> d.Bat = expected) findResult
         }
 
         testCaseAsync "Can find values between int64" <| async {
@@ -513,18 +552,26 @@ let tests =
             let max = expected + 10000000000L
 
             // Create records that would be under the min range, over the max range, and between both
-            do! Async.Parallel [
-                    create ({defaultRecord with Bat = min - 1L}) client
-                    create ({defaultRecord with Bat = max + 1L}) client
-                    create ({defaultRecord with Bat = expected - 1L}) client
-                    create ({defaultRecord with Bat = expected + 1L}) client
-                ]|> Async.Ignore
+            do!
+                [
+                    { defaultRecord with Bat = min - 1L }
+                    { defaultRecord with Bat = max + 1L }
+                    { defaultRecord with Bat = expected - 1L }
+                    { defaultRecord with Bat = expected + 1L }
+                ]
+                |> Seq.map (FirstDoc >> insertable >> create >> fun f -> f client)
+                |> Async.Parallel
+                |> Async.Ignore
 
             // let! result = findByExpr<MyTestClass> <@ fun (c: MyTestClass) -> c.Bat > min @> None client
-            let selector = Map.ofSeq ["Bat", [GreaterThan min; LesserThan max]]
-            let! result = findBySelector<MyTestClass> selector None client
+            let! result = 
+                Map.empty
+                |> Map.add "Bat" [GreaterThan min; LesserThan max]
+                |> find []
+                <| client
+                |> asyncMap mapListToFirstDocs
 
-            Expect.all result (fun c -> c.Bat > min && c.Bat < max) "All records returned should be greater than min value and lesser than max value."
+            Expect.all "All records returned should be greater than min value and lesser than max value." (fun c -> c.Bat > min && c.Bat < max) result
         }
 
         testCaseAsync "Serializes and deserializes options and unions" <| async {
@@ -535,25 +582,26 @@ let tests =
             let expectedDate = DateTime.UtcNow.AddHours -7.
             let expectedDecimal = 23.75M
 
-            let! createdOpt = create ({ defaultRecord with Opt = expectedOpt }) client
-            let! createdUnionStr = create ({ defaultRecord with Union = expectedUnionStr }) client
-            let! createdUnionInt = create ({defaultRecord with Union = expectedUnionInt }) client
-            let! createdUnionInt64 = create ({defaultRecord with Union = expectedUnionInt64 }) client
-            let! createdDateTime = create ({defaultRecord with Date = expectedDate}) client
-            let! createdDecimal = create({defaultRecord with Dec = expectedDecimal}) client
+            let makeAndGet = 
+                FirstDoc 
+                >> insertable 
+                >> create 
+                >> fun fn -> fn client
+                >> asyncBind (fun (id, rev, _) -> get id (Some rev) client)
+                >> asyncMap mapFirstDoc
 
-            let! opt = get createdOpt.Id (Some createdOpt.Rev) client |> asyncMap Option.get
-            let! unionStr = get createdUnionStr.Id (Some createdUnionStr.Rev) client |> asyncMap Option.get
-            let! unionInt = get createdUnionInt.Id (Some createdUnionInt.Rev) client |> asyncMap Option.get
-            let! unionInt64 = get createdUnionInt64.Id (Some createdUnionInt64.Rev) client |> asyncMap Option.get
-            let! dateTime = get createdDateTime.Id (Some createdDateTime.Rev) client |> asyncMap Option.get
-            let! decimal = get createdDecimal.Id (Some createdDecimal.Rev) client |> asyncMap Option.get
+            let! opt = makeAndGet { defaultRecord with Opt = expectedOpt }
+            let! unionStr = makeAndGet { defaultRecord with Union = expectedUnionStr }
+            let! unionInt = makeAndGet { defaultRecord with Union = expectedUnionInt }
+            let! unionInt64 = makeAndGet { defaultRecord with Union = expectedUnionInt64 }
+            let! dateTime = makeAndGet { defaultRecord with Date = expectedDate }
+            let! decimal = makeAndGet { defaultRecord with Dec = expectedDecimal }
 
-            Expect.equal opt.Opt expectedOpt "Options should be equal"
-            Expect.equal unionStr.Union expectedUnionStr "Union str should be equal"
-            Expect.equal unionInt.Union expectedUnionInt "Union int should be equal"
-            Expect.equal unionInt64.Union expectedUnionInt64 "Union int64 should be equal"
-            Expect.equal dateTime.Date expectedDate "Date should be equal"
-            Expect.equal decimal.Dec expectedDecimal "Decimal should be equal"
+            Expect.equal "Options should be equal" opt.Opt expectedOpt
+            Expect.equal "Union str should be equal" unionStr.Union expectedUnionStr
+            Expect.equal "Union int should be equal" unionInt.Union expectedUnionInt
+            Expect.equal "Union int64 should be equal" unionInt64.Union expectedUnionInt64
+            Expect.equal "Date should be equal" dateTime.Date expectedDate
+            Expect.equal "Decimal should be equal" decimal.Dec expectedDecimal
         }
     ]

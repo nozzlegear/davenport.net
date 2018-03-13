@@ -60,7 +60,7 @@ let allDocsRaw includeDocs options =
 
 let allDocs includeDocs options props = 
     allDocsRaw includeDocs options props 
-    |> asyncMap (stringToDocumentList props.converter)
+    |> asyncMap (stringToViewResult props.converter)
 
 let create (document: InsertedDocument<'a>) props = 
     request "" props
@@ -117,7 +117,7 @@ let viewRaw designDocName viewName options props =
 /// </summary>
 let view designDocName viewName options props = 
     viewRaw designDocName viewName options props
-    |> asyncMap (ofJson<JToken> props.converter >> fun token -> token.SelectToken("rows").ToObject<ViewDoc list>())
+    |> asyncMap (stringToViewResult props.converter)
 
 /// <summary>
 /// Queries a view and reduces it, returning the raw JSON string.
@@ -251,23 +251,18 @@ let deleteDatabase =
 let createOrUpdateDesignDoc ((id, views): DesignDoc) props =
     let viewData = 
         views
-        |> Seq.map (fun (name, map, reduce) ->
+        |> Map.map (fun _ (map, reduce) ->
             match reduce with 
             | None -> Map.empty
             | Some reduce -> Map.add "reduce" reduce Map.empty
-            |> Map.add "name" name
             |> Map.add "map" map
-            |> fun view -> name, view
         )
-        |> Map.ofSeq
 
     let data = 
-        [
-            "views", viewData :> obj
-            // Javascript is currently the only supported language
-            "language", "javascript" :> obj
-        ]
-        |> Map.ofSeq
+        Map.empty 
+        |> Map.add "views" (viewData :> obj)
+        // Javascript is currently the only supported language
+        |> Map.add "language" ("javascript" :> obj)
 
     request (sprintf "_design/%s" id) props
     |> body data
@@ -289,3 +284,12 @@ let createIndexes (indexes: string seq) props =
     request "_index" props
     |> body indexData
     |> send Post
+
+module DesignDoc =
+    let doc name views: DesignDoc = name, views
+
+    let addView viewName mapFunc revFunc ((name, previousViews): DesignDoc): DesignDoc = 
+        name, previousViews |> Map.add viewName (mapFunc, revFunc)
+
+    let addViews views ((name, previousViews): DesignDoc): DesignDoc = 
+        name, (Map.fold (fun state key value -> Map.add key value state) previousViews views)

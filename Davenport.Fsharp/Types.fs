@@ -31,9 +31,9 @@ type Okay = bool
 
 type DocData = JToken 
 
-type Document = TypeName option * DocData
+type ViewValue = JToken
 
-type DocumentList = TotalRows * Offset * Document list
+type Document = TypeName option * DocData
 
 type FoundList = Warning option * Document list
 
@@ -45,7 +45,9 @@ type ViewKey =
     | Key of obj
     | KeyList of obj list
 
-type ViewDoc = ViewKey * Document
+type ViewDoc = Id * ViewKey * ViewValue * Document option
+
+type ViewResult = TotalRows * Offset * ViewDoc list
 
 type CouchResult =  TypeName option * Newtonsoft.Json.Linq.JObject
 
@@ -127,13 +129,13 @@ type BulkMode =
 
 type ViewName = string
 
-type MapFunction = string
+type MapFunction = string 
 
 type ReduceFunction = string
 
-type View = ViewName * MapFunction * ReduceFunction option
+type Views = Map<ViewName, MapFunction * ReduceFunction option>
 
-type DesignDoc = Id * View list
+type DesignDoc = Id * Views
 
 type BulkErrorType = 
     | Conflict
