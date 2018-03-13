@@ -1,4 +1,4 @@
-module Davenport.Fsharp.Tests.Conveters
+module Tests.Conveters
 
 open System
 open Expecto
