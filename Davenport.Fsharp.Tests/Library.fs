@@ -1,4 +1,4 @@
-module Davenport.Fsharp.Tests.Library
+module Tests.Library
 
 open System
 open Davenport.Fsharp
@@ -123,16 +123,42 @@ let mapListToSecondDocs docs =
     |> Seq.filter Option.isSome
     |> Seq.map Option.get
 
+let envVar key = 
+    match System.Environment.GetEnvironmentVariable key with 
+    | ""
+    | null -> None
+    | s -> Some s
+    
+let envVarDefault key defaultValue = envVar key |> Option.defaultValue defaultValue
+
+let maybeAddUsername usrname props =
+    match usrname with 
+    | Some s -> username s props
+    | None -> props
+
+let maybeAddPassword pass props = 
+    match pass with 
+    | Some s -> password s props
+    | None -> props
+
 [<Tests>]
 let tests =
     let debug = false
     let fiddler = false
-    let url = if fiddler then "localhost.fiddler:5984" else System.Environment.GetEnvironmentVariable "COUCHDB_URL"
+    let couchUsername = envVar "COUCHDB_USERNAME"
+    let couchPassword = envVar "COUCHDB_PASSWORD"
+    let url = 
+        if fiddler 
+        then "localhost.fiddler:5984"
+        else envVarDefault "COUCHDB_URL" "localhost:5984"
+
     let client =
         url
         |> database "davenport_net_fsharp"
         |> mapFields (Map.ofSeq [MyTestClass.typeName, ("MyId", "MyRev"); MyOtherClass.typeName, ("DocId", "Revision")])
         |> warning (printfn "%s")
+        |> maybeAddUsername couchUsername
+        |> maybeAddPassword couchPassword
 
     // Set debug to `true` to start debugging.
     // 1. Start the test suite (dotnet run)
