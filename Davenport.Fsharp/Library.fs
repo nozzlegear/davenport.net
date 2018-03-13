@@ -62,19 +62,19 @@ let allDocs includeDocs options props =
     allDocsRaw includeDocs options props 
     |> asyncMap (stringToViewResult props.converter)
 
-let create (document: InsertedDocument<'a>) props = 
+let create (document: InsertedDocument) props = 
     request "" props
-    |> body document
+    |> body (Serializable document)
     |> send Post
     |> asyncMap (stringToPostPutCopyResponse props.converter)
 
-let createWithId id (document: InsertedDocument<'a>) props = 
+let createWithId id (document: InsertedDocument) props = 
     request id props
     |> body document 
     |> send Put
     |> asyncMap (stringToPostPutCopyResponse props.converter)
 
-let update id rev (document: InsertedDocument<'a>) props = 
+let update id rev (document: InsertedDocument) props = 
     request id props
     |> querystring (mapFromRev (Some rev))
     |> body document
@@ -198,7 +198,7 @@ let existsBySelector selector =
 /// 
 /// If the new edits are *not* allowed (to push existing revisions instead of creating new ones) the response will not include entries for any of the successful revisions (since their rev IDs are already known to the sender), only for the ones that had errors. Also, the `"conflict"` error will never appear, since in this mode conflicts are allowed. 
 /// </summary>
-let bulkInsert mode (docs: InsertedDocument<_> list) props = 
+let bulkInsert mode (docs: InsertedDocument list) props = 
     let qs = 
         match mode with 
         | AllowNewEdits -> Map.ofSeq ["new_edits", true :> obj]

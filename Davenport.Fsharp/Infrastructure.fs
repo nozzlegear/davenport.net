@@ -95,13 +95,9 @@ let makeUrl pathSegments (querystring: Map<string, string>) =
 // https://blogs.msdn.microsoft.com/alazarev/2017/12/29/disposable-finalizers-and-httpclient/
 let private httpClient = new HttpClient()
 
-let toJson converter object = JsonConvert.SerializeObject(object, [|converter; Converters.fableConverter :> JsonConverter|])
-
-let ofJson<'a> converter json = JsonConvert.DeserializeObject<'a>(json, [|converter; Converters.fableConverter :> JsonConverter|])
-
 let mapFromRev (rev: string option) =
     rev
-    |> Option.map (fun rev -> ["rev", rev :> obj])
+    |> Option.map (fun rev -> ["rev", rev])
     |> Option.defaultValue []
     |> Map.ofSeq
 
@@ -109,37 +105,37 @@ let mapFromListOptions (options: ListOption list) =
     let rec inner remaining qs = 
         match remaining with 
         | ListLimit l::rest -> 
-            Map.add "limit" (l :> obj) qs
+            Map.add "limit" (string l) qs
             |> inner rest
         | Key k::rest ->
-            Map.add "key" k qs
+            Map.add "key" (Key k |> encode) qs
             |> inner rest
         | Keys k::rest ->
-            Map.add "keys" (k :> obj) qs
+            Map.add "keys" (Keys k |> encode) qs
             |> inner rest
         | StartKey k::rest ->
-            Map.add "start_key" k qs
+            Map.add "start_key" (StartKey k |> encode) qs
             |> inner rest
         | EndKey k::rest ->
-            Map.add "end_key" k qs
+            Map.add "end_key" (EndKey k |> encode) qs
             |> inner rest
         | InclusiveEnd i::rest ->
-            Map.add "inclusive_end" (i :> obj) qs
+            Map.add "inclusive_end" (string i) qs
             |> inner rest
         | Descending d::rest ->
-            Map.add "descending" (d :> obj) qs
+            Map.add "descending" (string d) qs
             |> inner rest
         | ListOption.Skip s::rest ->
-            Map.add "skip" (s :> obj) qs
+            Map.add "skip" (string s) qs
             |> inner rest
         | Reduce r::rest ->
-            Map.add "reduce" (r :> obj) qs
+            Map.add "reduce" (string r) qs
             |> inner rest
         | Group g::rest ->
-            Map.add "group" (g :> obj) qs
+            Map.add "group" (string g) qs
             |> inner rest
         | GroupLevel l::rest ->
-            Map.add "group_level" (l :> obj) qs
+            Map.add "group_level" (string l) qs
             |> inner rest
         | [] -> qs
 
@@ -187,14 +183,10 @@ let body body props = { props with body = Some body }
 let send (method: Method) (request: RequestProps) = 
     let props = request.couchProps
 
-    // JsonSerialize any query string value.
     let url = 
-        match request.querystring with
-        | Some qs -> Map.map (fun _ value -> toJson props.converter value) qs
-        | None -> Map.empty
+        request.querystring
+        |> Option.defaultValue Map.empty
         |> makeUrl [props.couchUrl; props.databaseName; request.path]
-
-    printfn "URL is %s" url
 
     let method = 
         match method with 
@@ -223,8 +215,7 @@ let send (method: Method) (request: RequestProps) =
     | None -> ()
     | Some body -> 
         let message = 
-            toJson props.converter body
-            |> System.Text.Encoding.UTF8.GetBytes
+            System.Text.Encoding.UTF8.GetBytes body
             |> fun b -> new ByteArrayContent(b)
 
         message.Headers.ContentType <- MediaTypeHeaderValue "application/json"
@@ -254,13 +245,3 @@ let send (method: Method) (request: RequestProps) =
 
         return rawBody
     }
-
-let stringToDocument = ofJson<Document>
-
-let stringToViewResult = ofJson<ViewResult>
-
-let stringToPostPutCopyResponse = ofJson<PostPutCopyResponse>
-
-let stringToFoundList = ofJson<FoundList>
-
-let stringToBulkResponseList = ofJson<BulkResponse list>

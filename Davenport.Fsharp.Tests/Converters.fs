@@ -20,7 +20,7 @@ let tests =
     let converter = DefaultConverter (Map.ofSeq ["my-type", ("Id", "Rev")])
     let toJson data = JsonConvert.SerializeObject(data, [|converter :> JsonConverter|])
 
-    testList "Davenport.Fsharp.Converters" [
+    ftestList "Davenport.Fsharp.Converters" [
         testCaseAsync "Serializes an InsertedDocument" <| async {
             let doc = {
                 Id = "my-doc-id"

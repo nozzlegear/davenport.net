@@ -7,7 +7,7 @@ open Types
 // The Fable JsonConverter uses a cache, so it's best to just instantiate it once.
 let fableConverter = Fable.JsonConverter()
 
-let writeInsertedDocument (fieldMappings: FieldMapping) (writer: JsonWriter) (doc: InsertedDocument<_>) (serializer: JsonSerializer) = 
+let writeInsertedDocument (fieldMappings: FieldMapping) (writer: JsonWriter) (doc: InsertedDocument) (serializer: JsonSerializer) = 
     writer.WriteStartObject()
 
     let (typeName, docValue) = doc
@@ -50,6 +50,13 @@ let writeInsertedDocument (fieldMappings: FieldMapping) (writer: JsonWriter) (do
     |> Seq.iter (fun prop -> prop.WriteTo(writer))       
 
     writer.WriteEndObject()
+
+// 2018-03-13
+// Another problem: our alias types such as InsertedDocument aren't passed to the WriteJson function. Instead
+// they come through as the underlying (string option * 'a) type. 
+//
+// First solution coming to mind is to just dump the json converter and add type-specific functions for reading
+// and writing.
 
 // 2018-03-12
 // Current problem: It's now set up to easily pass the Id and Rev field names when writing to JSON, but
@@ -101,9 +108,10 @@ type DefaultConverter (_fieldMappings: FieldMapping) =
 
     override __.CanConvert objectType = 
         [
-            typeof<InsertedDocument<_>>
+            typeof<Serializable>
         ]
         |> Seq.contains objectType
+        |> fun b -> printfn "Can convert %A? %b" objectType b; b
 
     override x.ReadJson(reader: JsonReader, objectType: System.Type, existingValue: obj, serializer: JsonSerializer) = 
         existingValue
@@ -149,5 +157,10 @@ type DefaultConverter (_fieldMappings: FieldMapping) =
 
     override x.WriteJson(writer: JsonWriter, objValue: obj, serializer: JsonSerializer) =
         match objValue with 
-        | :? InsertedDocument<obj> as inserted -> writeInsertedDocument (x.GetFieldMappings()) writer inserted serializer
+        | :? Serializable as inserted -> 
+            use stream = new System.IO.MemoryStream()
+            let streamWriter = new System.IO.StreamWriter(stream) :> System.IO.TextWriter
+            let t = new JsonTextWriter(streamWriter)
+            x.WriteJson(t, obj, serializer)
+            writeInsertedDocument (x.GetFieldMappings()) writer inserted serializer
         | _ -> failwithf "FsConverter.WriteJson: Unsupported object type %A." (objValue.GetType())

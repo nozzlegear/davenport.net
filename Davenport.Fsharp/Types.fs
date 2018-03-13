@@ -11,12 +11,6 @@ type RevFieldName = string
 
 type FieldMapping = Map<TypeName, IdFieldName * RevFieldName>
 
-[<AbstractClass>]
-type ICouchConverter() = 
-    inherit JsonConverter()
-    abstract AddFieldMappings: FieldMapping -> unit
-    abstract GetFieldMappings: unit -> FieldMapping
-
 type TotalRows = int
 
 type Offset = int
@@ -35,11 +29,16 @@ type ViewValue = JToken
 
 type Document = TypeName option * DocData
 
-type FoundList = Warning option * Document list
+type FindResult = Warning option * Document list
 
-type SerializableData<'a> = 'a
+type SerializableData = obj
 
-type InsertedDocument<'a> = TypeName option * SerializableData<'a>
+type InsertedDocument = TypeName option * SerializableData
+
+type PostPutCopyResult = Id * Rev * Okay
+
+type Serializable = 
+    | Serializable of InsertedDocument
 
 type ViewKey = 
     | Key of obj
@@ -51,14 +50,19 @@ type ViewResult = TotalRows * Offset * ViewDoc list
 
 type CouchResult =  TypeName option * Newtonsoft.Json.Linq.JObject
 
-type CouchProps = 
-    internal { 
-        username: string option
-        password: string option
-        converter: ICouchConverter
-        databaseName: string
-        couchUrl: string
-        onWarning: Event<string> }
+type BulkErrorType = 
+    | Conflict
+    | Forbidden
+    | Unauthorized
+    | Other of string
+
+type BulkErrorReason = string
+
+type BulkDocumentError = Id * BulkErrorType * BulkErrorReason
+
+type BulkResult = 
+    | Inserted of PostPutCopyResult
+    | Failed of BulkDocumentError
 
 type ViewProps = 
     internal {
@@ -74,19 +78,9 @@ type Method =
     | Head
     | Copy
 
-type RequestProps = {
-    querystring: Map<string, obj> option
-    headers: Map<string, string> option
-    body: obj option
-    couchProps: CouchProps
-    path: string
-}
-
 type CreateDatabaseResult = 
     | Created
     | AlreadyExisted
-
-type PostPutCopyResponse = Id * Rev * Okay
 
 type Find =
     | EqualTo of obj
@@ -117,8 +111,6 @@ type FindOption =
     | UseIndex of obj
     | Selector of string
 
-
-
 type IncludeDocs = 
     | WithDocs
     | WithoutDocs
@@ -137,19 +129,37 @@ type Views = Map<ViewName, MapFunction * ReduceFunction option>
 
 type DesignDoc = Id * Views
 
-type BulkErrorType = 
-    | Conflict
-    | Forbidden
-    | Unauthorized
-    | Other of string
+[<AbstractClass>]
+type ICouchConverter() = 
+    abstract AddFieldMappings: FieldMapping -> unit
+    abstract GetFieldMappings: unit -> FieldMapping
+    abstract ConvertListOptionsToMap: ListOption -> string
+    abstract ConvertFindOptionsToMap: FindOption -> string
+    abstract ConvertRevToMap: Rev -> string
+    abstract WriteInsertedDocument: FieldMapping -> JsonWriter -> InsertedDocument
+    abstract ReadToDocument: JsonReader -> Document
+    abstract ReadToViewResult: JsonReader -> ViewResult 
+    abstract ReadToPostPutCopyResponse: JsonReader -> PostPutCopyResult
+    abstract ReadToFindResult: JsonReader -> FindResult 
+    abstract ReadToBulkResultList: JsonReader -> BulkResult list
+    abstract ReadJToken: JsonReader -> JToken
 
-type BulkErrorReason = string
-
-type BulkDocumentError = Id * BulkErrorType * BulkErrorReason
-
-type BulkResponse = 
-    | Inserted of PostPutCopyResponse
-    | Failed of BulkDocumentError
+type CouchProps = 
+    internal { 
+        username: string option
+        password: string option
+        converter: ICouchConverter
+        databaseName: string
+        couchUrl: string
+        onWarning: Event<string> }
+        
+type RequestProps = {
+    querystring: Map<string, string> option
+    headers: Map<string, string> option
+    body: string option
+    couchProps: CouchProps
+    path: string
+}    
 
 type DavenportException (msg, statusCode, statusReason, responseBody, requestUrl) = 
     inherit System.Exception(msg)    

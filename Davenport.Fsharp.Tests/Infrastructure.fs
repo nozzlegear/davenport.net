@@ -7,7 +7,7 @@ open Davenport.Infrastructure
 
 [<Tests>]
 let tests =
-    ftestList "Davenport.Fsharp.Infrastructure" [
+    testList "Davenport.Fsharp.Infrastructure" [
         testCaseAsync "Combines URLs" <| async {
             makeUrl ["http://couchy:5984"; "my_database"; "henlo_world"] (Map.ofSeq ["rev", "abcd"])
             |> Expect.equal "" "http://couchy:5984/my_database/henlo_world?rev=abcd"
