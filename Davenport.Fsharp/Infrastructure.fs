@@ -61,11 +61,17 @@ let rec findDavenportExceptionOrRaise (exn: Exception) =
     | :? DavenportException as exn -> exn 
     | _ -> raise exn
 
-let (|StartsWithLocalhost|_|) (s: string) = 
-    match s.StartsWith("localhost", StringComparison.OrdinalIgnoreCase) with
-    | true -> Some s
-    | false ->None
-
+let (|StartsWithProtocol|_|) (s: string) = 
+    [
+        Uri.UriSchemeHttp
+        Uri.UriSchemeHttps
+    ]
+    |> Seq.fold (fun state value -> 
+        match state, value with 
+        | Some x, _ -> Some x
+        | None, scheme when s.StartsWith(scheme, StringComparison.OrdinalIgnoreCase) -> Some s
+        | None, _ -> None) None
+    
 let makeUrl pathSegments (querystring: Map<string, string>) = 
     let rec combinePaths (remaining: string list) output = 
         match remaining with 
@@ -74,8 +80,8 @@ let makeUrl pathSegments (querystring: Map<string, string>) =
 
     let ub = 
         match String.Join("/", combinePaths pathSegments []) with 
-        | StartsWithLocalhost s -> sprintf "%s%s%s" Uri.UriSchemeHttp Uri.SchemeDelimiter s
-        | s -> s
+        | StartsWithProtocol s -> s
+        | s -> sprintf "%s%s%s" Uri.UriSchemeHttp Uri.SchemeDelimiter s
         |> System.UriBuilder
         
     ub.Query <- 
@@ -187,6 +193,8 @@ let send (method: Method) (request: RequestProps) =
         | Some qs -> Map.map (fun _ value -> toJson props.converter value) qs
         | None -> Map.empty
         |> makeUrl [props.couchUrl; props.databaseName; request.path]
+
+    printfn "URL is %s" url
 
     let method = 
         match method with 
