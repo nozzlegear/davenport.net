@@ -2,6 +2,7 @@ module Davenport.Types
 
 open Newtonsoft.Json.Linq
 open Newtonsoft.Json
+open System.Text
 
 type TypeName = string
 
@@ -90,6 +91,10 @@ type Find =
     | GreaterThanOrEqualTo of obj
     | LessThanOrEqualTo of obj
 
+type SortOrder = 
+    | Ascending
+    | Descending 
+
 type ListOption = 
     | ListLimit of int 
     | Key of obj
@@ -97,15 +102,19 @@ type ListOption =
     | StartKey of obj
     | EndKey of obj
     | InclusiveEnd of bool
-    | Descending of bool
+    | Direction of SortOrder
     | Skip of int
     | Reduce of bool
     | Group of bool
     | GroupLevel of int
 
+type SortFieldName = string
+
+type Sort = | Sort of SortFieldName * SortOrder
+
 type FindOption = 
     | Fields of string list 
-    | Sort of obj list 
+    | SortBy of Sort list 
     | FindLimit of int list 
     | Skip of int list
     | UseIndex of obj

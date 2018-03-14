@@ -5,7 +5,9 @@ open Newtonsoft.Json.Linq
 open Types
 
 // The Fable JsonConverter uses a cache, so it's best to just instantiate it once.
-let fableConverter = Fable.JsonConverter()
+let defaultSerializerSettings = JsonSerializerSettings()
+defaultSerializerSettings.Converters.Add (Fable.JsonConverter())
+defaultSerializerSettings.NullValueHandling <- NullValueHandling.Ignore
 
 let writeInsertedDocument (fieldMappings: FieldMapping) (writer: JsonWriter) (doc: InsertedDocument) (serializer: JsonSerializer) = 
     writer.WriteStartObject()
@@ -50,6 +52,102 @@ let writeInsertedDocument (fieldMappings: FieldMapping) (writer: JsonWriter) (do
     |> Seq.iter (fun prop -> prop.WriteTo(writer))       
 
     writer.WriteEndObject()
+
+let private encodeOption o = JsonConvert.SerializeObject(o, defaultSerializerSettings)
+
+let convertRevToMap (rev: string option) =
+    rev
+    |> Option.map (fun rev -> ["rev", rev])
+    |> Option.defaultValue []
+    |> Map.ofSeq
+
+let convertListOptionsToMap (options: ListOption list) = 
+    let rec inner remaining qs = 
+        match remaining with 
+        | ListLimit l::rest -> 
+            Map.add "limit" (string l) qs
+            |> inner rest
+        | Key k::rest ->
+            Map.add "key" (encodeOption k) qs
+            |> inner rest
+        | Keys k::rest ->
+            Map.add "keys" (encodeOption k) qs
+            |> inner rest
+        | StartKey k::rest ->
+            Map.add "start_key" (encodeOption k) qs
+            |> inner rest
+        | EndKey k::rest ->
+            Map.add "end_key" (encodeOption k) qs
+            |> inner rest
+        | InclusiveEnd i::rest ->
+            Map.add "inclusive_end" (string i) qs
+            |> inner rest
+        | Direction d::rest ->
+            let value = 
+                match d with 
+                | Descending -> true
+                | Ascending -> false
+
+            Map.add "descending" (string value) qs
+            |> inner rest
+        | ListOption.Skip s::rest ->
+            Map.add "skip" (string s) qs
+            |> inner rest
+        | Reduce r::rest ->
+            Map.add "reduce" (string r) qs
+            |> inner rest
+        | Group g::rest ->
+            Map.add "group" (string g) qs
+            |> inner rest
+        | GroupLevel l::rest ->
+            Map.add "group_level" (string l) qs
+            |> inner rest
+        | [] -> qs
+
+    inner options Map.empty
+
+let convertSortListToMap (sorts: Sort list) = 
+    // When serialized, we want the json to look like: [{"fieldName1": "asc"}, {"fieldName2": "desc"}]
+    let rec inner sorts output = 
+        match sorts with 
+        | [] -> output 
+        | Sort (field, dir)::rest -> 
+            let item = 
+                match dir with
+                | Ascending -> "asc"
+                | Descending -> "desc"
+                |> fun d -> [field, d]
+                |> Map.ofSeq
+
+            inner rest (output@[item])
+
+    inner sorts []
+
+let convertFindOptionsToMap (options: FindOption list) = 
+    let rec inner remaining qs = 
+        match remaining with 
+        | Fields f::rest ->
+            Map.add "fields" (encodeOption f) qs
+            |> inner rest
+        | SortBy s::rest ->
+            Map.add "sort" (convertSortListToMap s |> encodeOption) qs
+            |> inner rest
+        | FindLimit l::rest ->
+            Map.add "limit" (string l) qs
+            |> inner rest
+        | FindOption.Skip s::rest ->
+            Map.add "skip" (encodeOption s) qs
+            |> inner rest
+        | UseIndex i::rest ->
+            Map.add "use_index" (encodeOption i) qs
+            |> inner rest
+        | Selector s::rest ->
+            Map.add "selector" (encodeOption s) qs
+            |> inner rest
+        | [] -> qs
+    
+    inner options Map.empty
+
 
 // 2018-03-13
 // Another problem: our alias types such as InsertedDocument aren't passed to the WriteJson function. Instead

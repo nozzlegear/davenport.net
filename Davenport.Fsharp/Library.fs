@@ -37,7 +37,7 @@ let warning handler (props: CouchProps) =
 
 let getRaw id rev = 
     request id
-    >> querystring (mapFromRev rev)
+    >> querystring (convertRevToMap rev)
     >> send Get
 
 let get id rev props = 
@@ -51,7 +51,7 @@ let allDocsRaw includeDocs options =
         | WithoutDocs -> false
 
     let qs = 
-        mapFromListOptions options
+        convertListOptionsToMap options
         |> Map.add "include_docs" (includeDocs :> obj)
 
     request "_all_docs"
@@ -76,14 +76,14 @@ let createWithId id (document: InsertedDocument) props =
 
 let update id rev (document: InsertedDocument) props = 
     request id props
-    |> querystring (mapFromRev (Some rev))
+    |> querystring (convertRevToMap (Some rev))
     |> body document
     |> send Put
     |> asyncMap (stringToPostPutCopyResponse props.converter)
 
 let exists id rev =
     request id 
-    >> querystring (mapFromRev rev)
+    >> querystring (convertRevToMap rev)
     >> send Head
     >> Async.Catch
     // Doc exists if CouchDB didn't throw an error status code
@@ -97,7 +97,7 @@ let copy oldId newId props =
 
 let delete id rev = 
     request id
-    >> querystring (mapFromRev (Some rev))
+    >> querystring (convertRevToMap (Some rev))
     >> send Delete
     >> asyncMap ignore
 
@@ -108,7 +108,7 @@ let delete id rev =
 let viewRaw designDocName viewName options props = 
     (sprintf "_design/%s/_view/%s" designDocName viewName, props)
     ||> request
-    |> querystring (mapFromListOptions options |> Map.add "reduce" (false :> obj))
+    |> querystring (convertListOptionsToMap options |> Map.add "reduce" (false :> obj))
     |> send Get
 
 /// <summary>
@@ -126,7 +126,7 @@ let view designDocName viewName options props =
 let reduceRaw designDocName viewName options props = 
     (sprintf "_design/%s/_view/%s" designDocName viewName, props)
     ||> request
-    |> querystring (mapFromListOptions options |> Map.add "reduce" (true :> obj))
+    |> querystring (convertListOptionsToMap options |> Map.add "reduce" (true :> obj))
     |> send Get
 
 /// <summary>
@@ -139,7 +139,7 @@ let reduce designDocName viewName options props =
 
 let findRaw findOptions selector =
     let data = 
-        mapFromFindOptions findOptions
+        convertFindOptionsToMap findOptions
         |> Map.add "selector" (convertFindsToMap selector :> obj)
 
     request "_find"
