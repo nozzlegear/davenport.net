@@ -140,12 +140,11 @@ type DesignDoc = Id * Views
 
 [<AbstractClass>]
 type ICouchConverter() = 
-    abstract AddFieldMappings: FieldMapping -> unit
-    abstract GetFieldMappings: unit -> FieldMapping
-    abstract ConvertListOptionsToMap: ListOption -> string
-    abstract ConvertFindOptionsToMap: FindOption -> string
-    abstract ConvertRevToMap: Rev -> string
-    abstract WriteInsertedDocument: FieldMapping -> JsonWriter -> InsertedDocument
+    abstract ConvertListOptionsToMap: ListOption list -> Map<string, string>
+    abstract ConvertFindOptionsToMap: FindOption list -> Map<string, string>
+    abstract ConvertRevToMap: Rev -> Map<string, string>
+    abstract WriteInsertedDocument: FieldMapping -> JsonWriter -> InsertedDocument -> string
+    abstract WriteUnknownObject: FieldMapping -> JsonWriter -> 'a -> string
     abstract ReadToDocument: JsonReader -> Document
     abstract ReadToViewResult: JsonReader -> ViewResult 
     abstract ReadToPostPutCopyResponse: JsonReader -> PostPutCopyResult

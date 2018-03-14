@@ -5,9 +5,53 @@ open Newtonsoft.Json.Linq
 open Types
 
 // The Fable JsonConverter uses a cache, so it's best to just instantiate it once.
+let fableConverter = Fable.JsonConverter()
 let defaultSerializerSettings = JsonSerializerSettings()
-defaultSerializerSettings.Converters.Add (Fable.JsonConverter())
+defaultSerializerSettings.Converters.Add fableConverter
 defaultSerializerSettings.NullValueHandling <- NullValueHandling.Ignore
+
+let makeJsonWriter () = 
+    let stream = new System.IO.MemoryStream()
+    let streamWriter = new System.IO.StreamWriter(stream) :> System.IO.TextWriter
+    new JsonTextWriter(streamWriter)
+
+type JsonKey = string
+
+type JsonValue = 
+    | StringProp of JsonKey * string 
+    | IntProp of JsonKey * int 
+    | ObjectProp of JsonKey * JsonValue
+    | ArrayProp of JsonKey * JsonValue list
+    | RawProp of JsonKey * string
+    | String of string 
+    | Int of int 
+    | Object of JsonValue 
+    | Array of JsonValue list
+    | Raw of string
+
+type JsonObjectBuilder() = 
+    member __.Yield(x: JsonValue) = [x]
+    member __.Zero() = [] // Empty list
+    member __.Delay(x) = x()
+    member __.Combine(a: JsonValue list, b: JsonValue list): JsonValue list = a@b
+    member __.Run(values: JsonValue list) =     
+        use stream = new System.IO.MemoryStream()
+        use streamWriter = new System.IO.StreamWriter(stream) :> System.IO.TextWriter
+        use writer = new JsonTextWriter(streamWriter)
+        writer.WriteStartObject()
+
+        // TODO: Iterate through the list and build an object
+
+        writer.WriteEndObject()        
+        use reader = new System.IO.StreamReader(stream)
+        reader.ReadToEnd()
+
+let jsonObject = JsonObjectBuilder()
+
+let asdf = jsonObject {
+    yield StringProp ("hello", "world")
+    yield IntProp ("foo", 5)
+}
 
 let writeInsertedDocument (fieldMappings: FieldMapping) (writer: JsonWriter) (doc: InsertedDocument) (serializer: JsonSerializer) = 
     writer.WriteStartObject()
@@ -55,11 +99,7 @@ let writeInsertedDocument (fieldMappings: FieldMapping) (writer: JsonWriter) (do
 
 let private encodeOption o = JsonConvert.SerializeObject(o, defaultSerializerSettings)
 
-let convertRevToMap (rev: string option) =
-    rev
-    |> Option.map (fun rev -> ["rev", rev])
-    |> Option.defaultValue []
-    |> Map.ofSeq
+let convertRevToMap rev = Map.ofSeq ["rev", rev]
 
 let convertListOptionsToMap (options: ListOption list) = 
     let rec inner remaining qs = 
@@ -204,61 +244,17 @@ type DefaultConverter (_fieldMappings: FieldMapping) =
 
     override __.GetFieldMappings() = fieldMappings
 
-    override __.CanConvert objectType = 
-        [
-            typeof<Serializable>
-        ]
-        |> Seq.contains objectType
-        |> fun b -> printfn "Can convert %A? %b" objectType b; b
+    override __.ConvertListOptionsToMap options = convertListOptionsToMap options
 
-    override x.ReadJson(reader: JsonReader, objectType: System.Type, existingValue: obj, serializer: JsonSerializer) = 
-        existingValue
-        // let j = JObject.Load reader 
-        // let docTypeToken: JToken option = Option.ofObj j.["type"]
+    override __.ConvertFindOptionsToMap options = convertFindOptionsToMap options 
 
-        // if JtokenOptionType docTypeToken |> x.CanConvertDirectly |> not 
-        // then 
-        //     x.CustomConverter.ReadJson(reader, objectType, existingValue, serializer)
-        // else 
+    override __.ConvertRevToMap rev = convertRevToMap rev
 
-        // let docType = 
-        //     JtokenOptionType docTypeToken 
-        //     |> x.GetSupportedType
-        //     |> Option.get
-
-        // let id: JToken option = Option.ofObj j.["_id"]
-        // let rev: JToken option = Option.ofObj j.["_rev"]
-
-        // // Rename the _id and _rev fields to whatever the type expects them to be
-        // match id, docType.idField with 
-        // | None, _ -> ()
-        // | _, None -> ()
-        // | _, Some fieldName when fieldName = "_id" -> ()
-        // | Some value, Some fieldName -> 
-        //     j.Remove("_id") |> ignore 
-        //     j.Add(fieldName, value)
-
-        // match rev, docType.revField with 
-        // | None, _ -> ()
-        // | _, None -> ()
-        // | _, Some fieldName when fieldName = "_rev" -> ()
-        // | Some value, Some fieldName ->
-        //     j.Remove("_rev") |> ignore
-        //     j.Add(fieldName, value)
-
-        // if objectType = typeof<Document> then 
-        //     let output: CouchResult = docType.typeName, j
-
-        //     output :> obj
-        // else 
-        //     j.ToObject(objectType)
+    override __.WriteInsertedDocument mapping writer doc = writeInsertedDocument mapping writer doc
 
     override x.WriteJson(writer: JsonWriter, objValue: obj, serializer: JsonSerializer) =
         match objValue with 
         | :? Serializable as inserted -> 
-            use stream = new System.IO.MemoryStream()
-            let streamWriter = new System.IO.StreamWriter(stream) :> System.IO.TextWriter
-            let t = new JsonTextWriter(streamWriter)
             x.WriteJson(t, obj, serializer)
             writeInsertedDocument (x.GetFieldMappings()) writer inserted serializer
         | _ -> failwithf "FsConverter.WriteJson: Unsupported object type %A." (objValue.GetType())
