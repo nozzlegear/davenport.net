@@ -33,7 +33,7 @@ let tests =
             
             inserted            
             |> converter.WriteInsertedDocument mapping
-            |> Expect.equal "Should serialize to expected string" "{}"
+            |> Expect.equal "Should serialize to expected string" """{"type":"my-type","_id":"my-doc-id","_rev":"my-doc-id","Foo":true,"Bar":17,"Hello":"world"}"""
 
             ()
         }
