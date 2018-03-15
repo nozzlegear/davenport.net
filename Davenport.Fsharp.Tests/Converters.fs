@@ -28,23 +28,23 @@ type MyDoc = {
 let tests =
     let converter = DefaultConverter ()
     let mapping: FieldMapping = Map.ofSeq ["my-type", ("Id", "Rev")]
+    let insertable doc: InsertedDocument<MyDoc> = Some "my-type", doc
+    let defaultDoc = 
+        {
+            Id = "my-doc-id"
+            Rev = "my-doc-rev"
+            Foo = true
+            Bar = 17
+            Hello = "world"
+            Token = Some "test token"
+            OtherToken = None
+            Thing = Descended 15
+            OtherThing = SomethingElse
+        }
 
     ftestList "Davenport.Fsharp.Converters" [
         testCaseAsync "Serializes an InsertedDocument" <| async {
-            let doc = {
-                Id = "my-doc-id"
-                Rev = "my-doc-rev"
-                Foo = true
-                Bar = 17
-                Hello = "world"
-                Token = Some "test token"
-                OtherToken = None
-                Thing = Descended 15
-                OtherThing = SomethingElse
-            }
-            let inserted: InsertedDocument<_> = Some "my-type", doc
-            
-            inserted            
+            insertable defaultDoc         
             |> converter.WriteInsertedDocument mapping
             |> Expect.equal "Should serialize to expected string" """{"type":"my-type","_id":"my-doc-id","_rev":"my-doc-id","Foo":true,"Bar":17,"Hello":"world","Token":"test token","Thing":{"Descended":15},"OtherThing":"SomethingElse"}"""
         }
@@ -79,5 +79,14 @@ let tests =
             |> Map.add "my-second-view" ("function (doc) { emit(doc._id, 5) }", None)
             |> converter.WriteDesignDoc
             |> Expect.equal "Should serialize design docs" """{"views":{"my-first-view":{"reduce":"_count","map":"function (doc) { emit(doc._id) }"},"my-second-view":{"map":"function (doc) { emit(doc._id, 5) }"}},"language":"javascript"}"""
+        }
+
+        testCaseAsync "Serializes bulk inserts" <| async {
+            [
+                insertable defaultDoc 
+                insertable { defaultDoc with Hello = "goodbye" }
+            ]
+            |> converter.WriteBulkInsertList mapping AllowNewEdits
+            |> Expect.equal "Should serialize bulk insert list" """{"new_edits":true,"docs":[{"type":"my-type","_id":"my-doc-id","_rev":"my-doc-id","Foo":true,"Bar":17,"Hello":"world","Token":"test token","Thing":{"Descended":15},"OtherThing":"SomethingElse"},{"type":"my-type","_id":"my-doc-id","_rev":"my-doc-id","Foo":true,"Bar":17,"Hello":"goodbye","Token":"test token","Thing":{"Descended":15},"OtherThing":"SomethingElse"}]}"""
         }
     ]
