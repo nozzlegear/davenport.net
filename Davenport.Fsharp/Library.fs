@@ -35,8 +35,12 @@ let warning handler (props: CouchProps) =
     props
 
 let getRaw id rev props = 
-    request id props
-    |> querystring (props.converter.ConvertRevToMap rev)
+    match rev with 
+    | None -> 
+        request id props 
+    | Some rev ->
+        request id props 
+        |> querystring (props.converter.ConvertRevToMap rev)
     |> send Get
 
 let get id rev props = 
@@ -78,12 +82,9 @@ let createWithId id (document: InsertedDocument<'a>) props =
     |> Async.Map (props.converter.ReadAsPostPutCopyResponse props.fieldMapping)
 
 let update id rev (document: InsertedDocument<'a>) props = 
-    match rev with 
-    | None -> 
-        request id props 
-    | Some rev -> 
-        request id props 
-        |> querystring (props.converter.ConvertRevToMap rev)
+    props
+    |> request id
+    |> querystring (props.converter.ConvertRevToMap rev)
     |> body (props.converter.WriteInsertedDocument props.fieldMapping document)
     |> send Put
     |> Async.Map (props.converter.ReadAsPostPutCopyResponse props.fieldMapping)
@@ -107,12 +108,9 @@ let copy oldId newId props =
     |> Async.Map (props.converter.ReadAsPostPutCopyResponse props.fieldMapping)
 
 let delete id rev props = 
-    match rev with 
-    | None -> 
-        request id props 
-    | Some rev -> 
-        request id props
-        |> querystring (props.converter.ConvertRevToMap rev)
+    props
+    |> request id
+    |> querystring (props.converter.ConvertRevToMap rev)
     |> send Delete
     |> Async.Ignore
 
