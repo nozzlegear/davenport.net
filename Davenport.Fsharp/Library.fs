@@ -7,7 +7,7 @@ open Davenport.Types
 let private defaultProps =  
     { username = None 
       password = None 
-      converter = DefaultConverter Map.empty
+      converter = DefaultConverter()
       databaseName = ""
       couchUrl = ""
       onWarning = Event<string>()
@@ -65,19 +65,19 @@ let allDocs includeDocs options props =
     allDocsRaw includeDocs options props 
     |> Async.Map (props.converter.ReadAsViewResult props.fieldMapping)
 
-let create (document: InsertedDocument) props = 
+let create (document: InsertedDocument<'a>) props = 
     request "" props
     |> body (props.converter.WriteInsertedDocument props.fieldMapping document)
     |> send Post
     |> Async.Map (props.converter.ReadAsPostPutCopyResponse props.fieldMapping)
 
-let createWithId id (document: InsertedDocument) props = 
+let createWithId id (document: InsertedDocument<'a>) props = 
     request id props
     |> body (props.converter.WriteInsertedDocument props.fieldMapping document)
     |> send Put
     |> Async.Map (props.converter.ReadAsPostPutCopyResponse props.fieldMapping)
 
-let update id rev (document: InsertedDocument) props = 
+let update id rev (document: InsertedDocument<'a>) props = 
     match rev with 
     | None -> 
         request id props 
@@ -218,7 +218,7 @@ let existsBySelector selector =
 /// 
 /// If the new edits are *not* allowed (to push existing revisions instead of creating new ones) the response will not include entries for any of the successful revisions (since their rev IDs are already known to the sender), only for the ones that had errors. Also, the `"conflict"` error will never appear, since in this mode conflicts are allowed. 
 /// </summary>
-let bulkInsert mode (docs: InsertedDocument list) props = 
+let bulkInsert mode (docs: InsertedDocument<'a> list) props = 
     let qs = 
         match mode with 
         | AllowNewEdits -> Map.ofSeq ["new_edits", "true"]

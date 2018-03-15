@@ -30,9 +30,7 @@ type ViewValue = JToken
 
 type Document = TypeName option * DocData
 
-type SerializableData = obj
-
-type InsertedDocument = TypeName option * SerializableData
+type InsertedDocument<'a> = TypeName option * 'a
 
 type PostPutCopyResult = Id * Rev * Okay
 
@@ -162,8 +160,8 @@ type ICouchConverter() =
     abstract ConvertFindOptionsToMap: FindOption list -> Map<string, string>
     abstract ConvertFindSelectorToMap: FindSelector -> Map<string, Map<string, obj>>
     abstract ConvertRevToMap: Rev -> Map<string, string>
-    abstract WriteBulkInsertList: FieldMapping -> InsertedDocument list -> string
-    abstract WriteInsertedDocument: FieldMapping -> InsertedDocument -> string
+    abstract WriteBulkInsertList: FieldMapping -> InsertedDocument<'a> list -> string
+    abstract WriteInsertedDocument: FieldMapping -> InsertedDocument<'a> -> string
     abstract WriteUnknownObject: 'a -> string
     abstract WriteDesignDoc: Views -> string
     abstract WriteIndexes: IndexName -> IndexField list -> string

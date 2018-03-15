@@ -136,7 +136,7 @@ let jsonObject = JsonObjectBuilder()
 // to map all the types it will deal with. Then the original FsConverter receives those types (if it's not in multiple doc mode the converter still receives the
 // list, just with one single element.)
 
-type DefaultConverter (_fieldMappings: FieldMapping) = 
+type DefaultConverter () = 
     inherit ICouchConverter()
 
     let encodeOption o = JsonConvert.SerializeObject(o, defaultSerializerSettings)
