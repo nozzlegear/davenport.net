@@ -143,12 +143,14 @@ type JsonKey = string
 type JsonValue = 
     | StringProp of JsonKey * string 
     | IntProp of JsonKey * int 
+    | BoolProp of JsonKey * bool
     | ObjectProp of JsonKey * JsonValue list
     | ArrayProp of JsonKey * JsonValue list
     | RawProp of JsonKey * string
     | JProp of JProperty
     | String of string 
     | Int of int 
+    | Bool of bool
     | Object of JsonValue list 
     | Array of JsonValue list
     | Raw of string
@@ -157,7 +159,7 @@ type JsonValue =
 type ICouchConverter() = 
     abstract ConvertListOptionsToMap: ListOption list -> Map<string, string>
     abstract ConvertRevToMap: Rev -> Map<string, string>
-    abstract WriteBulkInsertList: FieldMapping -> InsertedDocument<'a> list -> string
+    abstract WriteBulkInsertList: FieldMapping -> BulkMode -> InsertedDocument<'a> list -> string
     abstract WriteInsertedDocument: FieldMapping -> InsertedDocument<'a> -> string
     abstract WriteDesignDoc: Views -> string
     abstract WriteIndexes: IndexName -> IndexField list -> string

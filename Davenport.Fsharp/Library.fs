@@ -211,15 +211,9 @@ let existsBySelector selector =
 /// If the new edits are *not* allowed (to push existing revisions instead of creating new ones) the response will not include entries for any of the successful revisions (since their rev IDs are already known to the sender), only for the ones that had errors. Also, the `"conflict"` error will never appear, since in this mode conflicts are allowed. 
 /// </summary>
 let bulkInsert mode (docs: InsertedDocument<'a> list) props = 
-    let qs = 
-        match mode with 
-        | AllowNewEdits -> Map.ofSeq ["new_edits", "true"]
-        | NoNewEdits -> Map.empty
-    
     props    
     |> request "_bulk_docs"
-    |> querystring qs
-    |> body (props.converter.WriteBulkInsertList props.fieldMapping docs)
+    |> body (props.converter.WriteBulkInsertList props.fieldMapping mode docs)
     |> send Post
     |> Async.Map props.converter.ReadAsBulkResultList
 

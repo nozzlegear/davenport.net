@@ -48,6 +48,9 @@ type JsonObjectBuilder() =
             | (Int x)::rest ->
                 writer.WriteValue x
                 inner rest
+            | (Bool x)::rest -> 
+                writer.WriteValue x 
+                inner rest
             | (Object x)::rest ->
                 writer.WriteStartObject()
                 inner x
@@ -69,6 +72,10 @@ type JsonObjectBuilder() =
                 writer.WritePropertyName k
                 writer.WriteValue x 
                 inner rest 
+            | BoolProp (k, x)::rest ->
+                writer.WritePropertyName k
+                writer.WriteValue x
+                inner rest
             | ObjectProp (k, x)::rest ->
                 writer.WritePropertyName k 
                 writer.WriteStartObject()
@@ -251,13 +258,24 @@ type DefaultConverter () =
             |> List.ofSeq
     }
 
-    override x.WriteBulkInsertList mapping docs = 
-        // Desired json looks like { "new_edits": [{doc1}, {doc2}, {doc3}] }
-        failwith "not implemented"
+    override x.WriteBulkInsertList mapping mode docs = jsonObject {
+        // Desired json looks like { "new_edits": true, "docs": [{doc1}, {doc2}, {doc3}] }
+
+        yield
+            match mode with 
+            | AllowNewEdits -> true
+            | NoNewEdits -> false
+            |> fun b -> BoolProp("new_edits", b)
+
+        yield
+            docs 
+            |> List.map (x.WriteInsertedDocument mapping >> JsonValue.Raw)
+            |> fun l -> ArrayProp("docs", l)
+    }
 
     override __.WriteDesignDoc views = jsonObject {
         // Desired json looks like { "language": "javascript", "views": { "view1": { "map": "...", "reduce": "..." } } }
-        
+
         let viewData = 
             views
             |> Seq.map (fun kvp -> 
