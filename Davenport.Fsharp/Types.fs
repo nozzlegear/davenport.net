@@ -169,6 +169,7 @@ type ICouchConverter() =
     abstract ReadAsPostPutCopyResponse: FieldMapping -> string -> PostPutCopyResult
     abstract ReadAsFindResult: FieldMapping -> string -> FindResult 
     abstract ReadAsBulkResultList: string -> BulkResult list
+    abstract ReadVersionToken: string -> string 
     abstract ReadAsJToken: FieldMapping -> string -> JToken
 
 type CouchProps = 

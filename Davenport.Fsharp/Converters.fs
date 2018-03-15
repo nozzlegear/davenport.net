@@ -152,6 +152,8 @@ type DefaultConverter () =
 
     let stringify o = JsonConvert.SerializeObject(o, defaultSerializerSettings)
 
+    let toJToken s = JsonConvert.DeserializeObject<JToken>(s, defaultSerializerSettings)
+
     let convertSortListToJsonValues (sorts: Sort list) = 
         // When serialized, we want the json to look like: [{"fieldName1": "asc"}, {"fieldName2": "desc"}]
         let rec inner sorts output = 
@@ -343,6 +345,13 @@ type DefaultConverter () =
         yield ObjectProp("selector", selectorProps)
     }
 
+    override __.ReadAsJToken mapping json = 
+        // let token = JToken.Parse(json)
+        let token = toJToken json
+
+        // TODO: Use the fieldmapping to switch _id and _rev properties according to the `type` property.
+        token
+
     override __.ReadAsDocument mapping json = failwith "not implemented"
 
     override __.ReadAsViewResult mapping json = failwith "not implemented"
@@ -353,4 +362,8 @@ type DefaultConverter () =
 
     override __.ReadAsBulkResultList json = failwith "not implemented"
 
-    override __.ReadAsJToken mapping json = failwith " not implemented"
+    override __.ReadVersionToken json = 
+        let token = toJToken json
+        // props.converter.ReadAsJToken props.fieldMapping >> fun t -> t.Value<string> "version"
+
+        token.Value<string> "version"

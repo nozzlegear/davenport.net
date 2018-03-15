@@ -220,7 +220,7 @@ let bulkInsert mode (docs: InsertedDocument<'a> list) props =
 let getCouchVersion props =
     request "" props
     |> send Get 
-    |> Async.Map (props.converter.ReadAsJToken props.fieldMapping >> fun t -> t.Value<string> "version" )
+    |> Async.Map props.converter.ReadVersionToken
 
 let isVersion2OrAbove = 
     getCouchVersion
