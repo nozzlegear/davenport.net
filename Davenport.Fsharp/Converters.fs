@@ -28,9 +28,13 @@ type JsonObjectBuilder() =
     member __.Delay(x) = x()
     member __.Combine(a: JsonValue list, b: JsonValue list): JsonValue list = a@b
     member __.Run(values: JsonValue list) =     
-        use stream = new System.IO.MemoryStream()
-        use streamWriter = new System.IO.StreamWriter(stream) :> System.IO.TextWriter
-        use writer = new JsonTextWriter(streamWriter)
+        // Json text writer example: 
+        // https://www.newtonsoft.com/json/help/html/WriteJsonWithJsonTextWriter.htm
+
+        let sb = new System.Text.StringBuilder()
+        let sw = new System.IO.StringWriter(sb)
+        use writer = new JsonTextWriter(sw)
+
         writer.WriteStartObject()
 
         // Iterate through the list and build an object
@@ -86,9 +90,8 @@ type JsonObjectBuilder() =
 
         inner values
 
-        writer.WriteEndObject()        
-        use reader = new System.IO.StreamReader(stream)
-        reader.ReadToEnd()
+        writer.WriteEndObject()   
+        sb.ToString()
 
 let jsonObject = JsonObjectBuilder()
 
