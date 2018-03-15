@@ -66,4 +66,10 @@ let tests =
             |> converter.WriteFindSelector options 
             |> Expect.equal "Should serialize a find selector" """{"fields":["_id"],"sort":[{"_id":"asc"},{"_rev":"desc"}],"limit":10,"skip":3,"use_index":{"not_sure":{"some_key":5}},"selector":{"fieldName":{"$eq":5,"$ne":"test","$gt":{"some_key":5},"$lt":20,"$gte":1,"$lte":15}}}"""
         }
+
+        testCaseAsync "Serializes indexes" <| async {
+            ["field1"; "field2"; "field3"]
+            |> converter.WriteIndexes "index-name"
+            |> Expect.equal "Should serialize indexes" """{"name":"index-name","fields":["field1","field2","field3"]}"""
+        }
     ]
