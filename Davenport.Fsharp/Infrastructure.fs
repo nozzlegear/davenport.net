@@ -19,9 +19,13 @@ module internal Async =
     }
 
 module internal String = 
-    let Lowercase (s: string) = s.ToLower()    
+    let Lowercase (s: string) = s.ToLower()
     let Uppercase (s: string) = s.ToUpper()
     let EqualsIgnoreCase (s1: string) (s2: string) = String.Equals(s1, s2, StringComparison.OrdinalIgnoreCase)
+
+module internal List = 
+    let ofSingle x = [x]
+    let appendSingle x list = list@[x]
 
 // /// <summary>
 // /// Converts an F# expression to a LINQ expression, then converts that LINQ expression to a Map<string, Find> due to an incompatibility with the FsDoc and the types expected by Find, Exists and CountByExpression functions.

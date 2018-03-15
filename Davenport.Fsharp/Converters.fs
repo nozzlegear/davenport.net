@@ -3,7 +3,7 @@ module Davenport.Converters
 open Newtonsoft.Json
 open Newtonsoft.Json.Linq
 open Types
-open System.IO.IsolatedStorage
+open Infrastructure
 
 // The Fable JsonConverter uses a cache, so it's best to just instantiate it once.
 let fableConverter = Fable.JsonConverter()
@@ -255,26 +255,28 @@ type DefaultConverter () =
         // Desired json looks like { "new_edits": [{doc1}, {doc2}, {doc3}] }
         failwith "not implemented"
 
-    override __.WriteMap doc = JsonConvert.SerializeObject(doc, defaultSerializerSettings)
-
-    override __.WriteDesignDoc views = 
+    override __.WriteDesignDoc views = jsonObject {
         // Desired json looks like { "language": "javascript", "views": { "view1": { "map": "...", "reduce": "..." } } }
+        
         let viewData = 
             views
-            |> Map.map (fun _ (map, reduce) ->
+            |> Seq.map (fun kvp -> 
+                let (map, reduce) = kvp.Value
+
                 match reduce with 
-                | None -> Map.empty
-                | Some reduce -> Map.add "reduce" reduce Map.empty
-                |> Map.add "map" map
-            )
+                | None -> None
+                | Some reduce -> Some <| StringProp("reduce", reduce)
+                |> List.ofSingle
+                |> List.appendSingle (Some <| StringProp("map", map))
+                |> List.filter Option.isSome 
+                |> List.map Option.get
+                |> fun v -> ObjectProp(kvp.Key, v))
+            |> List.ofSeq
 
-        let data = 
-            Map.empty 
-            |> Map.add "views" (viewData :> obj)
-            // Javascript is currently the only supported language
-            |> Map.add "language" ("javascript" :> obj)
-
-        failwith "not implemented"
+        yield ObjectProp("views", viewData)
+        // JS is the only supported language by CouchDB
+        yield StringProp("language", "javascript")
+    }
 
     override __.WriteIndexes name fields = jsonObject {
         // Desired json looks like { "name" : "index-name", "fields": ["field1", "field2", "field3"]}
