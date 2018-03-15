@@ -138,13 +138,28 @@ type Views = Map<ViewName, MapFunction * ReduceFunction option>
 
 type DesignDoc = Id * Views
 
+type JsonKey = string
+
+type JsonValue = 
+    | StringProp of JsonKey * string 
+    | IntProp of JsonKey * int 
+    | ObjectProp of JsonKey * JsonValue
+    | ArrayProp of JsonKey * JsonValue list
+    | RawProp of JsonKey * string
+    | JProp of JProperty
+    | String of string 
+    | Int of int 
+    | Object of JsonValue 
+    | Array of JsonValue list
+    | Raw of string
+
 [<AbstractClass>]
 type ICouchConverter() = 
     abstract ConvertListOptionsToMap: ListOption list -> Map<string, string>
     abstract ConvertFindOptionsToMap: FindOption list -> Map<string, string>
     abstract ConvertRevToMap: Rev -> Map<string, string>
-    abstract WriteInsertedDocument: FieldMapping -> JsonWriter -> InsertedDocument -> string
-    abstract WriteUnknownObject: FieldMapping -> JsonWriter -> 'a -> string
+    abstract WriteInsertedDocument: FieldMapping -> InsertedDocument -> string
+    abstract WriteUnknownObject: FieldMapping -> 'a -> string
     abstract ReadToDocument: JsonReader -> Document
     abstract ReadToViewResult: JsonReader -> ViewResult 
     abstract ReadToPostPutCopyResponse: JsonReader -> PostPutCopyResult

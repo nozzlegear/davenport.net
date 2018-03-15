@@ -6,31 +6,24 @@ open Types
 
 // The Fable JsonConverter uses a cache, so it's best to just instantiate it once.
 let fableConverter = Fable.JsonConverter()
+
 let defaultSerializerSettings = JsonSerializerSettings()
-defaultSerializerSettings.Converters.Add fableConverter
 defaultSerializerSettings.NullValueHandling <- NullValueHandling.Ignore
+defaultSerializerSettings.Converters.Add fableConverter
 
-let makeJsonWriter () = 
-    let stream = new System.IO.MemoryStream()
-    let streamWriter = new System.IO.StreamWriter(stream) :> System.IO.TextWriter
-    new JsonTextWriter(streamWriter)
-
-type JsonKey = string
-
-type JsonValue = 
-    | StringProp of JsonKey * string 
-    | IntProp of JsonKey * int 
-    | ObjectProp of JsonKey * JsonValue
-    | ArrayProp of JsonKey * JsonValue list
-    | RawProp of JsonKey * string
-    | String of string 
-    | Int of int 
-    | Object of JsonValue 
-    | Array of JsonValue list
-    | Raw of string
+let defaultSerializer = JsonSerializer.Create(defaultSerializerSettings)
 
 type JsonObjectBuilder() = 
     member __.Yield(x: JsonValue) = [x]
+    member __.Yield(x: JsonValue list) = x
+    member __.YieldFrom(x: JsonValue option) = 
+        x
+        |> Option.map (fun x -> [x])
+        |> Option.defaultValue []
+    member __.YieldFrom(x: JsonValue option list) =
+        x
+        |> List.filter Option.isSome
+        |> List.map Option.get
     member __.Zero() = [] // Empty list
     member __.Delay(x) = x()
     member __.Combine(a: JsonValue list, b: JsonValue list): JsonValue list = a@b
@@ -40,7 +33,58 @@ type JsonObjectBuilder() =
         use writer = new JsonTextWriter(streamWriter)
         writer.WriteStartObject()
 
-        // TODO: Iterate through the list and build an object
+        // Iterate through the list and build an object
+        let rec inner remaining = 
+            match remaining with 
+            | [] -> ()
+            | (String x)::rest -> 
+                writer.WriteValue x
+                inner rest
+            | (Int x)::rest ->
+                writer.WriteValue x
+                inner rest
+            | (Object x)::rest ->
+                writer.WriteStartObject()
+                inner [x]
+                writer.WriteEndObject()
+                inner rest
+            | (Array x)::rest ->
+                writer.WriteStartArray()
+                inner x
+                writer.WriteEndArray()
+                inner rest
+            | (Raw x)::rest ->
+                writer.WriteRawValue x
+                inner rest 
+            | StringProp (k, x)::rest ->
+                writer.WritePropertyName k
+                writer.WriteValue x
+                inner rest 
+            | IntProp (k, x)::rest ->
+                writer.WritePropertyName k
+                writer.WriteValue x 
+                inner rest 
+            | ObjectProp (k, x)::rest ->
+                writer.WritePropertyName k 
+                writer.WriteStartObject()
+                inner [x]
+                writer.WriteEndObject()
+                inner rest 
+            | ArrayProp (k, x)::rest ->
+                writer.WritePropertyName k
+                writer.WriteStartArray()
+                inner x 
+                writer.WriteEndArray()
+                inner rest
+            | RawProp (k, x)::rest ->
+                writer.WritePropertyName k 
+                writer.WriteRawValue x 
+                inner rest
+            | JProp x::rest ->
+                x.WriteTo writer 
+                inner rest
+
+        inner values
 
         writer.WriteEndObject()        
         use reader = new System.IO.StreamReader(stream)
@@ -48,23 +92,14 @@ type JsonObjectBuilder() =
 
 let jsonObject = JsonObjectBuilder()
 
-let asdf = jsonObject {
-    yield StringProp ("hello", "world")
-    yield IntProp ("foo", 5)
-}
-
-let writeInsertedDocument (fieldMappings: FieldMapping) (writer: JsonWriter) (doc: InsertedDocument) (serializer: JsonSerializer) = 
-    writer.WriteStartObject()
-
+let writeInsertedDocument (fieldMappings: FieldMapping) (doc: InsertedDocument) = jsonObject { 
     let (typeName, docValue) = doc
     let docValueType = doc.GetType()
-    let j = JObject.FromObject(docValue, serializer)
+    let j = JObject.FromObject(docValue, defaultSerializer)
 
-    typeName
-    |> Option.iter (fun typeName ->
-        writer.WritePropertyName "type"
-        writer.WriteValue typeName
-    )
+    yield!
+        typeName
+        |> Option.map (fun t -> StringProp ("type", t))
 
     let (idField, revField) =
         match typeName with 
@@ -72,30 +107,32 @@ let writeInsertedDocument (fieldMappings: FieldMapping) (writer: JsonWriter) (do
         | Some typeName -> Map.tryFind typeName fieldMappings
         |> Option.defaultValue ("_id", "_rev")
 
-    [
-        j.[idField], idField, "_id", "Id";
-        j.[revField], revField, "_rev", "Rev";
-    ]
-    |> Seq.iter (fun (token, givenFieldName, canonFieldName, readableFieldName) ->
-        match isNull token with 
-        | true -> 
-            sprintf "%s field '%s' was not found on type %s. If you want to map it to a custom field on your type, use Davenport's `converterSettings` function to pass a list of field mappings." readableFieldName givenFieldName docValueType.FullName
-            |> System.ArgumentException
-            |> raise
-        | false ->
-            let value = j.[idField].Value<string>()
+    yield!
+        [
+            j.[idField], idField, "_id", "Id";
+            j.[revField], revField, "_rev", "Rev";
+        ]
+        |> List.map (fun (token, givenFieldName, canonFieldName, readableFieldName) ->
+            match isNull token with 
+            | true -> 
+                sprintf "%s field '%s' was not found on type %s. If you want to map it to a custom field on your type, use Davenport's `converterSettings` function to pass a list of field mappings." readableFieldName givenFieldName docValueType.FullName
+                |> System.ArgumentException
+                |> raise
+            | false ->
+                let value = j.[idField].Value<string>()
 
-            if System.String.IsNullOrEmpty value |> not
-            then 
-                writer.WritePropertyName canonFieldName
-                writer.WriteValue value
-    )
+                match System.String.IsNullOrEmpty value with 
+                | true -> None 
+                | false ->
+                    Some (StringProp (canonFieldName, value))
+        )
 
-    Seq.cast<JProperty> j 
-    |> Seq.filter (fun prop -> prop.Name <> "type" && prop.Name <> idField && prop.Name <> revField)
-    |> Seq.iter (fun prop -> prop.WriteTo(writer))       
-
-    writer.WriteEndObject()
+    yield
+        Seq.cast<JProperty> j 
+        |> Seq.filter (fun prop -> prop.Name <> "type" && prop.Name <> idField && prop.Name <> revField)
+        |> Seq.map JProp
+        |> List.ofSeq
+}
 
 let private encodeOption o = JsonConvert.SerializeObject(o, defaultSerializerSettings)
 
@@ -238,11 +275,11 @@ type DefaultConverter (_fieldMappings: FieldMapping) =
 
     let mutable fieldMappings: FieldMapping = _fieldMappings
 
-    override __.AddFieldMappings mapping = 
+    member __.AddFieldMappings mapping = 
         // Merge the new mapping into the old one, overwriting old keys if necessary.
         fieldMappings <- Map.fold (fun state key value -> Map.add key value state) fieldMappings mapping
 
-    override __.GetFieldMappings() = fieldMappings
+    member __.GetFieldMappings() = fieldMappings
 
     override __.ConvertListOptionsToMap options = convertListOptionsToMap options
 
@@ -250,11 +287,4 @@ type DefaultConverter (_fieldMappings: FieldMapping) =
 
     override __.ConvertRevToMap rev = convertRevToMap rev
 
-    override __.WriteInsertedDocument mapping writer doc = writeInsertedDocument mapping writer doc
-
-    override x.WriteJson(writer: JsonWriter, objValue: obj, serializer: JsonSerializer) =
-        match objValue with 
-        | :? Serializable as inserted -> 
-            x.WriteJson(t, obj, serializer)
-            writeInsertedDocument (x.GetFieldMappings()) writer inserted serializer
-        | _ -> failwithf "FsConverter.WriteJson: Unsupported object type %A." (objValue.GetType())
+    override __.WriteInsertedDocument mapping doc = writeInsertedDocument mapping doc
