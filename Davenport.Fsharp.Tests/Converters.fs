@@ -89,4 +89,16 @@ let tests =
             |> converter.WriteBulkInsertList mapping AllowNewEdits
             |> Expect.equal "Should serialize bulk insert list" """{"new_edits":true,"docs":[{"type":"my-type","_id":"my-doc-id","_rev":"my-doc-id","Foo":true,"Bar":17,"Hello":"world","Token":"test token","Thing":{"Descended":15},"OtherThing":"SomethingElse"},{"type":"my-type","_id":"my-doc-id","_rev":"my-doc-id","Foo":true,"Bar":17,"Hello":"goodbye","Token":"test token","Thing":{"Descended":15},"OtherThing":"SomethingElse"}]}"""
         }
+
+        testCaseAsync "Deserializes database version" <| async {
+            """{"couchdb":"Welcome","version":"2.0.0","vendor":{"name":"The Apache Software Foundation"}}"""
+            |> converter.ReadVersionToken 
+            |> Expect.equal "Should deserialize database version" "2.0.0"
+        }
+
+        // TODO: Does the default converter's `toJToken` function actually use the FableConverter? My suspicion is
+        // FableConverter will return `false` on `CanConvert` because that function will receive the JToken type
+        // which I doubt is specifically handled by the converter. It might be better to, instead of returning a
+        // Document (typeName option * Jtoken), return a function that will call `JToken.ToObject<'a>(fableConverter)`.
+        // So Document would become Document (typeName option * (unit -> 'a))
     ]
