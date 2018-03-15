@@ -255,7 +255,7 @@ type DefaultConverter () =
 
     override __.ConvertRevToMap rev = Map.ofSeq ["rev", rev]
 
-    override __.WriteInsertedDocument (fieldMappings: FieldMapping) (doc: InsertedDocument) = jsonObject { 
+    override __.WriteInsertedDocument (fieldMappings: FieldMapping) (doc: InsertedDocument<_>) = jsonObject { 
         let (typeName, docValue) = doc
         let docValueType = doc.GetType()
         let j = JObject.FromObject(docValue, defaultSerializer)
