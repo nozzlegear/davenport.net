@@ -2,21 +2,26 @@ module Davenport.Infrastructure
 
 open System
 open System.Net.Http
-open Newtonsoft.Json
 open System.Net.Http.Headers
 open Types
 
-let internal asyncMap (fn: 't -> 'u) task = async {
-    let! result = task
+module internal Async = 
+    let Map (fn: 't -> 'u) task = async {
+        let! result = task
 
-    return fn result
-}
+        return fn result
+    }
 
-let internal asyncMapSeq (fn: 't -> 'u) task = async {
-    let! result = task
+    let MapSeq (fn: 't -> 'u) task = async {
+        let! result = task
 
-    return Seq.map fn result
-}
+        return Seq.map fn result
+    }
+
+module internal String = 
+    let Lowercase (s: string) = s.ToLower()    
+    let Uppercase (s: string) = s.ToUpper()
+    let EqualsIgnoreCase (s1: string) (s2: string) = String.Equals(s1, s2, StringComparison.OrdinalIgnoreCase)
 
 // /// <summary>
 // /// Converts an F# expression to a LINQ expression, then converts that LINQ expression to a Map<string, Find> due to an incompatibility with the FsDoc and the types expected by Find, Exists and CountByExpression functions.
@@ -29,31 +34,6 @@ let internal asyncMapSeq (fn: 't -> 'u) task = async {
     
 //     Expression.Lambda<Func<'a, bool>>(lambda.Body, lambda.Parameters)
 //     |> Davenport.Infrastructure.ExpressionParser.Parse
-
-let convertFindsToMap (finds: Map<string, Find list>) =
-    let rec convert remaining m =
-        match remaining with
-        | EqualTo x::rest ->
-            Map.add "$eq" x m
-            |> convert rest
-        | NotEqualTo x::rest ->
-            Map.add "$ne" x m
-            |> convert rest
-        | GreaterThan x::rest ->
-            Map.add "$gt" x m
-            |> convert rest
-        | LesserThan x::rest ->
-            Map.add "$lt" x m
-            |> convert rest
-        | GreaterThanOrEqualTo x::rest ->
-            Map.add "$gte" x m
-            |> convert rest
-        | LessThanOrEqualTo x::rest ->
-            Map.add "$lte" x m
-            |> convert rest
-        | [] -> m
-
-    Map.map (fun _ list -> convert list Map.empty) finds
 
 let rec findDavenportExceptionOrRaise (exn: Exception) = 
     match exn with 
@@ -90,7 +70,7 @@ let makeUrl pathSegments (querystring: Map<string, string>) =
         |> fun s -> String.Join("&", s)
 
     ub.ToString()
-   
+
 // Because of the way http connections work, it's best to have one HttpClient instance for the whole application.
 // https://blogs.msdn.microsoft.com/alazarev/2017/12/29/disposable-finalizers-and-httpclient/
 let private httpClient = new HttpClient()

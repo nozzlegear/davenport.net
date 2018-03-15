@@ -30,16 +30,11 @@ type ViewValue = JToken
 
 type Document = TypeName option * DocData
 
-type FindResult = Warning option * Document list
-
 type SerializableData = obj
 
 type InsertedDocument = TypeName option * SerializableData
 
 type PostPutCopyResult = Id * Rev * Okay
-
-type Serializable = 
-    | Serializable of InsertedDocument
 
 type ViewKey = 
     | Key of obj
@@ -83,14 +78,6 @@ type CreateDatabaseResult =
     | Created
     | AlreadyExisted
 
-type Find =
-    | EqualTo of obj
-    | NotEqualTo of obj
-    | GreaterThan of obj
-    | LesserThan of obj
-    | GreaterThanOrEqualTo of obj
-    | LessThanOrEqualTo of obj
-
 type SortOrder = 
     | Ascending
     | Descending 
@@ -112,6 +99,14 @@ type SortFieldName = string
 
 type Sort = | Sort of SortFieldName * SortOrder
 
+type FindOperator =
+    | EqualTo of obj
+    | NotEqualTo of obj
+    | GreaterThan of obj
+    | LesserThan of obj
+    | GreaterThanOrEqualTo of obj
+    | LessThanOrEqualTo of obj
+
 type FindOption = 
     | Fields of string list 
     | SortBy of Sort list 
@@ -119,6 +114,10 @@ type FindOption =
     | Skip of int list
     | UseIndex of obj
     | Selector of string
+
+type FindResult = Warning option * Document list
+
+type FindSelector = Map<string, FindOperator list>        
 
 type IncludeDocs = 
     | WithDocs
@@ -137,6 +136,10 @@ type ReduceFunction = string
 type Views = Map<ViewName, MapFunction * ReduceFunction option>
 
 type DesignDoc = Id * Views
+
+type IndexName = string 
+
+type IndexField = string
 
 type JsonKey = string
 
@@ -157,15 +160,19 @@ type JsonValue =
 type ICouchConverter() = 
     abstract ConvertListOptionsToMap: ListOption list -> Map<string, string>
     abstract ConvertFindOptionsToMap: FindOption list -> Map<string, string>
+    abstract ConvertFindSelectorToMap: FindSelector -> Map<string, Map<string, obj>>
     abstract ConvertRevToMap: Rev -> Map<string, string>
+    abstract WriteBulkInsertList: FieldMapping -> InsertedDocument list -> string
     abstract WriteInsertedDocument: FieldMapping -> InsertedDocument -> string
-    abstract WriteUnknownObject: FieldMapping -> 'a -> string
-    abstract ReadToDocument: JsonReader -> Document
-    abstract ReadToViewResult: JsonReader -> ViewResult 
-    abstract ReadToPostPutCopyResponse: JsonReader -> PostPutCopyResult
-    abstract ReadToFindResult: JsonReader -> FindResult 
-    abstract ReadToBulkResultList: JsonReader -> BulkResult list
-    abstract ReadJToken: JsonReader -> JToken
+    abstract WriteUnknownObject: 'a -> string
+    abstract WriteDesignDoc: Views -> string
+    abstract WriteIndexes: IndexName -> IndexField list -> string
+    abstract ReadAsDocument: FieldMapping -> string -> Document
+    abstract ReadAsViewResult: FieldMapping -> string -> ViewResult 
+    abstract ReadAsPostPutCopyResponse: FieldMapping -> string -> PostPutCopyResult
+    abstract ReadAsFindResult: FieldMapping -> string -> FindResult 
+    abstract ReadAsBulkResultList: string -> BulkResult list
+    abstract ReadAsJToken: FieldMapping -> string -> JToken
 
 type CouchProps = 
     internal { 
@@ -174,7 +181,8 @@ type CouchProps =
         converter: ICouchConverter
         databaseName: string
         couchUrl: string
-        onWarning: Event<string> }
+        onWarning: Event<string>
+        fieldMapping: FieldMapping }
         
 type RequestProps = {
     querystring: Map<string, string> option

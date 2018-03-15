@@ -3,7 +3,6 @@ module Davenport.Fsharp
 open Davenport.Infrastructure
 open Davenport.Converters
 open Davenport.Types
-open Newtonsoft.Json.Linq
 
 let private defaultProps =  
     { username = None 
@@ -11,7 +10,8 @@ let private defaultProps =
       converter = DefaultConverter Map.empty
       databaseName = ""
       couchUrl = ""
-      onWarning = Event<string>() }
+      onWarning = Event<string>()
+      fieldMapping = Map.empty }
 
 let database name couchUrl =
     { defaultProps with databaseName = name; couchUrl = couchUrl }
@@ -20,86 +20,101 @@ let username username config = { config with username = Some username }
 
 let password password config = { config with password = Some password }
 
-let converter converter props = 
-    failwith "TODO: Use the converter.CanConvert function to check that the converter implements all necessary conversions."
-    { props with converter = converter }
+let converter converter props = { props with converter = converter }
 
 /// <summary>
 /// Map custom field names to the CouchDB _id and _rev fields. This can be used multiple times. Any key that is already set and also exists in the new mapping will be overwritten.
 /// </summary>
 let mapFields mapping (props: CouchProps) = 
-    props.converter.AddFieldMappings mapping
-    props
+    // Merge the new mapping into the old one, overwriting old keys if necessary.
+    let newMapping = Map.fold (fun state key value -> Map.add key value state) props.fieldMapping mapping
+    { props with fieldMapping = newMapping }
 
 let warning handler (props: CouchProps) = 
     Event.add handler props.onWarning.Publish
     props
 
-let getRaw id rev = 
-    request id
-    >> querystring (convertRevToMap rev)
-    >> send Get
+let getRaw id rev props = 
+    request id props
+    |> querystring (props.converter.ConvertRevToMap rev)
+    |> send Get
 
 let get id rev props = 
     getRaw id rev props
-    |> asyncMap (stringToDocument props.converter)
+    |> Async.Map (props.converter.ReadAsDocument props.fieldMapping)
 
-let allDocsRaw includeDocs options = 
+let allDocsRaw includeDocs options props = 
     let includeDocs = 
         match includeDocs with 
         | WithDocs -> true
         | WithoutDocs -> false
+        |> string 
+        |> String.Lowercase
 
     let qs = 
-        convertListOptionsToMap options
-        |> Map.add "include_docs" (includeDocs :> obj)
+        options
+        |> props.converter.ConvertListOptionsToMap
+        |> Map.add "include_docs" (string includeDocs)
 
-    request "_all_docs"
-    >> querystring qs
-    >> send Get
+    props
+    |> request "_all_docs"
+    |> querystring qs
+    |> send Get
 
 let allDocs includeDocs options props = 
     allDocsRaw includeDocs options props 
-    |> asyncMap (stringToViewResult props.converter)
+    |> Async.Map (props.converter.ReadAsViewResult props.fieldMapping)
 
 let create (document: InsertedDocument) props = 
     request "" props
-    |> body (Serializable document)
+    |> body (props.converter.WriteInsertedDocument props.fieldMapping document)
     |> send Post
-    |> asyncMap (stringToPostPutCopyResponse props.converter)
+    |> Async.Map (props.converter.ReadAsPostPutCopyResponse props.fieldMapping)
 
 let createWithId id (document: InsertedDocument) props = 
     request id props
-    |> body document 
+    |> body (props.converter.WriteInsertedDocument props.fieldMapping document)
     |> send Put
-    |> asyncMap (stringToPostPutCopyResponse props.converter)
+    |> Async.Map (props.converter.ReadAsPostPutCopyResponse props.fieldMapping)
 
 let update id rev (document: InsertedDocument) props = 
-    request id props
-    |> querystring (convertRevToMap (Some rev))
-    |> body document
+    match rev with 
+    | None -> 
+        request id props 
+    | Some rev -> 
+        request id props 
+        |> querystring (props.converter.ConvertRevToMap rev)
+    |> body (props.converter.WriteInsertedDocument props.fieldMapping document)
     |> send Put
-    |> asyncMap (stringToPostPutCopyResponse props.converter)
+    |> Async.Map (props.converter.ReadAsPostPutCopyResponse props.fieldMapping)
 
-let exists id rev =
-    request id 
-    >> querystring (convertRevToMap rev)
-    >> send Head
-    >> Async.Catch
+let exists id rev props =
+    match rev with 
+    | None ->
+        request id props 
+    | Some rev -> 
+        request id props 
+        |> querystring (props.converter.ConvertRevToMap rev)
+    |> send Head
+    |> Async.Catch
     // Doc exists if CouchDB didn't throw an error status code
-    >> asyncMap (function | Choice1Of2 _ -> true | Choice2Of2 _ -> false) 
+    |> Async.Map (function | Choice1Of2 _ -> true | Choice2Of2 _ -> false) 
 
 let copy oldId newId props = 
     request oldId props
     |> headers (Map.ofSeq ["Destination", newId])
     |> send Copy
-    |> asyncMap (stringToPostPutCopyResponse props.converter)
+    |> Async.Map (props.converter.ReadAsPostPutCopyResponse props.fieldMapping)
 
-let delete id rev = 
-    request id
-    >> querystring (convertRevToMap (Some rev))
-    >> send Delete
-    >> asyncMap ignore
+let delete id rev props = 
+    match rev with 
+    | None -> 
+        request id props 
+    | Some rev -> 
+        request id props
+        |> querystring (props.converter.ConvertRevToMap rev)
+    |> send Delete
+    |> Async.Ignore
 
 /// <summary>
 /// Queries a view and returns the unparsed JSON string. 
@@ -108,7 +123,7 @@ let delete id rev =
 let viewRaw designDocName viewName options props = 
     (sprintf "_design/%s/_view/%s" designDocName viewName, props)
     ||> request
-    |> querystring (convertListOptionsToMap options |> Map.add "reduce" (false :> obj))
+    |> querystring (props.converter.ConvertListOptionsToMap options |> Map.add "reduce" "false")
     |> send Get
 
 /// <summary>
@@ -116,8 +131,9 @@ let viewRaw designDocName viewName options props =
 /// NOTE: This function forces the `reduce` parameter to FALSE, i.e. it will NOT reduce. Use the `reduce` or `reduceRaw` functions instead.
 /// </summary>
 let view designDocName viewName options props = 
-    viewRaw designDocName viewName options props
-    |> asyncMap (stringToViewResult props.converter)
+    props
+    |> viewRaw designDocName viewName options
+    |> Async.Map (props.converter.ReadAsViewResult props.fieldMapping)
 
 /// <summary>
 /// Queries a view and reduces it, returning the raw JSON string.
@@ -126,7 +142,7 @@ let view designDocName viewName options props =
 let reduceRaw designDocName viewName options props = 
     (sprintf "_design/%s/_view/%s" designDocName viewName, props)
     ||> request
-    |> querystring (convertListOptionsToMap options |> Map.add "reduce" (true :> obj))
+    |> querystring (props.converter.ConvertListOptionsToMap options |> Map.add "reduce" "true")
     |> send Get
 
 /// <summary>
@@ -134,17 +150,21 @@ let reduceRaw designDocName viewName options props =
 /// NOTE: This function forces the `reduce` parameter to TRUE< i.e. will ALWAYS reduce. Use the `view` or `ViewRaw` functions to query a view's docs instead.
 /// </summary>
 let reduce designDocName viewName options props = 
-    reduceRaw designDocName viewName options props
-    |> asyncMap (stringToDocument props.converter)
+    props 
+    |> reduceRaw designDocName viewName options
+    |> Async.Map (props.converter.ReadAsDocument props.fieldMapping)
 
-let findRaw findOptions selector =
+let findRaw findOptions selector props =
     let data = 
-        convertFindOptionsToMap findOptions
-        |> Map.add "selector" (convertFindsToMap selector :> obj)
+        findOptions
+        |> props.converter.ConvertFindOptionsToMap
+        |> Map.map (fun _ value -> value :> obj)
+        |> Map.add "selector" (props.converter.ConvertFindSelectorToMap selector :> obj)
 
-    request "_find"
-    >> body data
-    >> send Get
+    props 
+    |> request "_find"
+    |> body (props.converter.WriteUnknownObject data)
+    |> send Get
 
 /// <summary>
 /// Searches for documents matching the given selector.
@@ -152,7 +172,7 @@ let findRaw findOptions selector =
 let find (findOptions: FindOption list) selector props = async {
     let! (warning, docs) = 
         findRaw findOptions selector props
-        |> asyncMap (stringToFoundList props.converter)
+        |> Async.Map (props.converter.ReadAsFindResult props.fieldMapping)
 
     Option.iter props.onWarning.Trigger warning
 
@@ -161,7 +181,7 @@ let find (findOptions: FindOption list) selector props = async {
 
 let count = 
     allDocs WithoutDocs [ListLimit 0] 
-    >> asyncMap (fun (totalRows, _, _) -> totalRows)
+    >> Async.Map (fun (totalRows, _, _) -> totalRows)
 
 /// <summary>
 /// Retrieves a count of all documents matching the given selector.
@@ -170,7 +190,7 @@ let count =
 let countBySelector selector = 
     // Selectors must use the Find API, which means they must return documents too. Limit the bandwidth by just returning _id.
     find [Fields ["_id"]] selector
-    >> asyncMap Seq.length
+    >> Async.Map Seq.length
 
 /// <summary>
 /// Checks that a document matching the given selector exists.
@@ -181,7 +201,7 @@ let existsBySelector selector =
     find [Fields ["_id"]] selector
     >> Async.Catch
     // Doc exists if CouchDB didn't throw an error status code
-    >> asyncMap (function | Choice1Of2 _ -> true | Choice2Of2 _ -> false) 
+    >> Async.Map (function | Choice1Of2 _ -> true | Choice2Of2 _ -> false) 
 
 /// <summary>
 /// Inserts, updates or deletes multiple documents at the same time. 
@@ -201,23 +221,24 @@ let existsBySelector selector =
 let bulkInsert mode (docs: InsertedDocument list) props = 
     let qs = 
         match mode with 
-        | AllowNewEdits -> Map.ofSeq ["new_edits", true :> obj]
+        | AllowNewEdits -> Map.ofSeq ["new_edits", "true"]
         | NoNewEdits -> Map.empty
     
-    request "_bulk_docs" props
+    props    
+    |> request "_bulk_docs"
     |> querystring qs
-    |> body (Map.ofSeq ["new_edits", docs :> obj])
+    |> body (props.converter.WriteBulkInsertList props.fieldMapping docs)
     |> send Post
-    |> asyncMap (stringToBulkResponseList props.converter)
+    |> Async.Map props.converter.ReadAsBulkResultList
 
 let getCouchVersion props =
     request "" props
     |> send Get 
-    |> asyncMap (ofJson<JToken> props.converter >> fun t -> t.Value<string> "version" )
+    |> Async.Map (props.converter.ReadAsJToken props.fieldMapping >> fun t -> t.Value<string> "version" )
 
 let isVersion2OrAbove = 
     getCouchVersion
-    >> asyncMap (fun str ->
+    >> Async.Map (fun str ->
         let version = System.Convert.ToInt32(str.Split('.').[0])
 
         version >= 2
@@ -230,7 +251,7 @@ let createDatabase props =
     request "" props
     |> send Put 
     |> Async.Catch
-    |> asyncMap (
+    |> Async.Map (
         function
         | Choice1Of2 _ -> Created
         | Choice2Of2 (:? DavenportException as exn) when exn.StatusCode = 412 -> AlreadyExisted
@@ -243,46 +264,27 @@ let createDatabase props =
 let deleteDatabase =
     request ""
     >> send Delete
-    >> asyncMap ignore
+    >> Async.Ignore
 
 /// <summary>
 /// Creates the given design docs. This is a dumb function and will overwrite the data of any design doc that shares its id.
 /// </summary>
 let createOrUpdateDesignDoc ((id, views): DesignDoc) props =
-    let viewData = 
-        views
-        |> Map.map (fun _ (map, reduce) ->
-            match reduce with 
-            | None -> Map.empty
-            | Some reduce -> Map.add "reduce" reduce Map.empty
-            |> Map.add "map" map
-        )
-
-    let data = 
-        Map.empty 
-        |> Map.add "views" (viewData :> obj)
-        // Javascript is currently the only supported language
-        |> Map.add "language" ("javascript" :> obj)
-
     request (sprintf "_design/%s" id) props
-    |> body data
+    |> body (props.converter.WriteDesignDoc views)
     |> send Put
-    |> asyncMap ignore
+    |> Async.Ignore
 
 /// <summary>
 /// Creates indexes for the given fields. This makes querying with the Find methods and selectors faster.
 /// Will throw an ArgumentException if no indexes are given.
 /// </summary>
-let createIndexes (indexes: string seq) props =
-    let indexData =
-        [
-            "name", (sprintf "%s-indexes" props.databaseName) :> obj
-            "fields", (Map.ofSeq [ "fields", indexes ]) :> obj
-        ]
-        |> Map.ofSeq
+let createIndexes (fields: IndexField list) props =
+    let name = sprintf "%s-indexes" props.databaseName
         
-    request "_index" props
-    |> body indexData
+    props
+    |> request "_index"
+    |> body (props.converter.WriteIndexes name fields)
     |> send Post
 
 module DesignDoc =

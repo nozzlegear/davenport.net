@@ -92,140 +92,6 @@ type JsonObjectBuilder() =
 
 let jsonObject = JsonObjectBuilder()
 
-let writeInsertedDocument (fieldMappings: FieldMapping) (doc: InsertedDocument) = jsonObject { 
-    let (typeName, docValue) = doc
-    let docValueType = doc.GetType()
-    let j = JObject.FromObject(docValue, defaultSerializer)
-
-    yield!
-        typeName
-        |> Option.map (fun t -> StringProp ("type", t))
-
-    let (idField, revField) =
-        match typeName with 
-        | None -> None
-        | Some typeName -> Map.tryFind typeName fieldMappings
-        |> Option.defaultValue ("_id", "_rev")
-
-    yield!
-        [
-            j.[idField], idField, "_id", "Id";
-            j.[revField], revField, "_rev", "Rev";
-        ]
-        |> List.map (fun (token, givenFieldName, canonFieldName, readableFieldName) ->
-            match isNull token with 
-            | true -> 
-                sprintf "%s field '%s' was not found on type %s. If you want to map it to a custom field on your type, use Davenport's `converterSettings` function to pass a list of field mappings." readableFieldName givenFieldName docValueType.FullName
-                |> System.ArgumentException
-                |> raise
-            | false ->
-                let value = j.[idField].Value<string>()
-
-                match System.String.IsNullOrEmpty value with 
-                | true -> None 
-                | false ->
-                    Some (StringProp (canonFieldName, value))
-        )
-
-    yield
-        Seq.cast<JProperty> j 
-        |> Seq.filter (fun prop -> prop.Name <> "type" && prop.Name <> idField && prop.Name <> revField)
-        |> Seq.map JProp
-        |> List.ofSeq
-}
-
-let private encodeOption o = JsonConvert.SerializeObject(o, defaultSerializerSettings)
-
-let convertRevToMap rev = Map.ofSeq ["rev", rev]
-
-let convertListOptionsToMap (options: ListOption list) = 
-    let rec inner remaining qs = 
-        match remaining with 
-        | ListLimit l::rest -> 
-            Map.add "limit" (string l) qs
-            |> inner rest
-        | Key k::rest ->
-            Map.add "key" (encodeOption k) qs
-            |> inner rest
-        | Keys k::rest ->
-            Map.add "keys" (encodeOption k) qs
-            |> inner rest
-        | StartKey k::rest ->
-            Map.add "start_key" (encodeOption k) qs
-            |> inner rest
-        | EndKey k::rest ->
-            Map.add "end_key" (encodeOption k) qs
-            |> inner rest
-        | InclusiveEnd i::rest ->
-            Map.add "inclusive_end" (string i) qs
-            |> inner rest
-        | Direction d::rest ->
-            let value = 
-                match d with 
-                | Descending -> true
-                | Ascending -> false
-
-            Map.add "descending" (string value) qs
-            |> inner rest
-        | ListOption.Skip s::rest ->
-            Map.add "skip" (string s) qs
-            |> inner rest
-        | Reduce r::rest ->
-            Map.add "reduce" (string r) qs
-            |> inner rest
-        | Group g::rest ->
-            Map.add "group" (string g) qs
-            |> inner rest
-        | GroupLevel l::rest ->
-            Map.add "group_level" (string l) qs
-            |> inner rest
-        | [] -> qs
-
-    inner options Map.empty
-
-let convertSortListToMap (sorts: Sort list) = 
-    // When serialized, we want the json to look like: [{"fieldName1": "asc"}, {"fieldName2": "desc"}]
-    let rec inner sorts output = 
-        match sorts with 
-        | [] -> output 
-        | Sort (field, dir)::rest -> 
-            let item = 
-                match dir with
-                | Ascending -> "asc"
-                | Descending -> "desc"
-                |> fun d -> [field, d]
-                |> Map.ofSeq
-
-            inner rest (output@[item])
-
-    inner sorts []
-
-let convertFindOptionsToMap (options: FindOption list) = 
-    let rec inner remaining qs = 
-        match remaining with 
-        | Fields f::rest ->
-            Map.add "fields" (encodeOption f) qs
-            |> inner rest
-        | SortBy s::rest ->
-            Map.add "sort" (convertSortListToMap s |> encodeOption) qs
-            |> inner rest
-        | FindLimit l::rest ->
-            Map.add "limit" (string l) qs
-            |> inner rest
-        | FindOption.Skip s::rest ->
-            Map.add "skip" (encodeOption s) qs
-            |> inner rest
-        | UseIndex i::rest ->
-            Map.add "use_index" (encodeOption i) qs
-            |> inner rest
-        | Selector s::rest ->
-            Map.add "selector" (encodeOption s) qs
-            |> inner rest
-        | [] -> qs
-    
-    inner options Map.empty
-
-
 // 2018-03-13
 // Another problem: our alias types such as InsertedDocument aren't passed to the WriteJson function. Instead
 // they come through as the underlying (string option * 'a) type. 
@@ -273,18 +139,203 @@ let convertFindOptionsToMap (options: FindOption list) =
 type DefaultConverter (_fieldMappings: FieldMapping) = 
     inherit ICouchConverter()
 
-    let mutable fieldMappings: FieldMapping = _fieldMappings
+    let encodeOption o = JsonConvert.SerializeObject(o, defaultSerializerSettings)
 
-    member __.AddFieldMappings mapping = 
-        // Merge the new mapping into the old one, overwriting old keys if necessary.
-        fieldMappings <- Map.fold (fun state key value -> Map.add key value state) fieldMappings mapping
+    let convertSortListToMap (sorts: Sort list) = 
+        // When serialized, we want the json to look like: [{"fieldName1": "asc"}, {"fieldName2": "desc"}]
+        let rec inner sorts output = 
+            match sorts with 
+            | [] -> output 
+            | Sort (field, dir)::rest -> 
+                let item = 
+                    match dir with
+                    | Ascending -> "asc"
+                    | Descending -> "desc"
+                    |> fun d -> [field, d]
+                    |> Map.ofSeq
 
-    member __.GetFieldMappings() = fieldMappings
+                inner rest (output@[item])
 
-    override __.ConvertListOptionsToMap options = convertListOptionsToMap options
+        inner sorts []
 
-    override __.ConvertFindOptionsToMap options = convertFindOptionsToMap options 
+    override __.ConvertListOptionsToMap options = 
+        let rec inner remaining qs = 
+            match remaining with 
+            | ListLimit l::rest -> 
+                Map.add "limit" (string l) qs
+                |> inner rest
+            | Key k::rest ->
+                Map.add "key" (encodeOption k) qs
+                |> inner rest
+            | Keys k::rest ->
+                Map.add "keys" (encodeOption k) qs
+                |> inner rest
+            | StartKey k::rest ->
+                Map.add "start_key" (encodeOption k) qs
+                |> inner rest
+            | EndKey k::rest ->
+                Map.add "end_key" (encodeOption k) qs
+                |> inner rest
+            | InclusiveEnd i::rest ->
+                Map.add "inclusive_end" (string i) qs
+                |> inner rest
+            | Direction d::rest ->
+                let value = 
+                    match d with 
+                    | Descending -> true
+                    | Ascending -> false
 
-    override __.ConvertRevToMap rev = convertRevToMap rev
+                Map.add "descending" (string value) qs
+                |> inner rest
+            | ListOption.Skip s::rest ->
+                Map.add "skip" (string s) qs
+                |> inner rest
+            | Reduce r::rest ->
+                Map.add "reduce" (string r) qs
+                |> inner rest
+            | Group g::rest ->
+                Map.add "group" (string g) qs
+                |> inner rest
+            | GroupLevel l::rest ->
+                Map.add "group_level" (string l) qs
+                |> inner rest
+            | [] -> qs
 
-    override __.WriteInsertedDocument mapping doc = writeInsertedDocument mapping doc
+        inner options Map.empty
+
+    override __.ConvertFindOptionsToMap options =
+        let rec inner remaining qs = 
+            match remaining with 
+            | Fields f::rest ->
+                Map.add "fields" (encodeOption f) qs
+                |> inner rest
+            | SortBy s::rest ->
+                Map.add "sort" (convertSortListToMap s |> encodeOption) qs
+                |> inner rest
+            | FindLimit l::rest ->
+                Map.add "limit" (string l) qs
+                |> inner rest
+            | FindOption.Skip s::rest ->
+                Map.add "skip" (encodeOption s) qs
+                |> inner rest
+            | UseIndex i::rest ->
+                Map.add "use_index" (encodeOption i) qs
+                |> inner rest
+            | Selector s::rest ->
+                Map.add "selector" (encodeOption s) qs
+                |> inner rest
+            | [] -> qs
+        
+        inner options Map.empty
+
+    override __.ConvertFindSelectorToMap selector = 
+        let rec convert remaining m =
+            match remaining with
+            | EqualTo x::rest ->
+                Map.add "$eq" x m
+                |> convert rest
+            | NotEqualTo x::rest ->
+                Map.add "$ne" x m
+                |> convert rest
+            | GreaterThan x::rest ->
+                Map.add "$gt" x m
+                |> convert rest
+            | LesserThan x::rest ->
+                Map.add "$lt" x m
+                |> convert rest
+            | GreaterThanOrEqualTo x::rest ->
+                Map.add "$gte" x m
+                |> convert rest
+            | LessThanOrEqualTo x::rest ->
+                Map.add "$lte" x m
+                |> convert rest
+            | [] -> m
+
+        Map.map (fun _ list -> convert list Map.empty) selector
+
+    override __.ConvertRevToMap rev = Map.ofSeq ["rev", rev]
+
+    override __.WriteInsertedDocument (fieldMappings: FieldMapping) (doc: InsertedDocument) = jsonObject { 
+        let (typeName, docValue) = doc
+        let docValueType = doc.GetType()
+        let j = JObject.FromObject(docValue, defaultSerializer)
+
+        yield!
+            typeName
+            |> Option.map (fun t -> StringProp ("type", t))
+
+        let (idField, revField) =
+            match typeName with 
+            | None -> None
+            | Some typeName -> Map.tryFind typeName fieldMappings
+            |> Option.defaultValue ("_id", "_rev")
+
+        yield!
+            [
+                j.[idField], idField, "_id", "Id";
+                j.[revField], revField, "_rev", "Rev";
+            ]
+            |> List.map (fun (token, givenFieldName, canonFieldName, readableFieldName) ->
+                match isNull token with 
+                | true -> 
+                    sprintf "%s field '%s' was not found on type %s. If you want to map it to a custom field on your type, use Davenport's `converterSettings` function to pass a list of field mappings." readableFieldName givenFieldName docValueType.FullName
+                    |> System.ArgumentException
+                    |> raise
+                | false ->
+                    let value = j.[idField].Value<string>()
+
+                    match System.String.IsNullOrEmpty value with 
+                    | true -> None 
+                    | false ->
+                        Some (StringProp (canonFieldName, value))
+            )
+
+        yield
+            Seq.cast<JProperty> j 
+            |> Seq.filter (fun prop -> prop.Name <> "type" && prop.Name <> idField && prop.Name <> revField)
+            |> Seq.map JProp
+            |> List.ofSeq
+    }
+
+    override x.WriteBulkInsertList mapping docs = 
+        // Desired json looks like { "new_edits": [{doc1}, {doc2}, {doc3}] }
+        failwith "not implemented"
+
+    override __.WriteUnknownObject doc = failwith "not implemented"
+
+    override __.WriteDesignDoc views = 
+        // Desired json looks like { "language": "javascript", "views": { "view1": { "map": "...", "reduce": "..." } } }
+        let viewData = 
+            views
+            |> Map.map (fun _ (map, reduce) ->
+                match reduce with 
+                | None -> Map.empty
+                | Some reduce -> Map.add "reduce" reduce Map.empty
+                |> Map.add "map" map
+            )
+
+        let data = 
+            Map.empty 
+            |> Map.add "views" (viewData :> obj)
+            // Javascript is currently the only supported language
+            |> Map.add "language" ("javascript" :> obj)
+
+        failwith "not implemented"
+
+    override __.WriteIndexes name fields = jsonObject {
+        // Desired json looks like { "name" : "index-name", "fields": ["field1", "field2", "field3"]}
+        yield StringProp ("name", name)
+        yield ArrayProp ("fields", fields |> List.map JsonValue.String)
+    }
+
+    override __.ReadAsDocument mapping json = failwith "not implemented"
+
+    override __.ReadAsViewResult mapping json = failwith "not implemented"
+
+    override __.ReadAsPostPutCopyResponse mapping json = failwith "not implemented"
+
+    override __.ReadAsFindResult mapping json = failwith "not implemented"
+
+    override __.ReadAsBulkResultList json = failwith "not implemented"
+
+    override __.ReadAsJToken mapping json = failwith " not implemented"
