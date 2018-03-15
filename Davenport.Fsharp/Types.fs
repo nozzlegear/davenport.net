@@ -162,7 +162,7 @@ type ICouchConverter() =
     abstract ConvertRevToMap: Rev -> Map<string, string>
     abstract WriteBulkInsertList: FieldMapping -> InsertedDocument<'a> list -> string
     abstract WriteInsertedDocument: FieldMapping -> InsertedDocument<'a> -> string
-    abstract WriteUnknownObject: 'a -> string
+    abstract WriteMap: Map<'a, 'b> -> string
     abstract WriteDesignDoc: Views -> string
     abstract WriteIndexes: IndexName -> IndexField list -> string
     abstract ReadAsDocument: FieldMapping -> string -> Document

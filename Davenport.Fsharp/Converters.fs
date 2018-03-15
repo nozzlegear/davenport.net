@@ -304,7 +304,7 @@ type DefaultConverter () =
         // Desired json looks like { "new_edits": [{doc1}, {doc2}, {doc3}] }
         failwith "not implemented"
 
-    override __.WriteUnknownObject doc = failwith "not implemented"
+    override __.WriteMap doc = JsonConvert.SerializeObject(doc, defaultSerializerSettings)
 
     override __.WriteDesignDoc views = 
         // Desired json looks like { "language": "javascript", "views": { "view1": { "map": "...", "reduce": "..." } } }

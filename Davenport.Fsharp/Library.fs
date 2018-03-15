@@ -161,7 +161,7 @@ let findRaw findOptions selector props =
 
     props 
     |> request "_find"
-    |> body (props.converter.WriteUnknownObject data)
+    |> body (props.converter.WriteMap data)
     |> send Get
 
 /// <summary>
