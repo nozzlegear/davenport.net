@@ -72,4 +72,12 @@ let tests =
             |> converter.WriteIndexes "index-name"
             |> Expect.equal "Should serialize indexes" """{"name":"index-name","fields":["field1","field2","field3"]}"""
         }
+
+        testCaseAsync "Serializes design docs" <| async {
+            Map.empty 
+            |> Map.add "my-first-view" ("function (doc) { emit(doc._id) }", Some "_count")
+            |> Map.add "my-second-view" ("function (doc) { emit(doc._id, 5) }", None)
+            |> converter.WriteDesignDoc
+            |> Expect.equal "Should serialize design docs" """{"views":{"my-first-view":{"reduce":"_count","map":"function (doc) { emit(doc._id) }"},"my-second-view":{"map":"function (doc) { emit(doc._id, 5) }"}},"language":"javascript"}"""
+        }
     ]
