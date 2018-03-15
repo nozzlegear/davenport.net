@@ -108,10 +108,9 @@ type FindOperator =
 type FindOption = 
     | Fields of string list 
     | SortBy of Sort list 
-    | FindLimit of int list 
-    | Skip of int list
+    | FindLimit of int
+    | Skip of int
     | UseIndex of obj
-    | Selector of string
 
 type FindResult = Warning option * Document list
 
@@ -144,27 +143,26 @@ type JsonKey = string
 type JsonValue = 
     | StringProp of JsonKey * string 
     | IntProp of JsonKey * int 
-    | ObjectProp of JsonKey * JsonValue
+    | ObjectProp of JsonKey * JsonValue list
     | ArrayProp of JsonKey * JsonValue list
     | RawProp of JsonKey * string
     | JProp of JProperty
     | String of string 
     | Int of int 
-    | Object of JsonValue 
+    | Object of JsonValue list 
     | Array of JsonValue list
     | Raw of string
 
 [<AbstractClass>]
 type ICouchConverter() = 
     abstract ConvertListOptionsToMap: ListOption list -> Map<string, string>
-    abstract ConvertFindOptionsToMap: FindOption list -> Map<string, string>
-    abstract ConvertFindSelectorToMap: FindSelector -> Map<string, Map<string, obj>>
     abstract ConvertRevToMap: Rev -> Map<string, string>
     abstract WriteBulkInsertList: FieldMapping -> InsertedDocument<'a> list -> string
     abstract WriteInsertedDocument: FieldMapping -> InsertedDocument<'a> -> string
     abstract WriteMap: Map<'a, 'b> -> string
     abstract WriteDesignDoc: Views -> string
     abstract WriteIndexes: IndexName -> IndexField list -> string
+    abstract WriteFindSelector: FindOption list -> FindSelector -> string
     abstract ReadAsDocument: FieldMapping -> string -> Document
     abstract ReadAsViewResult: FieldMapping -> string -> ViewResult 
     abstract ReadAsPostPutCopyResponse: FieldMapping -> string -> PostPutCopyResult

@@ -3,6 +3,7 @@ module Davenport.Converters
 open Newtonsoft.Json
 open Newtonsoft.Json.Linq
 open Types
+open System.IO.IsolatedStorage
 
 // The Fable JsonConverter uses a cache, so it's best to just instantiate it once.
 let fableConverter = Fable.JsonConverter()
@@ -49,7 +50,7 @@ type JsonObjectBuilder() =
                 inner rest
             | (Object x)::rest ->
                 writer.WriteStartObject()
-                inner [x]
+                inner x
                 writer.WriteEndObject()
                 inner rest
             | (Array x)::rest ->
@@ -71,7 +72,7 @@ type JsonObjectBuilder() =
             | ObjectProp (k, x)::rest ->
                 writer.WritePropertyName k 
                 writer.WriteStartObject()
-                inner [x]
+                inner x
                 writer.WriteEndObject()
                 inner rest 
             | ArrayProp (k, x)::rest ->
@@ -142,9 +143,9 @@ let jsonObject = JsonObjectBuilder()
 type DefaultConverter () = 
     inherit ICouchConverter()
 
-    let encodeOption o = JsonConvert.SerializeObject(o, defaultSerializerSettings)
+    let stringify o = JsonConvert.SerializeObject(o, defaultSerializerSettings)
 
-    let convertSortListToMap (sorts: Sort list) = 
+    let convertSortListToJsonValues (sorts: Sort list) = 
         // When serialized, we want the json to look like: [{"fieldName1": "asc"}, {"fieldName2": "desc"}]
         let rec inner sorts output = 
             match sorts with 
@@ -154,8 +155,8 @@ type DefaultConverter () =
                     match dir with
                     | Ascending -> "asc"
                     | Descending -> "desc"
-                    |> fun d -> [field, d]
-                    |> Map.ofSeq
+                    |> fun dir -> [StringProp(field, dir)]
+                    |> JsonValue.Object
 
                 inner rest (output@[item])
 
@@ -168,16 +169,16 @@ type DefaultConverter () =
                 Map.add "limit" (string l) qs
                 |> inner rest
             | Key k::rest ->
-                Map.add "key" (encodeOption k) qs
+                Map.add "key" (stringify k) qs
                 |> inner rest
             | Keys k::rest ->
-                Map.add "keys" (encodeOption k) qs
+                Map.add "keys" (stringify k) qs
                 |> inner rest
             | StartKey k::rest ->
-                Map.add "start_key" (encodeOption k) qs
+                Map.add "start_key" (stringify k) qs
                 |> inner rest
             | EndKey k::rest ->
-                Map.add "end_key" (encodeOption k) qs
+                Map.add "end_key" (stringify k) qs
                 |> inner rest
             | InclusiveEnd i::rest ->
                 Map.add "inclusive_end" (string i) qs
@@ -205,56 +206,6 @@ type DefaultConverter () =
             | [] -> qs
 
         inner options Map.empty
-
-    override __.ConvertFindOptionsToMap options =
-        let rec inner remaining qs = 
-            match remaining with 
-            | Fields f::rest ->
-                Map.add "fields" (encodeOption f) qs
-                |> inner rest
-            | SortBy s::rest ->
-                Map.add "sort" (convertSortListToMap s |> encodeOption) qs
-                |> inner rest
-            | FindLimit l::rest ->
-                Map.add "limit" (string l) qs
-                |> inner rest
-            | FindOption.Skip s::rest ->
-                Map.add "skip" (encodeOption s) qs
-                |> inner rest
-            | UseIndex i::rest ->
-                Map.add "use_index" (encodeOption i) qs
-                |> inner rest
-            | Selector s::rest ->
-                Map.add "selector" (encodeOption s) qs
-                |> inner rest
-            | [] -> qs
-        
-        inner options Map.empty
-
-    override __.ConvertFindSelectorToMap selector = 
-        let rec convert remaining m =
-            match remaining with
-            | EqualTo x::rest ->
-                Map.add "$eq" x m
-                |> convert rest
-            | NotEqualTo x::rest ->
-                Map.add "$ne" x m
-                |> convert rest
-            | GreaterThan x::rest ->
-                Map.add "$gt" x m
-                |> convert rest
-            | LesserThan x::rest ->
-                Map.add "$lt" x m
-                |> convert rest
-            | GreaterThanOrEqualTo x::rest ->
-                Map.add "$gte" x m
-                |> convert rest
-            | LessThanOrEqualTo x::rest ->
-                Map.add "$lte" x m
-                |> convert rest
-            | [] -> m
-
-        Map.map (fun _ list -> convert list Map.empty) selector
 
     override __.ConvertRevToMap rev = Map.ofSeq ["rev", rev]
 
@@ -329,6 +280,47 @@ type DefaultConverter () =
         // Desired json looks like { "name" : "index-name", "fields": ["field1", "field2", "field3"]}
         yield StringProp ("name", name)
         yield ArrayProp ("fields", fields |> List.map JsonValue.String)
+    }
+
+    override __.WriteFindSelector options selector = jsonObject {
+        // Desired json looks like {"fields": ["_id"], "sort": [{"fieldName": "asc", "fieldName2": "desc"}], "selector": {"fieldName": {"$eq", "some value"}}}
+        let rec getOptions remaining out = 
+            match remaining with 
+            | Fields f::rest ->
+                getOptions rest (out@[ArrayProp("fields", f |> List.map JsonValue.String)])
+            | SortBy s::rest ->
+                getOptions rest (out@[ArrayProp("sort", convertSortListToJsonValues s)])
+            | FindLimit l::rest ->
+                getOptions rest (out@[IntProp("limit", l)])
+            | FindOption.Skip s::rest ->
+                getOptions rest (out@[IntProp("skip", s)])
+            | UseIndex i::rest ->
+                getOptions rest (out@[RawProp("use_index", stringify i)])
+            | [] -> out
+
+        let rec getSelector remaining out =
+            match remaining with
+            | EqualTo x::rest ->
+                getSelector rest (out@[RawProp("$eq", stringify x)])
+            | NotEqualTo x::rest ->
+                getSelector rest (out@[RawProp("$ne", stringify x)])
+            | GreaterThan x::rest ->
+                getSelector rest (out@[RawProp("$gt", stringify x)])
+            | LesserThan x::rest ->
+                getSelector rest (out@[RawProp("$lt", stringify x)])
+            | GreaterThanOrEqualTo x::rest ->
+                getSelector rest (out@[RawProp("$gte", stringify x)])
+            | LessThanOrEqualTo x::rest ->
+                getSelector rest (out@[RawProp("$lte", stringify x)])
+            | [] -> out
+
+        let selectorProps = 
+            selector 
+            |> Seq.map (fun kvp -> ObjectProp(kvp.Key, getSelector kvp.Value []))
+            |> List.ofSeq
+
+        yield getOptions options []
+        yield ObjectProp("selector", selectorProps)
     }
 
     override __.ReadAsDocument mapping json = failwith "not implemented"

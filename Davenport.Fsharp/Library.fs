@@ -153,15 +153,9 @@ let reduce designDocName viewName options props =
     |> Async.Map (props.converter.ReadAsDocument props.fieldMapping)
 
 let findRaw findOptions selector props =
-    let data = 
-        findOptions
-        |> props.converter.ConvertFindOptionsToMap
-        |> Map.map (fun _ value -> value :> obj)
-        |> Map.add "selector" (props.converter.ConvertFindSelectorToMap selector :> obj)
-
     props 
     |> request "_find"
-    |> body (props.converter.WriteMap data)
+    |> body (props.converter.WriteFindSelector findOptions selector)
     |> send Get
 
 /// <summary>
