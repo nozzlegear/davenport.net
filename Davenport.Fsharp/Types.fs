@@ -24,9 +24,9 @@ type Rev = string
 
 type Okay = bool
 
-type DocData = JToken 
+type DocData = JObject 
 
-type ViewValue = JToken
+type ViewValue = JObject
 
 type Document = TypeName option * DocData
 
@@ -170,7 +170,7 @@ type ICouchConverter() =
     abstract ReadAsFindResult: FieldMapping -> string -> FindResult 
     abstract ReadAsBulkResultList: string -> BulkResult list
     abstract ReadVersionToken: string -> string 
-    abstract ReadAsJToken: FieldMapping -> string -> JToken
+    abstract ReadAsJObject: FieldMapping -> string -> (TypeName option * JObject)
 
 type CouchProps = 
     internal { 

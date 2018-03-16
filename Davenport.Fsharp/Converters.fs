@@ -152,8 +152,6 @@ type DefaultConverter () =
 
     let stringify o = JsonConvert.SerializeObject(o, defaultSerializerSettings)
 
-    let toJToken s = JsonConvert.DeserializeObject<JToken>(s, defaultSerializerSettings)
-
     let convertSortListToJsonValues (sorts: Sort list) = 
         // When serialized, we want the json to look like: [{"fieldName1": "asc"}, {"fieldName2": "desc"}]
         let rec inner sorts output = 
@@ -245,7 +243,7 @@ type DefaultConverter () =
                     |> System.ArgumentException
                     |> raise
                 | false ->
-                    let value = j.[idField].Value<string>()
+                    let value = j.[givenFieldName].Value<string>()
 
                     match System.String.IsNullOrEmpty value with 
                     | true -> None 
@@ -345,14 +343,31 @@ type DefaultConverter () =
         yield ObjectProp("selector", selectorProps)
     }
 
-    override __.ReadAsJToken mapping json = 
-        // let token = JToken.Parse(json)
-        let token = toJToken json
+    override __.ReadAsJObject mapping json =
+        let token = JsonConvert.DeserializeObject<JObject>(json, defaultSerializerSettings)
+        let typeName = 
+            token.["type"]
+            |> Option.ofObj 
+            |> Option.filter (fun t -> t.Type = JTokenType.String)
+            |> Option.map (fun t -> t.Value<string>())
 
-        // TODO: Use the fieldmapping to switch _id and _rev properties according to the `type` property.
-        token
+        typeName
+        |> Option.bind (fun t -> mapping |> Map.tryFind t)
+        |> Option.iter (fun (idField, revField) -> 
+            [
+                Option.ofObj token.["_id"], "_id", idField
+                Option.ofObj token.["_rev"], "_rev", revField
+            ]
+            |> Seq.filter (fun (field, _, _) -> Option.isSome field)
+            |> Seq.map (fun (field, x, y) -> Option.get field, x, y)
+            |> Seq.iter (fun (field, fieldName, newFieldName) ->
+                token.Remove fieldName |> ignore
+                token.Add(newFieldName, field)
+            ))
 
-    override __.ReadAsDocument mapping json = failwith "not implemented"
+        typeName, token
+
+    override x.ReadAsDocument mapping json = x.ReadAsJObject mapping json
 
     override __.ReadAsViewResult mapping json = failwith "not implemented"
 
@@ -362,8 +377,7 @@ type DefaultConverter () =
 
     override __.ReadAsBulkResultList json = failwith "not implemented"
 
-    override __.ReadVersionToken json = 
-        let token = toJToken json
-        // props.converter.ReadAsJToken props.fieldMapping >> fun t -> t.Value<string> "version"
+    override x.ReadVersionToken json = 
+        let _, doc = x.ReadAsJObject Map.empty json
 
-        token.Value<string> "version"
+        doc.Value<string> "version"

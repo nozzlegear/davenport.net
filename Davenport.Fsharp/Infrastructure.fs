@@ -27,6 +27,9 @@ module internal List =
     let ofSingle x = [x]
     let appendSingle x list = list@[x]
 
+module internal Option = 
+    let iterSeq fn list = list |> Seq.iter (Option.iter fn)
+
 // /// <summary>
 // /// Converts an F# expression to a LINQ expression, then converts that LINQ expression to a Map<string, Find> due to an incompatibility with the FsDoc and the types expected by Find, Exists and CountByExpression functions.
 // /// </summary>

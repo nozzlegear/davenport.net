@@ -46,7 +46,7 @@ let tests =
         testCaseAsync "Serializes an InsertedDocument" <| async {
             insertable defaultDoc         
             |> converter.WriteInsertedDocument mapping
-            |> Expect.equal "Should serialize to expected string" """{"type":"my-type","_id":"my-doc-id","_rev":"my-doc-id","Foo":true,"Bar":17,"Hello":"world","Token":"test token","Thing":{"Descended":15},"OtherThing":"SomethingElse"}"""
+            |> Expect.equal "Should serialize to expected string" """{"type":"my-type","_id":"my-doc-id","_rev":"my-doc-rev","Foo":true,"Bar":17,"Hello":"world","Token":"test token","Thing":{"Descended":15},"OtherThing":"SomethingElse"}"""
         }
 
         testCaseAsync "Serializes a find selector" <| async {
@@ -87,13 +87,26 @@ let tests =
                 insertable { defaultDoc with Hello = "goodbye" }
             ]
             |> converter.WriteBulkInsertList mapping AllowNewEdits
-            |> Expect.equal "Should serialize bulk insert list" """{"new_edits":true,"docs":[{"type":"my-type","_id":"my-doc-id","_rev":"my-doc-id","Foo":true,"Bar":17,"Hello":"world","Token":"test token","Thing":{"Descended":15},"OtherThing":"SomethingElse"},{"type":"my-type","_id":"my-doc-id","_rev":"my-doc-id","Foo":true,"Bar":17,"Hello":"goodbye","Token":"test token","Thing":{"Descended":15},"OtherThing":"SomethingElse"}]}"""
+            |> Expect.equal "Should serialize bulk insert list" """{"new_edits":true,"docs":[{"type":"my-type","_id":"my-doc-id","_rev":"my-doc-rev","Foo":true,"Bar":17,"Hello":"world","Token":"test token","Thing":{"Descended":15},"OtherThing":"SomethingElse"},{"type":"my-type","_id":"my-doc-id","_rev":"my-doc-rev","Foo":true,"Bar":17,"Hello":"goodbye","Token":"test token","Thing":{"Descended":15},"OtherThing":"SomethingElse"}]}"""
         }
 
         testCaseAsync "Deserializes database version" <| async {
             """{"couchdb":"Welcome","version":"2.0.0","vendor":{"name":"The Apache Software Foundation"}}"""
             |> converter.ReadVersionToken 
             |> Expect.equal "Should deserialize database version" "2.0.0"
+        }
+
+        testCaseAsync "Deserializes json as a Document with type name" <| async {
+            let (typeName, docToken) = 
+                """{"type":"my-type","_id":"my-doc-id","_rev":"my-doc-rev","Foo":true,"Bar":17,"Hello":"world","Token":"test token","Thing":{"Descended":15},"OtherThing":"SomethingElse"}"""
+                |> converter.ReadAsDocument mapping
+
+            typeName
+            |> Expect.equal "TypeName should be Some (my-type)" (Some "my-type")
+
+            let doc = docToken.ToObject<MyDoc>()
+
+            Expect.equal "Deserialized doc should equal default doc" defaultDoc doc
         }
 
         // TODO: Does the default converter's `toJToken` function actually use the FableConverter? My suspicion is
