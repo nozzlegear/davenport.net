@@ -97,14 +97,14 @@ let tests =
         }
 
         testCaseAsync "Deserializes json as a Document with type name" <| async {
-            let (typeName, docToken) = 
+            let doc = 
                 """{"type":"my-type","_id":"my-doc-id","_rev":"my-doc-rev","Foo":true,"Bar":17,"Hello":"world","Token":"test token","Thing":{"Descended":15},"OtherThing":"SomethingElse"}"""
                 |> converter.ReadAsDocument mapping
 
-            typeName
+            doc.TypeName
             |> Expect.equal "TypeName should be Some (my-type)" (Some "my-type")
 
-            let doc = docToken.ToObject<MyDoc>()
+            let doc = doc.ToObject<MyDoc>()
 
             Expect.equal "Deserialized doc should equal default doc" defaultDoc doc
         }

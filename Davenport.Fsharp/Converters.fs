@@ -367,7 +367,10 @@ type DefaultConverter () =
 
         typeName, token
 
-    override x.ReadAsDocument mapping json = x.ReadAsJObject mapping json
+    override x.ReadAsDocument mapping json = 
+        let (typeName, j) = x.ReadAsJObject mapping json
+
+        Document(typeName, j, defaultSerializer)
 
     override __.ReadAsViewResult mapping json = failwith "not implemented"
 

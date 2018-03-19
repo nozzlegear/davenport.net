@@ -24,11 +24,23 @@ type Rev = string
 
 type Okay = bool
 
-type DocData = JObject 
+type Document(t, r, s) =
+    member __.TypeName: string option = t
+    member __.Raw: JObject = r
+    /// <summary>
+    /// The suggested JsonSerializer for deserializing the Raw document object.
+    /// </summary>
+    member __.Serializer: JsonSerializer = s
+    /// <summary>
+    /// Converts the Raw document object to the given type using the document's serializer.
+    /// </summary>
+    member x.ToObject<'a> (): 'a = x.Raw.ToObject<'a>(x.Serializer)
+    /// <summary>
+    /// An alias for the ToObject<'a> method.
+    /// </summary>
+    member x.To<'a> (): 'a = x.ToObject<'a>()
 
-type ViewValue = JObject
-
-type Document = TypeName option * DocData
+type ViewValue = Document
 
 type InsertedDocument<'a> = TypeName option * 'a
 

@@ -92,16 +92,16 @@ let asyncBind (fn: 'a -> Async<'b>) (task: Async<'a>) = async {
     return! fn result
 }
 
-let mapDoc ((typeName, data): Document) = 
-    match typeName with 
+let mapDoc (doc: Document) = 
+    match doc.TypeName with 
     | Some MyOtherClassType -> 
-        data.ToObject<MyOtherClass>()
+        doc.To<MyOtherClass>()
         |> SecondDoc
     | Some MyTestClassType -> 
-        data.ToObject<MyTestClass>()
+        doc.To<MyTestClass>()
         |> FirstDoc
     | Some _
-    | None -> failwithf "Failed to map unknown document %A" data
+    | None -> failwithf "Failed to map unknown document %A" doc
 
 let mapFirstDoc = mapDoc >> function 
     | FirstDoc d -> d
