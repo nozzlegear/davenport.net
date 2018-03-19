@@ -343,36 +343,87 @@ type DefaultConverter () =
         yield ObjectProp("selector", selectorProps)
     }
 
-    override __.ReadAsJObject mapping json =
-        let token = JsonConvert.DeserializeObject<JObject>(json, defaultSerializerSettings)
-        let typeName = 
-            token.["type"]
-            |> Option.ofObj 
-            |> Option.filter (fun t -> t.Type = JTokenType.String)
-            |> Option.map (fun t -> t.Value<string>())
+    override __.ReadAsJToken mapping json =
+        let token = 
+            match json with 
+            | JsonString s -> JsonConvert.DeserializeObject<JToken>(s, defaultSerializerSettings)
+            | JsonToken t -> t
+            | JsonObject o -> JToken.FromObject(o, defaultSerializer)
 
-        typeName
-        |> Option.bind (fun t -> mapping |> Map.tryFind t)
-        |> Option.iter (fun (idField, revField) -> 
-            [
-                Option.ofObj token.["_id"], "_id", idField
-                Option.ofObj token.["_rev"], "_rev", revField
-            ]
-            |> Seq.filter (fun (field, _, _) -> Option.isSome field)
-            |> Seq.map (fun (field, x, y) -> Option.get field, x, y)
-            |> Seq.iter (fun (field, fieldName, newFieldName) ->
-                token.Remove fieldName |> ignore
-                token.Add(newFieldName, field)
-            ))
+        match token.Type with 
+        | JTokenType.Object ->
+            let token = JObject.FromObject(token, defaultSerializer)
+            let typeName = 
+                token.["type"]
+                |> Option.ofObj 
+                |> Option.filter (fun t -> t.Type = JTokenType.String)
+                |> Option.map (fun t -> t.Value<string>())
 
-        typeName, token
+            typeName
+            |> Option.bind (fun t -> mapping |> Map.tryFind t)
+            |> Option.iter (fun (idField, revField) -> 
+                [
+                    Option.ofObj token.["_id"], "_id", idField
+                    Option.ofObj token.["_rev"], "_rev", revField
+                ]
+                |> Seq.filter (fun (field, _, _) -> Option.isSome field)
+                |> Seq.map (fun (field, x, y) -> Option.get field, x, y)
+                |> Seq.iter (fun (field, fieldName, newFieldName) ->
+                    token.Remove fieldName |> ignore
+                    token.Add(newFieldName, field)
+                ))
+
+            typeName, token :> JToken
+
+        | _ -> None, token 
 
     override x.ReadAsDocument mapping json = 
-        let (typeName, j) = x.ReadAsJObject mapping json
+        let (typeName, j) = x.ReadAsJToken mapping (JsonString json)
 
         Document(typeName, j, defaultSerializer)
 
-    override __.ReadAsViewResult mapping json = failwith "not implemented"
+    override x.ReadAsViewResult mapping json = 
+        let (_, j) = x.ReadAsJToken mapping (JsonString json) 
+        let offset = j.Value<int>("offset")
+        let totalRows = j.Value<int>("total_rows")
+
+        let parseViewDoc (d: JObject): ViewDoc = 
+            // This _id prop should not be mapped to a field
+            let id = d.Value<string> "_id"
+            let keyToken = d.GetValue "key"
+            let key = 
+                match keyToken.Type with 
+                | JTokenType.Null -> failwith "View doc's key was null"
+                | JTokenType.Array -> 
+                    keyToken.AsJEnumerable()
+                    |> Seq.map (fun k -> k.Value<obj>())
+                    |> List.ofSeq
+                    |> ViewKey.KeyList
+                | _ -> ViewKey.Key (keyToken.Value<obj>())
+
+            let tokenToDoc (tokenName: string) = 
+                tokenName 
+                |> d.GetValue 
+                |> fun token -> 
+                    match isNull token with 
+                    | true -> None 
+                    | false -> 
+                        match token.Type with 
+                        | JTokenType.Null -> None
+                        | _ ->
+                            JsonToken token 
+                            |> x.ReadAsJToken mapping 
+                            |> fun (typeName, j) -> Document(typeName, j, defaultSerializer)
+                            |> Some
+
+            { Id = id; Key = key; Value = tokenToDoc "value"; Doc = tokenToDoc "doc" }
+
+        let rows = 
+            j.Value<JArray>("rows")
+            |> Seq.map ((fun x -> JObject.FromObject(x, defaultSerializer)) >> parseViewDoc)
+            |> List.ofSeq
+
+        { TotalRows = totalRows; Offset = offset; Rows = rows}
 
     override __.ReadAsPostPutCopyResponse mapping json = failwith "not implemented"
 
@@ -381,6 +432,6 @@ type DefaultConverter () =
     override __.ReadAsBulkResultList json = failwith "not implemented"
 
     override x.ReadVersionToken json = 
-        let _, doc = x.ReadAsJObject Map.empty json
+        let _, doc = x.ReadAsJToken Map.empty (JsonString json)
 
         doc.Value<string> "version"

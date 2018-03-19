@@ -25,7 +25,7 @@ type Okay = bool
 
 type Document(t, r, s) =
     member __.TypeName: string option = t
-    member __.Raw: JObject = r
+    member __.Raw: JToken = r
     /// <summary>
     /// The suggested JsonSerializer for deserializing the Raw document object.
     /// </summary>
@@ -177,6 +177,11 @@ type JsonValue =
     | Array of JsonValue list
     | Raw of string
 
+type JsonParseKind = 
+    | JsonString of string 
+    | JsonObject of JObject 
+    | JsonToken of JToken    
+
 [<AbstractClass>]
 type ICouchConverter() = 
     abstract ConvertListOptionsToMap: ListOption list -> Map<string, string>
@@ -192,7 +197,7 @@ type ICouchConverter() =
     abstract ReadAsFindResult: FieldMapping -> string -> FindResult 
     abstract ReadAsBulkResultList: string -> BulkResult list
     abstract ReadVersionToken: string -> string 
-    abstract ReadAsJObject: FieldMapping -> string -> (TypeName option * JObject)
+    abstract ReadAsJToken: FieldMapping -> JsonParseKind -> (TypeName option * JToken)
 
 type CouchProps = 
     internal { 
