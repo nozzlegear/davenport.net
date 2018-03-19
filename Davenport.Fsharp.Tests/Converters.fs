@@ -90,6 +90,17 @@ let tests =
             |> Expect.equal "Should serialize bulk insert list" """{"new_edits":true,"docs":[{"type":"my-type","_id":"my-doc-id","_rev":"my-doc-rev","Foo":true,"Bar":17,"Hello":"world","Token":"test token","Thing":{"Descended":15},"OtherThing":"SomethingElse"},{"type":"my-type","_id":"my-doc-id","_rev":"my-doc-rev","Foo":true,"Bar":17,"Hello":"goodbye","Token":"test token","Thing":{"Descended":15},"OtherThing":"SomethingElse"}]}"""
         }
 
+        testCaseAsync "Deserializes as a JObject" <| async {
+            let (typeName, token) = 
+                """{"couchdb":"Welcome","version":"2.0.0","vendor":{"name":"The Apache Software Foundation"}}"""
+                |> converter.ReadAsJObject mapping
+
+            Expect.equal "TypeName should be none" None typeName
+            
+            token.Value<string> "couchdb"
+            |> Expect.equal "json prop `couchdb` should equal \"Welcome\"" "Welcome"
+        }
+
         testCaseAsync "Deserializes database version" <| async {
             """{"couchdb":"Welcome","version":"2.0.0","vendor":{"name":"The Apache Software Foundation"}}"""
             |> converter.ReadVersionToken 
