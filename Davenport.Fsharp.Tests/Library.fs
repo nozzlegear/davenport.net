@@ -88,7 +88,7 @@ let asyncMap (fn: 'a -> 'b) (task: Async<'a>) = async {
 
 let asyncBind (fn: 'a -> Async<'b>) (task: Async<'a>) = async {
     let! result = task
-
+    
     return! fn result
 }
 

@@ -109,9 +109,16 @@ let tests =
             Expect.equal "Deserialized doc should equal default doc" defaultDoc doc
         }
 
-        // TODO: Does the default converter's `toJToken` function actually use the FableConverter? My suspicion is
-        // FableConverter will return `false` on `CanConvert` because that function will receive the JToken type
-        // which I doubt is specifically handled by the converter. It might be better to, instead of returning a
-        // Document (typeName option * Jtoken), return a function that will call `JToken.ToObject<'a>(fableConverter)`.
-        // So Document would become Document (typeName option * (unit -> 'a))
+        testCaseAsync "Deserializes json as a Document without a type name" <| async {
+            let doc = 
+                """{"_id":"my-doc-id","_rev":"my-doc-rev","Foo":true,"Bar":17,"Hello":"world","Token":"test token","Thing":{"Descended":15},"OtherThing":"SomethingElse"}"""
+                |> converter.ReadAsDocument mapping
+
+            doc.TypeName
+            |> Expect.equal "TypeName should be None" None
+
+            let doc = doc.ToObject<MyDoc>()
+
+            Expect.equal "Deserialized doc should equal default doc with null id and rev values (because without a typename the converter doesn't know which fields _id and _rev map to)." ({defaultDoc with Id = null; Rev = null}) doc
+        }
     ]
