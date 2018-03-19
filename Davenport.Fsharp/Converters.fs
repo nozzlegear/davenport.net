@@ -6,11 +6,15 @@ open Types
 open Infrastructure
 
 // The Fable JsonConverter uses a cache, so it's best to just instantiate it once.
-let fableConverter = Fable.JsonConverter()
+// let fableConverter = Fable.JsonConverter()
 
-let defaultSerializerSettings = JsonSerializerSettings()
+// let defaultSerializerSettings = JsonSerializerSettings()
+// defaultSerializerSettings.NullValueHandling <- NullValueHandling.Ignore
+// defaultSerializerSettings.Converters.Add fableConverter
+let defaultSerializerSettings = Microsoft.FSharpLu.Json.Compact.Internal.Settings.settings
 defaultSerializerSettings.NullValueHandling <- NullValueHandling.Ignore
-defaultSerializerSettings.Converters.Add fableConverter
+defaultSerializerSettings.MissingMemberHandling <- MissingMemberHandling.Ignore
+    // Microsoft.FSharpLu.Json.Default.Internal.DefaultSettings.settings
 
 let defaultSerializer = JsonSerializer.Create(defaultSerializerSettings)
 
@@ -363,15 +367,12 @@ type DefaultConverter () =
             |> Option.bind (fun t -> mapping |> Map.tryFind t)
             |> Option.iter (fun (idField, revField) -> 
                 [
-                    Option.ofObj token.["_id"], "_id", idField
-                    Option.ofObj token.["_rev"], "_rev", revField
+                    Option.ofObj token.["_id"], idField
+                    Option.ofObj token.["_rev"], revField
                 ]
-                |> Seq.filter (fun (field, _, _) -> Option.isSome field)
-                |> Seq.map (fun (field, x, y) -> Option.get field, x, y)
-                |> Seq.iter (fun (field, fieldName, newFieldName) ->
-                    token.Remove fieldName |> ignore
-                    token.Add(newFieldName, field)
-                ))
+                |> Seq.filter (fun (field, _) -> Option.isSome field)
+                |> Seq.map (fun (field, x) -> Option.get field, x)
+                |> Seq.iter (fun (field, newFieldName) -> token.Add(newFieldName, field)))
 
             typeName, token :> JToken
 
@@ -387,29 +388,60 @@ type DefaultConverter () =
         let offset = j.Value<int>("offset")
         let totalRows = j.Value<int>("total_rows")
 
+        let rec keyValue (d: JToken): KeyValue = 
+            match d.Type with 
+            | JTokenType.String -> 
+                d.Value<string>()
+                |> KeyValue.String 
+            | JTokenType.Integer -> 
+                d.Value<int>()
+                |> KeyValue.Int
+            | JTokenType.Float ->
+                d.Value<float>()
+                |> KeyValue.Float 
+            | JTokenType.Date ->
+                d.Value<System.DateTime>()
+                |> KeyValue.Date
+            | JTokenType.Boolean -> 
+                d.Value<bool>()
+                |> KeyValue.Bool 
+            | JTokenType.Array ->
+                d.AsJEnumerable()
+                |> Seq.map keyValue
+                |> List.ofSeq
+                |> KeyValue.List
+            | _ -> 
+                d 
+                |> KeyValue.JToken
+
         let parseViewDoc (d: JObject): ViewDoc = 
-            // This _id prop should not be mapped to a field
-            let id = d.Value<string> "_id"
+            // This id prop should not be mapped to a field
+            let id = d.Value<string> "id"
             let keyToken = d.GetValue "key"
             let key = 
                 match keyToken.Type with 
                 | JTokenType.Null -> failwith "View doc's key was null"
                 | JTokenType.Array -> 
                     keyToken.AsJEnumerable()
-                    |> Seq.map (fun k -> k.Value<obj>())
-                    |> List.ofSeq
+                    |> Seq.map keyValue
+                    |> List.ofSeq 
                     |> ViewKey.KeyList
-                | _ -> ViewKey.Key (keyToken.Value<obj>())
+                | _ -> 
+                    keyToken 
+                    |> keyValue
+                    |> ViewKey.Key
 
             let tokenToDoc (tokenName: string) = 
                 tokenName 
                 |> d.GetValue 
                 |> fun token -> 
                     match isNull token with 
-                    | true -> None 
+                    | true -> 
+                        None 
                     | false -> 
                         match token.Type with 
-                        | JTokenType.Null -> None
+                        | JTokenType.Null -> 
+                            None
                         | _ ->
                             JsonToken token 
                             |> x.ReadAsJToken mapping 
@@ -419,7 +451,7 @@ type DefaultConverter () =
             { Id = id; Key = key; Value = tokenToDoc "value"; Doc = tokenToDoc "doc" }
 
         let rows = 
-            j.Value<JArray>("rows")
+            j.["rows"].AsJEnumerable()
             |> Seq.map ((fun x -> JObject.FromObject(x, defaultSerializer)) >> parseViewDoc)
             |> List.ofSeq
 

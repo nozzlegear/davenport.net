@@ -12,3 +12,4 @@ nuget fable.jsonconverter
 nuget Expecto
 nuget Expecto.BenchmarkDotNet
 nuget Expecto.FsCheck
+nuget microsoft.fsharplu.json

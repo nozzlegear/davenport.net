@@ -29,6 +29,14 @@ module internal List =
 
 module internal Option = 
     let iterSeq fn list = list |> Seq.iter (Option.iter fn)
+    /// <summary>
+    /// The same as Option.iter, but returns the option so it can be used further.
+    /// </summary>
+    let iter2 fn opt = 
+        opt 
+        |> Option.iter fn 
+
+        opt
 
 // /// <summary>
 // /// Converts an F# expression to a LINQ expression, then converts that LINQ expression to a Map<string, Find> due to an incompatibility with the FsDoc and the types expected by Find, Exists and CountByExpression functions.

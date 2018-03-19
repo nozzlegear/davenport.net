@@ -48,9 +48,18 @@ type PostPutCopyResult =
 
 type ViewValue = Document
 
+type KeyValue = 
+    | String of string 
+    | Int of int 
+    | Float of float 
+    | Date of System.DateTime
+    | Bool of bool 
+    | List of KeyValue list
+    | JToken of JToken
+
 type ViewKey = 
-    | Key of obj
-    | KeyList of obj list
+    | Key of KeyValue
+    | KeyList of KeyValue list    
 
 type ViewDoc = 
     { Id: Id
