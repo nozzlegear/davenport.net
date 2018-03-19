@@ -506,7 +506,8 @@ let tests =
                 called <- true
 
             let clientWithWarning = client |> warning handleWarning
-            let! id, _, _ = create defaultInsert clientWithWarning |> postPutCopyTuple
+
+            do! create defaultInsert clientWithWarning |> Async.Ignore
 
             // To get a warning, attempt to find a document by searching for a field that doesn't have an index.
             do!
@@ -525,7 +526,7 @@ let tests =
             // Make sure the design docs exist
             do! 
                 Map.empty
-                |> Map.add viewName ("function (doc) { if (doc.Baz > 10 { emit(doc._id, doc) }) }", None) 
+                |> Map.add viewName ("function (doc) { if (doc.Baz > 10 { emit(doc._id, doc.Baz) }) }", None) 
                 |> DesignDoc.doc docName
                 |> createOrUpdateDesignDoc
                 <| client
@@ -541,9 +542,13 @@ let tests =
 
             let! viewResult = view docName viewName [] client
 
+            viewResult.Rows 
+            |> Seq.map (fun r -> r.Value)
+            |> Expect.all "All rows should have a Some (int) value" Option.isSome
+
             let docValues = 
                 viewResult.Rows
-                |> Seq.map (fun d -> d.Value.To<int>())
+                |> Seq.map ((fun r -> r.Value) >> Option.get >> fun d -> d.To<int>())
 
             Expect.isGreaterThan "View should return at least one result" (viewResult.TotalRows, 0)
             Expect.isGreaterThan "Offset should be at least 0" (viewResult.Offset, -1)

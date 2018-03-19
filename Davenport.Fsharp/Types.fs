@@ -55,7 +55,7 @@ type ViewKey =
 type ViewDoc = 
     { Id: Id
       Key: ViewKey
-      Value: ViewValue
+      Value: ViewValue option
       Doc: Document option }
 
 type ViewResult = 
