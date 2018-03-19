@@ -121,4 +121,24 @@ let tests =
 
             Expect.equal "Deserialized doc should equal default doc with null id and rev values (because without a typename the converter doesn't know which fields _id and _rev map to)." ({defaultDoc with Id = null; Rev = null}) doc
         }
+
+        testCaseAsync "Deserializes a view result without docs" <| async {
+            skiptest "Not implemented"
+        }
+
+        testCaseAsync "Deserializes a view result with docs" <| async {
+            skiptest "Not implemented"
+        }
+
+        testCaseAsync "Deserializes a PostPutCopyResponse" <| async {
+            skiptest "Not implemented"
+        }
+
+        testCaseAsync "Deserializes a find result" <| async {
+            skiptest "Not implemented"
+        }
+
+        testCaseAsync "Deserializes a BulkResult list" <| async {
+            skiptest "Not implemented"
+        }
     ]
