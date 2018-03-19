@@ -173,7 +173,7 @@ let find (findOptions: FindOption list) selector props = async {
 
 let count = 
     allDocs WithoutDocs [ListLimit 0] 
-    >> Async.Map (fun (totalRows, _, _) -> totalRows)
+    >> Async.Map (fun d -> d.TotalRows)
 
 /// <summary>
 /// Retrieves a count of all documents matching the given selector.

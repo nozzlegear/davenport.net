@@ -2,7 +2,6 @@ module Davenport.Types
 
 open Newtonsoft.Json.Linq
 open Newtonsoft.Json
-open System.Text
 
 type TypeName = string
 
@@ -40,21 +39,29 @@ type Document(t, r, s) =
     /// </summary>
     member x.To<'a> (): 'a = x.ToObject<'a>()
 
-type ViewValue = Document
-
 type InsertedDocument<'a> = TypeName option * 'a
 
-type PostPutCopyResult = Id * Rev * Okay
+type PostPutCopyResult = 
+    { Id: Id
+      Rev: Rev
+      Okay: Okay }
+
+type ViewValue = Document
 
 type ViewKey = 
     | Key of obj
     | KeyList of obj list
 
-type ViewDoc = Id * ViewKey * ViewValue * Document option
+type ViewDoc = 
+    { Id: Id
+      Key: ViewKey
+      Value: ViewValue
+      Doc: Document option }
 
-type ViewResult = TotalRows * Offset * ViewDoc list
-
-type CouchResult =  TypeName option * Newtonsoft.Json.Linq.JObject
+type ViewResult = 
+    { TotalRows: TotalRows
+      Offset: Offset
+      Rows: ViewDoc list }
 
 type BulkErrorType = 
     | Conflict
@@ -64,7 +71,10 @@ type BulkErrorType =
 
 type BulkErrorReason = string
 
-type BulkDocumentError = Id * BulkErrorType * BulkErrorReason
+type BulkDocumentError = 
+    { Id: Id
+      ErrorType: BulkErrorType
+      ErrorReason: BulkErrorReason }
 
 type BulkResult = 
     | Inserted of PostPutCopyResult

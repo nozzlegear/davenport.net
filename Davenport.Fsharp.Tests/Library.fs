@@ -92,6 +92,9 @@ let asyncBind (fn: 'a -> Async<'b>) (task: Async<'a>) = async {
     return! fn result
 }
 
+let postPutCopyTuple (task: Async<PostPutCopyResult>) = 
+    asyncMap (fun (d: PostPutCopyResult) -> d.Id, d.Rev, d.Okay) task
+
 let mapDoc (doc: Document) = 
     match doc.TypeName with 
     | Some MyOtherClassType -> 
@@ -181,7 +184,7 @@ let tests =
 
     testList "Davenport.Fsharp.Wrapper" [
         testCaseAsync "Gets a document's raw json" <| async {
-            let! (createdId, createdRev, _) = create defaultInsert client
+            let! (createdId, createdRev, _) = create defaultInsert client |> postPutCopyTuple
             let! json = getRaw createdId (Some createdRev) client
 
             String.IsNullOrEmpty json
@@ -189,7 +192,7 @@ let tests =
         }
 
         testCaseAsync "Gets a document of the first type" <| async {
-            let! (createdId, createdRev, _) = create defaultInsert client
+            let! (createdId, createdRev, _) = create defaultInsert client |> postPutCopyTuple
             let! doc = 
                 get createdId (Some createdRev) client
                 |> asyncMap mapFirstDoc
@@ -202,7 +205,7 @@ let tests =
         }
 
         testCaseAsync "Gets a document of the second type" <| async {
-            let! (createdId, createdRev, _) = create defaultSecondInsert client
+            let! (createdId, createdRev, _) = create defaultSecondInsert client |> postPutCopyTuple
             let! doc = 
                 get createdId (Some createdRev) client
                 |> asyncMap mapSecondDoc
@@ -217,7 +220,7 @@ let tests =
         }
 
         testCaseAsync "Creates docs" <| async {
-            let! (docId, docRev, ok) = create defaultInsert client
+            let! (docId, docRev, ok) = create defaultInsert client |> postPutCopyTuple
 
             notNullOrEmpty "Id was empty" docId
             notNullOrEmpty "Rev was empty" docRev
@@ -226,7 +229,7 @@ let tests =
 
         testCaseAsync "Creates docs with specific ids" <| async {
             let myId = sprintf "specific_id_%s" (Guid.NewGuid().ToString())
-            let! (docId, docRev, ok) = createWithId myId defaultInsert client
+            let! (docId, docRev, ok) = createWithId myId defaultInsert client |> postPutCopyTuple
 
             Expect.equal "Created id and supplied id did not match" docId myId
             notNullOrEmpty "Rev was empty" docRev
@@ -234,7 +237,7 @@ let tests =
         }
 
         testCaseAsync "Gets docs without a revision" <| async {
-            let! (createdId, _, _) = create defaultInsert client
+            let! (createdId, _, _) = create defaultInsert client |> postPutCopyTuple
             let! doc = 
                 get createdId None client
                 |> asyncMap mapFirstDoc
@@ -295,7 +298,7 @@ let tests =
         }
 
         testCaseAsync "Updates docs" <| async {
-            let! (createdId, createdRev, _) = create defaultInsert client
+            let! (createdId, createdRev, _) = create defaultInsert client |> postPutCopyTuple
             let! retrieved =
                 get createdId (Some createdRev) client
                 |> asyncMap mapFirstDoc
@@ -305,7 +308,7 @@ let tests =
                 { retrieved with Foo = newFoo }
                 |> FirstDoc
                 |> insertable
-            let! (id, rev, ok) = update createdId createdRev newData client
+            let! (id, rev, ok) = update createdId createdRev newData client |> postPutCopyTuple
 
             Expect.isTrue "Update result is not Ok." ok
 
@@ -317,7 +320,7 @@ let tests =
         }
 
         testCaseAsync "Deletes docs" <| async {
-            let! (id, rev, _) = create defaultInsert client
+            let! (id, rev, _) = create defaultInsert client |> postPutCopyTuple
 
             do! delete id rev client
         }
@@ -326,20 +329,21 @@ let tests =
             // Create at least one doc to list
             do! create defaultInsert client |> Async.Ignore
 
-            let! (totalRows, offset, docs) = allDocs WithDocs [] client
+            let! viewResult = allDocs WithDocs [] client
 
-            Expect.equal "List offset is not 0." offset 0
-            Expect.isTrue "Total rows should be greater than 0" (totalRows > 0)
-            Expect.isNonEmpty "List is empty." docs
+            Expect.equal "List offset is not 0." viewResult.Offset 0
+            Expect.isTrue "Total rows should be greater than 0" (viewResult.TotalRows > 0)
+            Expect.isNonEmpty "List is empty." viewResult.Rows
 
-            let tryMapDoc = function 
-                | _, _, _, Some d ->
+            let tryMapDoc (doc: ViewDoc) = 
+                match doc.Doc with
+                | Some d ->
                     try mapDoc d |> Some with _ -> None
-                | _, _, _, _ ->
+                | None ->
                     None
 
             let mappedDocs = 
-                docs
+                viewResult.Rows
                 |> Seq.map tryMapDoc
                 |> Seq.filter Option.isSome
                 |> Seq.map Option.get
@@ -437,7 +441,7 @@ let tests =
         }
 
         testCaseAsync "Doc exists" <| async {
-            let! id, rev, _ = create defaultInsert client
+            let! id, rev, _ = create defaultInsert client |> postPutCopyTuple
             let! existsWithRev = exists id (Some rev) client
             let! existsWithoutRev = exists id None client
 
@@ -472,8 +476,8 @@ let tests =
 
         testCaseAsync "Copies docs" <| async {
             let uuid = sprintf "a-unique-string-%i" DateTime.UtcNow.Millisecond
-            let! id, _, _ = create defaultInsert client
-            let! id, _, ok = copy id uuid client
+            let! id, _, _ = create defaultInsert client |> postPutCopyTuple
+            let! id, _, ok = copy id uuid client |> postPutCopyTuple
 
             Expect.isTrue "" ok
             Expect.equal "The copied document's id should have equaled the expected uuid." id uuid
@@ -502,7 +506,7 @@ let tests =
                 called <- true
 
             let clientWithWarning = client |> warning handleWarning
-            let! id, _, _ = create defaultInsert clientWithWarning
+            let! id, _, _ = create defaultInsert clientWithWarning |> postPutCopyTuple
 
             // To get a warning, attempt to find a document by searching for a field that doesn't have an index.
             do!
@@ -535,14 +539,14 @@ let tests =
                 <| client
                 |> Async.Ignore
 
-            let! total, offset, docs = view docName viewName [] client
+            let! viewResult = view docName viewName [] client
 
             let docValues = 
-                docs 
-                |> Seq.map (fun (_, _, value, _) -> value.ToObject<int>())
+                viewResult.Rows
+                |> Seq.map (fun d -> d.Value.To<int>())
 
-            Expect.isGreaterThan "View should return at least one result" (total, 0)
-            Expect.isGreaterThan "Offset should be at least 0" (offset, -1)
+            Expect.isGreaterThan "View should return at least one result" (viewResult.TotalRows, 0)
+            Expect.isGreaterThan "Offset should be at least 0" (viewResult.Offset, -1)
             Expect.isGreaterThanOrEqual "The sum of all doc values should be greater than 10" (Seq.sum docValues, 10)
         }
 
@@ -613,6 +617,7 @@ let tests =
                 >> insertable 
                 >> create 
                 >> fun fn -> fn client
+                >> postPutCopyTuple
                 >> asyncBind (fun (id, rev, _) -> get id (Some rev) client)
                 >> asyncMap mapFirstDoc
 
