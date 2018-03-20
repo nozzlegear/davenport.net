@@ -352,7 +352,7 @@ type DefaultConverter () =
             match json with 
             | JsonString s -> JsonConvert.DeserializeObject<JToken>(s, defaultSerializerSettings)
             | JsonToken t -> t
-            | JsonObject o -> JToken.FromObject(o, defaultSerializer)
+            | JsonObject o -> o :> JToken
 
         match token.Type with 
         | JTokenType.Object ->
@@ -387,15 +387,27 @@ type DefaultConverter () =
         let (_, j) = x.ReadAsJToken mapping (JsonString json) 
         let offset = j.Value<int>("offset")
         let totalRows = j.Value<int>("total_rows")
-
+        
         let rec keyValue (d: JToken): KeyValue = 
             match d.Type with 
+            | JTokenType.Null -> 
+                KeyValue.Null
             | JTokenType.String -> 
                 d.Value<string>()
                 |> KeyValue.String 
-            | JTokenType.Integer -> 
-                d.Value<int>()
-                |> KeyValue.Int
+            | JTokenType.Integer ->
+                let str = d.Value<string>()
+
+                // First try to parse the value as an Int. If it's too long it will return None and we'll parse as an int64 instead.
+                // If both parses fail, fall back to returning the value as a string.
+                str 
+                |> Int.parse
+                |> Option.map KeyValue.Int
+                |> Option.defaultBindWith(fun _ ->
+                    str 
+                    |> Long.parse 
+                    |> Option.map KeyValue.Long)
+                |> Option.defaultValue (KeyValue.String str)
             | JTokenType.Float ->
                 d.Value<float>()
                 |> KeyValue.Float 

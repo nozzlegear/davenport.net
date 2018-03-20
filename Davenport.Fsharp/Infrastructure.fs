@@ -29,6 +29,10 @@ module internal List =
 
 module internal Option = 
     let iterSeq fn list = list |> Seq.iter (Option.iter fn)
+    let defaultBindWith fn opt = 
+        match opt with 
+        | Some x -> Some x
+        | None -> fn()
     /// <summary>
     /// The same as Option.iter, but returns the option so it can be used further.
     /// </summary>
@@ -37,6 +41,20 @@ module internal Option =
         |> Option.iter fn 
 
         opt
+
+module internal Int = 
+    let parse s = 
+        try 
+            System.Int32.Parse s |> Some
+        with 
+        | _ -> None
+
+module internal Long = 
+    let parse s = 
+        try 
+            System.Int64.Parse s |> Some 
+        with 
+        | _ -> None
 
 // /// <summary>
 // /// Converts an F# expression to a LINQ expression, then converts that LINQ expression to a Map<string, Find> due to an incompatibility with the FsDoc and the types expected by Find, Exists and CountByExpression functions.

@@ -51,10 +51,12 @@ type ViewValue = Document
 type KeyValue = 
     | String of string 
     | Int of int 
+    | Long of int64
     | Float of float 
     | Date of System.DateTime
     | Bool of bool 
     | List of KeyValue list
+    | Null 
     | JToken of JToken
 
 type ViewKey = 
