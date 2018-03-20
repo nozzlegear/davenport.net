@@ -469,7 +469,12 @@ type DefaultConverter () =
 
         { TotalRows = totalRows; Offset = offset; Rows = rows}
 
-    override __.ReadAsPostPutCopyResponse json = failwith "not implemented"
+    override x.ReadAsPostPutCopyResponse json = 
+        let _, token = x.ReadAsJToken Map.empty (JsonString json)
+        
+        { Okay = token.Value<bool>("ok") 
+          Id = token.Value<string>("id")
+          Rev = token.Value<string>("rev") }
 
     override __.ReadAsFindResult mapping json = failwith "not implemented"
 

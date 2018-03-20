@@ -267,7 +267,18 @@ let tests =
         }
 
         testCaseAsync "Deserializes a PostPutCopyResponse" <| async {
-            skiptest "Not implemented"
+            let resp = 
+                """{"ok":true,"id":"df8894a5b05cebf60df77bedee000e53","rev":"1-15f65339921e497348be384867bb940f"}"""
+                |> converter.ReadAsPostPutCopyResponse
+
+            resp.Okay
+            |> Expect.isTrue ".ok should be true"
+
+            resp.Id 
+            |> Expect.equal "Id should equal the expected value" "df8894a5b05cebf60df77bedee000e53"
+
+            resp.Rev 
+            |> Expect.equal "Rev should equal the expected value" "1-15f65339921e497348be384867bb940f"
         }
 
         testCaseAsync "Deserializes a find result" <| async {
