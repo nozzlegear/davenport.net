@@ -202,12 +202,12 @@ type ICouchConverter() =
     abstract WriteDesignDoc: Views -> string
     abstract WriteIndexes: IndexName -> IndexField list -> string
     abstract WriteFindSelector: FindOption list -> FindSelector -> string
-    abstract ReadAsDocument: FieldMapping -> string -> Document
-    abstract ReadAsViewResult: FieldMapping -> string -> ViewResult 
-    abstract ReadAsPostPutCopyResponse: string -> PostPutCopyResult
-    abstract ReadAsFindResult: FieldMapping -> string -> FindResult 
-    abstract ReadAsBulkResultList: string -> BulkResult list
-    abstract ReadVersionToken: string -> string 
+    abstract ReadAsDocument: FieldMapping -> JsonParseKind -> Document
+    abstract ReadAsViewResult: FieldMapping -> JsonParseKind -> ViewResult 
+    abstract ReadAsPostPutCopyResponse: JsonParseKind -> PostPutCopyResult
+    abstract ReadAsFindResult: FieldMapping -> JsonParseKind -> FindResult 
+    abstract ReadAsBulkResultList: JsonParseKind -> BulkResult list
+    abstract ReadVersionToken: JsonParseKind -> string 
     abstract ReadAsJToken: FieldMapping -> JsonParseKind -> (TypeName option * JToken)
 
 type CouchProps = 

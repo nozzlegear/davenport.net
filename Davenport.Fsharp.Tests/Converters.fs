@@ -105,6 +105,7 @@ let tests =
 
         testCaseAsync "Deserializes database version" <| async {
             """{"couchdb":"Welcome","version":"2.0.0","vendor":{"name":"The Apache Software Foundation"}}"""
+            |> JsonString
             |> converter.ReadVersionToken 
             |> Expect.equal "Should deserialize database version" "2.0.0"
         }
@@ -112,6 +113,7 @@ let tests =
         testCaseAsync "Deserializes json as a Document with type name" <| async {
             let doc = 
                 """{"type":"my-type","_id":"my-doc-id","_rev":"my-doc-rev","Foo":true,"Bar":17,"Hello":"world","Token":"test token","Thing":{"Descended":15},"OtherThing":"SomethingElse"}"""
+                |> JsonString
                 |> converter.ReadAsDocument mapping
 
             doc.TypeName
@@ -125,6 +127,7 @@ let tests =
         testCaseAsync "Deserializes json as a Document without a type name" <| async {
             let doc = 
                 """{"_id":"my-doc-id","_rev":"my-doc-rev","Foo":true,"Bar":17,"Hello":"world","Token":"test token","Thing":{"Descended":15},"OtherThing":"SomethingElse"}"""
+                |> JsonString
                 |> converter.ReadAsDocument mapping
 
             doc.TypeName
@@ -138,6 +141,7 @@ let tests =
         testCaseAsync "Deserializes a view result without values or docs" <| async {
             let viewResult = 
                 """{"total_rows":133970,"offset":3,"rows":[{"id":"4_imported","key":[0,1354773600000],"value":null},{"id":"10_imported","key":[0,1354860000000],"value":null},{"id":"11_imported","key":[0,1354860000000],"value":null}]}"""
+                |> JsonString
                 |> converter.ReadAsViewResult mapping
 
             viewResult.TotalRows
@@ -170,6 +174,7 @@ let tests =
         testCaseAsync "Deserializes a view result with values but without docs" <| async {
             let viewResult = 
                 """{"total_rows":133970,"offset":3,"rows":[{"id":"4_imported","key":[0,1354773600000],"value":3},{"id":"10_imported","key":[0,1354860000000],"value":2},{"id":"11_imported","key":[0,1354860000000],"value":1}]}"""
+                |> JsonString
                 |> converter.ReadAsViewResult mapping
 
             viewResult.TotalRows
@@ -202,6 +207,7 @@ let tests =
         testCaseAsync "Deserializes a view result with single item keys" <| async {
             let viewResult = 
                 """{"total_rows":133970,"offset":3,"rows":[{"id":"4_imported","key":1354773600000,"value":3},{"id":"10_imported","key":1354860000000,"value":2},{"id":"11_imported","key":1354860000000,"value":1}]}"""
+                |> JsonString
                 |> converter.ReadAsViewResult mapping
 
             viewResult.TotalRows
@@ -234,6 +240,7 @@ let tests =
         testCaseAsync "Deserializes a view result with docs" <| async {
             let viewResult = 
                 """{"total_rows":133970,"offset":3,"rows":[{"id":"4_imported","key":1354773600000,"value":3,"doc":{"type":"my-type","_id":"my-doc-id","_rev":"my-doc-rev","Foo":true,"Bar":17,"Hello":"world","Token":"test token","Thing":{"Descended":15},"OtherThing":"SomethingElse"}},{"id":"10_imported","key":1354860000000,"value":2,"doc":{"type":"my-type","_id":"my-doc-id","_rev":"my-doc-rev","Foo":true,"Bar":17,"Hello":"world","Token":"test token","Thing":{"Descended":15},"OtherThing":"SomethingElse"}},{"id":"11_imported","key":1354860000000,"value":1,"doc":{"type":"my-type","_id":"my-doc-id","_rev":"my-doc-rev","Foo":true,"Bar":17,"Hello":"world","Token":"test token","Thing":{"Descended":15},"OtherThing":"SomethingElse"}}]}"""
+                |> JsonString
                 |> converter.ReadAsViewResult mapping
 
             viewResult.TotalRows
@@ -270,6 +277,7 @@ let tests =
         testCaseAsync "Deserializes a PostPutCopyResponse" <| async {
             let resp = 
                 """{"ok":true,"id":"df8894a5b05cebf60df77bedee000e53","rev":"1-15f65339921e497348be384867bb940f"}"""
+                |> JsonString
                 |> converter.ReadAsPostPutCopyResponse
 
             resp.Okay
@@ -313,6 +321,7 @@ let tests =
                     }
                 ]
                 """
+                |> JsonString
                 |> converter.ReadAsBulkResultList
               
             result

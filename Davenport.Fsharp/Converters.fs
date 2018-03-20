@@ -156,6 +156,14 @@ type DefaultConverter () =
 
     let stringify o = JsonConvert.SerializeObject(o, defaultSerializerSettings)
 
+    /// <summary>
+    /// Stringifies the JsonKind back to JSON. This is intended mainly for logging.
+    /// </summary>
+    let stringifyJsonKind = function 
+        | JsonParseKind.JsonObject o -> stringify o
+        | JsonParseKind.JsonToken t -> stringify t
+        | JsonParseKind.JsonString s -> s
+
     let convertSortListToJsonValues (sorts: Sort list) = 
         // When serialized, we want the json to look like: [{"fieldName1": "asc"}, {"fieldName2": "desc"}]
         let rec inner sorts output = 
@@ -284,8 +292,7 @@ type DefaultConverter () =
                     match System.String.IsNullOrEmpty value with 
                     | true -> None 
                     | false ->
-                        Some (StringProp (canonFieldName, value))
-            )
+                        Some (StringProp (canonFieldName, value)))
 
         yield
             Seq.cast<JProperty> j 
@@ -411,12 +418,12 @@ type DefaultConverter () =
         | _ -> None, token 
 
     override x.ReadAsDocument mapping json = 
-        let (typeName, j) = x.ReadAsJToken mapping (JsonString json)
+        let (typeName, j) = x.ReadAsJToken mapping json
 
         Document(typeName, j, defaultSerializer)
 
     override x.ReadAsViewResult mapping json = 
-        let (_, j) = x.ReadAsJToken mapping (JsonString json) 
+        let (_, j) = x.ReadAsJToken mapping json
         let offset = j.Value<int>("offset")
         let totalRows = j.Value<int>("total_rows")
         
@@ -488,8 +495,7 @@ type DefaultConverter () =
                             None
                         | _ ->
                             JsonToken token 
-                            |> x.ReadAsJToken mapping 
-                            |> fun (typeName, j) -> Document(typeName, j, defaultSerializer)
+                            |> x.ReadAsDocument mapping
                             |> Some
 
             { Id = id; Key = key; Value = tokenToDoc "value"; Doc = tokenToDoc "doc" }
@@ -502,24 +508,30 @@ type DefaultConverter () =
         { TotalRows = totalRows; Offset = offset; Rows = rows}
 
     override x.ReadAsPostPutCopyResponse json =
-        let _, token = x.ReadAsJToken Map.empty (JsonString json)
+        let _, token = x.ReadAsJToken Map.empty json
 
         match token with 
         | PostPutCopyToken t -> t
-        | _ -> failwithf "Failed to read json as PostPutCopyResponse. %s" json
+        | _ -> failwithf "Failed to read json as PostPutCopyResponse. %s" (stringifyJsonKind json)
 
-    override __.ReadAsFindResult mapping json = failwith "not implemented"
+    override x.ReadAsFindResult mapping json = 
+        // x.ReadAsJToken mapping json
+        // |> fun (_, token) -> token.["rows"].AsJEnumerable()
+        // |> Seq.map (JsonToken >> x.ReadAsDocument mapping)
+        // |> List.ofSeq
+
+        failwith "not implemented"
 
     override x.ReadAsBulkResultList json = 
-        x.ReadAsJToken Map.empty (JsonString json)
+        x.ReadAsJToken Map.empty json
         |> fun (_, token) -> token.AsJEnumerable()
         |> Seq.map (function 
             | PostPutCopyToken t -> BulkResult.Inserted t
             | BulkErrorToken t -> BulkResult.Failed t
-            | t -> failwithf "Failed to read json array element as a BulkResult. %s" (JsonConvert.SerializeObject(t, defaultSerializerSettings)))
+            | t -> failwithf "Failed to read json array element as a BulkResult. %s" (stringify t))
         |> List.ofSeq
 
     override x.ReadVersionToken json = 
-        let _, doc = x.ReadAsJToken Map.empty (JsonString json)
+        let _, doc = x.ReadAsJToken Map.empty json
 
         doc.Value<string> "version"

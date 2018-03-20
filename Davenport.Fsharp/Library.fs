@@ -45,7 +45,7 @@ let getRaw id rev props =
 
 let get id rev props = 
     getRaw id rev props
-    |> Async.Map (props.converter.ReadAsDocument props.fieldMapping)
+    |> Async.Map (JsonString >> props.converter.ReadAsDocument props.fieldMapping)
 
 let allDocsRaw includeDocs options props = 
     let includeDocs = 
@@ -67,19 +67,19 @@ let allDocsRaw includeDocs options props =
 
 let allDocs includeDocs options props = 
     allDocsRaw includeDocs options props 
-    |> Async.Map (props.converter.ReadAsViewResult props.fieldMapping)
+    |> Async.Map (JsonString >> props.converter.ReadAsViewResult props.fieldMapping)
 
 let create (document: InsertedDocument<'a>) props = 
     request "" props
     |> body (props.converter.WriteInsertedDocument props.fieldMapping document)
     |> send Post
-    |> Async.Map props.converter.ReadAsPostPutCopyResponse
+    |> Async.Map (JsonString >> props.converter.ReadAsPostPutCopyResponse)
 
 let createWithId id (document: InsertedDocument<'a>) props = 
     request id props
     |> body (props.converter.WriteInsertedDocument props.fieldMapping document)
     |> send Put
-    |> Async.Map props.converter.ReadAsPostPutCopyResponse
+    |> Async.Map (JsonString >> props.converter.ReadAsPostPutCopyResponse)
 
 let update id rev (document: InsertedDocument<'a>) props = 
     props
@@ -87,7 +87,7 @@ let update id rev (document: InsertedDocument<'a>) props =
     |> querystring (props.converter.ConvertRevToMap rev)
     |> body (props.converter.WriteInsertedDocument props.fieldMapping document)
     |> send Put
-    |> Async.Map props.converter.ReadAsPostPutCopyResponse
+    |> Async.Map (JsonString >> props.converter.ReadAsPostPutCopyResponse)
 
 let exists id rev props =
     match rev with 
@@ -105,7 +105,7 @@ let copy oldId newId props =
     request oldId props
     |> headers (Map.ofSeq ["Destination", newId])
     |> send Copy
-    |> Async.Map props.converter.ReadAsPostPutCopyResponse
+    |> Async.Map (JsonString >> props.converter.ReadAsPostPutCopyResponse)
 
 let delete id rev props = 
     props
@@ -131,7 +131,7 @@ let viewRaw designDocName viewName options props =
 let view designDocName viewName options props = 
     props
     |> viewRaw designDocName viewName options
-    |> Async.Map (props.converter.ReadAsViewResult props.fieldMapping)
+    |> Async.Map (JsonString >> props.converter.ReadAsViewResult props.fieldMapping)
 
 /// <summary>
 /// Queries a view and reduces it, returning the raw JSON string.
@@ -150,7 +150,7 @@ let reduceRaw designDocName viewName options props =
 let reduce designDocName viewName options props = 
     props 
     |> reduceRaw designDocName viewName options
-    |> Async.Map (props.converter.ReadAsDocument props.fieldMapping)
+    |> Async.Map (JsonString >> props.converter.ReadAsDocument props.fieldMapping)
 
 let findRaw findOptions selector props =
     props 
@@ -164,7 +164,7 @@ let findRaw findOptions selector props =
 let find (findOptions: FindOption list) selector props = async {
     let! (warning, docs) = 
         findRaw findOptions selector props
-        |> Async.Map (props.converter.ReadAsFindResult props.fieldMapping)
+        |> Async.Map (JsonString >> props.converter.ReadAsFindResult props.fieldMapping)
 
     Option.iter props.onWarning.Trigger warning
 
@@ -215,12 +215,12 @@ let bulkInsert mode (docs: InsertedDocument<'a> list) props =
     |> request "_bulk_docs"
     |> body (props.converter.WriteBulkInsertList props.fieldMapping mode docs)
     |> send Post
-    |> Async.Map props.converter.ReadAsBulkResultList
+    |> Async.Map (JsonString >> props.converter.ReadAsBulkResultList)
 
 let getCouchVersion props =
     request "" props
     |> send Get 
-    |> Async.Map props.converter.ReadVersionToken
+    |> Async.Map (JsonString >> props.converter.ReadVersionToken)
 
 let isVersion2OrAbove = 
     getCouchVersion
