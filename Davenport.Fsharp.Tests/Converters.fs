@@ -43,7 +43,7 @@ let tests =
             OtherThing = SomethingElse
         }
 
-    ftestList "Davenport.Fsharp.Converters" [
+    testList "Davenport.Fsharp.Converters" [
         testCaseAsync "Serializes an InsertedDocument" <| async {
             insertable defaultDoc         
             |> converter.WriteInsertedDocument mapping
