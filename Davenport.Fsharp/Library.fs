@@ -73,13 +73,13 @@ let create (document: InsertedDocument<'a>) props =
     request "" props
     |> body (props.converter.WriteInsertedDocument props.fieldMapping document)
     |> send Post
-    |> Async.Map (props.converter.ReadAsPostPutCopyResponse props.fieldMapping)
+    |> Async.Map props.converter.ReadAsPostPutCopyResponse
 
 let createWithId id (document: InsertedDocument<'a>) props = 
     request id props
     |> body (props.converter.WriteInsertedDocument props.fieldMapping document)
     |> send Put
-    |> Async.Map (props.converter.ReadAsPostPutCopyResponse props.fieldMapping)
+    |> Async.Map props.converter.ReadAsPostPutCopyResponse
 
 let update id rev (document: InsertedDocument<'a>) props = 
     props
@@ -87,7 +87,7 @@ let update id rev (document: InsertedDocument<'a>) props =
     |> querystring (props.converter.ConvertRevToMap rev)
     |> body (props.converter.WriteInsertedDocument props.fieldMapping document)
     |> send Put
-    |> Async.Map (props.converter.ReadAsPostPutCopyResponse props.fieldMapping)
+    |> Async.Map props.converter.ReadAsPostPutCopyResponse
 
 let exists id rev props =
     match rev with 
@@ -105,7 +105,7 @@ let copy oldId newId props =
     request oldId props
     |> headers (Map.ofSeq ["Destination", newId])
     |> send Copy
-    |> Async.Map (props.converter.ReadAsPostPutCopyResponse props.fieldMapping)
+    |> Async.Map props.converter.ReadAsPostPutCopyResponse
 
 let delete id rev props = 
     props

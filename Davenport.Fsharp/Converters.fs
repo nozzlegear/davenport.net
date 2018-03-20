@@ -469,7 +469,7 @@ type DefaultConverter () =
 
         { TotalRows = totalRows; Offset = offset; Rows = rows}
 
-    override __.ReadAsPostPutCopyResponse mapping json = failwith "not implemented"
+    override __.ReadAsPostPutCopyResponse json = failwith "not implemented"
 
     override __.ReadAsFindResult mapping json = failwith "not implemented"
 

@@ -204,7 +204,7 @@ type ICouchConverter() =
     abstract WriteFindSelector: FindOption list -> FindSelector -> string
     abstract ReadAsDocument: FieldMapping -> string -> Document
     abstract ReadAsViewResult: FieldMapping -> string -> ViewResult 
-    abstract ReadAsPostPutCopyResponse: FieldMapping -> string -> PostPutCopyResult
+    abstract ReadAsPostPutCopyResponse: string -> PostPutCopyResult
     abstract ReadAsFindResult: FieldMapping -> string -> FindResult 
     abstract ReadAsBulkResultList: string -> BulkResult list
     abstract ReadVersionToken: string -> string 
