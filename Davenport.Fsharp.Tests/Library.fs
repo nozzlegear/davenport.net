@@ -5,6 +5,7 @@ open Davenport.Fsharp
 open Davenport.Types
 open Expecto
 open Expecto.Flip
+open Utils
 
 type MyUnion =
     | Case1 of string
@@ -78,22 +79,8 @@ let defaultSecondInsert = defaultSecondRecord |> SecondDoc |> insertable
 //     |> designDoc designDocName
 //     |> toSeq
 
-let notNullOrEmpty message = String.IsNullOrEmpty >> Expect.isFalse message
-
-let asyncMap (fn: 'a -> 'b) (task: Async<'a>) = async {
-    let! result = task
-
-    return fn result
-}
-
-let asyncBind (fn: 'a -> Async<'b>) (task: Async<'a>) = async {
-    let! result = task
-    
-    return! fn result
-}
-
 let postPutCopyTuple (task: Async<PostPutCopyResult>) = 
-    asyncMap (fun (d: PostPutCopyResult) -> d.Id, d.Rev, d.Okay) task
+    Async.Map (fun (d: PostPutCopyResult) -> d.Id, d.Rev, d.Okay) task
 
 let mapDoc (doc: Document) = 
     match doc.TypeName with 
@@ -195,10 +182,10 @@ let tests =
             let! (createdId, createdRev, _) = create defaultInsert client |> postPutCopyTuple
             let! doc = 
                 get createdId (Some createdRev) client
-                |> asyncMap mapFirstDoc
+                |> Async.Map mapFirstDoc
 
-            notNullOrEmpty "Id should not be empty" doc.MyId
-            notNullOrEmpty "Rev should not be empty" doc.MyRev
+            Expect.notNullOrEmpty "Id should not be empty" doc.MyId
+            Expect.notNullOrEmpty "Rev should not be empty" doc.MyRev
             Expect.equal "" defaultRecord.Foo doc.Foo
             Expect.equal "" defaultRecord.Bar doc.Bar
             Expect.equal "" defaultRecord.Baz doc.Baz
@@ -208,10 +195,10 @@ let tests =
             let! (createdId, createdRev, _) = create defaultSecondInsert client |> postPutCopyTuple
             let! doc = 
                 get createdId (Some createdRev) client
-                |> asyncMap mapSecondDoc
+                |> Async.Map mapSecondDoc
 
-            notNullOrEmpty "Id should not be empty" doc.DocId
-            notNullOrEmpty "Rev should not be empty" doc.Revision
+            Expect.notNullOrEmpty "Id should not be empty" doc.DocId
+            Expect.notNullOrEmpty "Rev should not be empty" doc.Revision
             Expect.equal ".hello should match" defaultSecondRecord.hello doc.hello
         }
 
@@ -222,8 +209,8 @@ let tests =
         testCaseAsync "Creates docs" <| async {
             let! (docId, docRev, ok) = create defaultInsert client |> postPutCopyTuple
 
-            notNullOrEmpty "Id was empty" docId
-            notNullOrEmpty "Rev was empty" docRev
+            Expect.notNullOrEmpty "Id was empty" docId
+            Expect.notNullOrEmpty "Rev was empty" docRev
             Expect.isTrue "" ok
         }
 
@@ -232,7 +219,7 @@ let tests =
             let! (docId, docRev, ok) = createWithId myId defaultInsert client |> postPutCopyTuple
 
             Expect.equal "Created id and supplied id did not match" docId myId
-            notNullOrEmpty "Rev was empty" docRev
+            Expect.notNullOrEmpty "Rev was empty" docRev
             Expect.isTrue "" ok
         }
 
@@ -240,10 +227,10 @@ let tests =
             let! (createdId, _, _) = create defaultInsert client |> postPutCopyTuple
             let! doc = 
                 get createdId None client
-                |> asyncMap mapFirstDoc
+                |> Async.Map mapFirstDoc
 
-            notNullOrEmpty "Id should not be empty" doc.MyId
-            notNullOrEmpty "Rev should not be empty" doc.MyRev
+            Expect.notNullOrEmpty "Id should not be empty" doc.MyId
+            Expect.notNullOrEmpty "Rev should not be empty" doc.MyRev
             Expect.equal "" defaultRecord.Foo doc.Foo
             Expect.equal "" defaultRecord.Bar doc.Bar
             Expect.equal "" defaultRecord.Baz doc.Baz
@@ -253,7 +240,7 @@ let tests =
             let! exists = 
                 get (Guid.NewGuid().ToString()) None client
                 |> Async.Catch
-                |> asyncMap (function | Choice2Of2 (:? DavenportException as exn) when exn.StatusCode = 404 -> false | _ -> true)
+                |> Async.Map (function | Choice2Of2 (:? DavenportException as exn) when exn.StatusCode = 404 -> false | _ -> true)
 
             Expect.isFalse "Should be false" exists
         }
@@ -301,7 +288,7 @@ let tests =
             let! (createdId, createdRev, _) = create defaultInsert client |> postPutCopyTuple
             let! retrieved =
                 get createdId (Some createdRev) client
-                |> asyncMap mapFirstDoc
+                |> Async.Map mapFirstDoc
 
             let newFoo = "updated_with_davenport_fsharp_wrapper"
             let newData = 
@@ -314,7 +301,7 @@ let tests =
 
             let! updated =
                 get id (Some rev) client
-                |> asyncMap mapFirstDoc
+                |> Async.Map mapFirstDoc
 
             Expect.equal updated.Foo newFoo "Failed to update doc's Foo property."
         }
@@ -415,7 +402,7 @@ let tests =
             let map = Map.ofSeq ["Foo", [EqualTo expected]; "type", [EqualTo MyTestClass.typeName]]
             let! found = 
                 find [] map client
-                |> asyncMap mapListToFirstDocs
+                |> Async.Map mapListToFirstDocs
 
             Expect.isTrue "Should have found at least one MyTestClass doc" (Seq.length found > 0)
             Expect.all "All docs returned should have the expected Foo value." (fun c -> c.Foo = expected) found
@@ -434,7 +421,7 @@ let tests =
             let map = Map.ofSeq ["Foo", [NotEqualTo expected]; "type", [EqualTo MyTestClass.typeName]]
             let! found = 
                 find [] map client
-                |> asyncMap mapListToFirstDocs
+                |> Async.Map mapListToFirstDocs
 
             Expect.isNonEmpty "findByMap should have found at least MyTestClass doc." found
             Expect.all "All docs returned should not have a Foo value equal to the search value." (fun c -> c.Foo <> expected) found
@@ -575,7 +562,7 @@ let tests =
                 |> Map.add "Bat" [EqualTo expected]
                 |> find []
                 <| client
-                |> asyncMap mapListToFirstDocs
+                |> Async.Map mapListToFirstDocs
                 
             Expect.isGreaterThan "Should have returned at least one record." (Seq.length findResult, 0)
             Expect.all "Every returned doc should have a Bat property equal to the expected value." (fun d -> d.Bat = expected) findResult
@@ -604,7 +591,7 @@ let tests =
                 |> Map.add "Bat" [GreaterThan min; LesserThan max]
                 |> find []
                 <| client
-                |> asyncMap mapListToFirstDocs
+                |> Async.Map mapListToFirstDocs
 
             Expect.all "All records returned should be greater than min value and lesser than max value." (fun c -> c.Bat > min && c.Bat < max) result
         }
@@ -623,8 +610,8 @@ let tests =
                 >> create 
                 >> fun fn -> fn client
                 >> postPutCopyTuple
-                >> asyncBind (fun (id, rev, _) -> get id (Some rev) client)
-                >> asyncMap mapFirstDoc
+                >> Async.Bind (fun (id, rev, _) -> get id (Some rev) client)
+                >> Async.Map mapFirstDoc
 
             let! opt = makeAndGet { defaultRecord with Opt = expectedOpt }
             let! unionStr = makeAndGet { defaultRecord with Union = expectedUnionStr }

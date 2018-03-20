@@ -1,5 +1,6 @@
 module Tests.Conveters
 
+open Utils
 open System
 open Expecto
 open Expecto.Flip
@@ -286,6 +287,115 @@ let tests =
         }
 
         testCaseAsync "Deserializes a BulkResult list" <| async {
-            skiptest "Not implemented"
+            let result = 
+                """
+                [
+                    {
+                        "id": "FishStew",
+                        "ok": true,
+                        "rev": "2-2bff94179917f1dec7cd7f0209066fb8"
+                    },
+                    {
+                        "id" : "PotatoStew",
+                        "error" : "conflict",
+                        "reason" : "Document update conflict."
+                    },
+                    {
+                        "id" : "TurkeyStew",
+                        "error" : "forbidden",
+                        "reason" : "A reason that this is forbidden."
+                    },
+                    {
+                        "id" : "ChickenStew",
+                        "error" : "hello_world",
+                        "reason" : "This is a fake error.",
+                        "rev": "A-fake-rev"
+                    }
+                ]
+                """
+                |> converter.ReadAsBulkResultList
+              
+            result
+            |> Seq.tryFind (function | Failed _ -> true | Inserted _ -> false)
+            |> Expect.isSome "Should contain a Failed union"
+
+            result 
+            |> Seq.tryFind (function | Failed _ -> false | Inserted _ -> true)
+            |> Expect.isSome "Should contain an Inserted union"
+
+            result 
+            |> Seq.filter (function | Failed _ -> true | Inserted _ -> false)
+            |> Seq.length
+            |> Expect.equal "Should contain 3 Failed" 3
+
+            result 
+            |> Seq.filter (function | Failed _ -> false | Inserted _ -> true)
+            |> Seq.length
+            |> Expect.equal "Should contain 1 Inserted" 1
+
+            let fishStew = 
+                result 
+                |> Seq.findSome (function | Failed _ -> None | Inserted i -> (if i.Id = "FishStew" then Some i else None))
+                |> Option.get
+
+            fishStew.Id
+            |> Expect.equal "" "FishStew"
+
+            fishStew.Rev 
+            |> Expect.equal "" "2-2bff94179917f1dec7cd7f0209066fb8"
+
+            fishStew.Okay
+            |> Expect.isTrue "FishStew's .Okay should be true"
+
+            let potatoStew = 
+                result 
+                |> Seq.findSome (function | Failed e -> (if e.Id = "PotatoStew" then Some e else None) | _ -> None)
+                |> Option.get
+
+            potatoStew.Id 
+            |> Expect.equal "" "PotatoStew"
+
+            potatoStew.Rev 
+            |> Expect.isNone "PotatoStew should not have a Rev"
+
+            potatoStew.Reason
+            |> Expect.equal "" "Document update conflict."
+
+            potatoStew.Error
+            |> Expect.equal "" BulkErrorType.Conflict
+
+            let turkeyStew = 
+                result 
+                |> Seq.findSome (function | Failed e -> (if e.Id = "TurkeyStew" then Some e else None) | _ -> None)
+                |> Option.get
+
+            turkeyStew.Id
+            |> Expect.equal "" "TurkeyStew"
+
+            turkeyStew.Rev
+            |> Expect.isNone "TurkeyStew should not have a Rev"
+
+            turkeyStew.Reason
+            |> Expect.equal "" "A reason that this is forbidden."
+
+            turkeyStew.Error
+            |> Expect.equal "" BulkErrorType.Forbidden
+
+            let chickenStew = 
+                result 
+                |> Seq.findSome (function | Failed e -> (if e.Id = "ChickenStew" then Some e else None) | _ -> None)
+                |> Option.get
+
+            chickenStew.Id
+            |> Expect.equal "" "ChickenStew"
+
+            chickenStew.Rev
+            |> Expect.equal "ChickenStew should have a Rev" (Some "A-fake-rev") 
+
+            chickenStew.Reason
+            |> Expect.equal "" "This is a fake error."
+
+            chickenStew.Error
+            |> Expect.equal "" (BulkErrorType.Other "hello_world")
         }
     ]

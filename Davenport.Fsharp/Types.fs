@@ -77,19 +77,19 @@ type ViewResult =
 type BulkErrorType = 
     | Conflict
     | Forbidden
-    | Unauthorized
     | Other of string
 
 type BulkErrorReason = string
 
-type BulkDocumentError = 
+type BulkError = 
     { Id: Id
-      ErrorType: BulkErrorType
-      ErrorReason: BulkErrorReason }
+      Error: BulkErrorType
+      Reason: BulkErrorReason
+      Rev: Rev option }
 
 type BulkResult = 
     | Inserted of PostPutCopyResult
-    | Failed of BulkDocumentError
+    | Failed of BulkError
 
 type ViewProps = 
     internal {

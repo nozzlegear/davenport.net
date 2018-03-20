@@ -173,6 +173,38 @@ type DefaultConverter () =
 
         inner sorts []
 
+    let (|PostPutCopyToken|_|) (token: JToken) = 
+        // PostPutCopy objects have a .ok property 
+        match isNull token.["ok"] with 
+        | true -> None 
+        | false -> 
+            { Okay = token.Value<bool>("ok") 
+              Id = token.Value<string>("id")
+              Rev = token.Value<string>("rev") }
+            |> Some
+
+    let (|BulkErrorToken|_|) (token: JToken) =
+        // Bulk document error objects have a .error property
+        match isNull token.["error"] with 
+        | true -> None 
+        | false -> 
+            let error = 
+                match token.Value<string>("error") with 
+                | "conflict" -> Conflict 
+                | "forbidden" -> Forbidden 
+                | s -> BulkErrorType.Other s
+
+            let rev = 
+                token.["rev"]
+                |> Option.ofObj
+                |> Option.map (fun t -> t.Value<string>())
+
+            { Id = token.Value<string>("id")
+              Error = error
+              Reason = token.Value<string>("reason")
+              Rev = rev }
+            |> Some
+
     override __.ConvertListOptionsToMap options = 
         let rec inner remaining qs = 
             match remaining with 
@@ -469,16 +501,23 @@ type DefaultConverter () =
 
         { TotalRows = totalRows; Offset = offset; Rows = rows}
 
-    override x.ReadAsPostPutCopyResponse json = 
+    override x.ReadAsPostPutCopyResponse json =
         let _, token = x.ReadAsJToken Map.empty (JsonString json)
-        
-        { Okay = token.Value<bool>("ok") 
-          Id = token.Value<string>("id")
-          Rev = token.Value<string>("rev") }
+
+        match token with 
+        | PostPutCopyToken t -> t
+        | _ -> failwithf "Failed to read json as PostPutCopyResponse. %s" json
 
     override __.ReadAsFindResult mapping json = failwith "not implemented"
 
-    override __.ReadAsBulkResultList json = failwith "not implemented"
+    override x.ReadAsBulkResultList json = 
+        x.ReadAsJToken Map.empty (JsonString json)
+        |> fun (_, token) -> token.AsJEnumerable()
+        |> Seq.map (function 
+            | PostPutCopyToken t -> BulkResult.Inserted t
+            | BulkErrorToken t -> BulkResult.Failed t
+            | t -> failwithf "Failed to read json array element as a BulkResult. %s" (JsonConvert.SerializeObject(t, defaultSerializerSettings)))
+        |> List.ofSeq
 
     override x.ReadVersionToken json = 
         let _, doc = x.ReadAsJToken Map.empty (JsonString json)

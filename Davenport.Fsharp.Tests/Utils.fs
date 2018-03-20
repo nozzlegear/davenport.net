@@ -23,3 +23,9 @@ module Async =
 
         return! fn result
     }
+
+module Seq = 
+    let findSome fn sequence = 
+        sequence
+        |> Seq.map fn 
+        |> Seq.find Option.isSome    
