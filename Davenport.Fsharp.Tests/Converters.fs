@@ -139,8 +139,6 @@ let tests =
                 """{"total_rows":133970,"offset":3,"rows":[{"id":"4_imported","key":[0,1354773600000],"value":null},{"id":"10_imported","key":[0,1354860000000],"value":null},{"id":"11_imported","key":[0,1354860000000],"value":null}]}"""
                 |> converter.ReadAsViewResult mapping
 
-            printfn "%A" viewResult
-
             viewResult.TotalRows
             |> Expect.equal "Should return correct total row count" 133970
 
