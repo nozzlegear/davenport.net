@@ -156,7 +156,7 @@ let findRaw findOptions selector props =
     props 
     |> request "_find"
     |> body (props.converter.WriteFindSelector findOptions selector)
-    |> send Get
+    |> send Post
 
 /// <summary>
 /// Searches for documents matching the given selector.
