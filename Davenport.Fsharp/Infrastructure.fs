@@ -137,7 +137,7 @@ let send (method: Method) (request: RequestProps) =
         | Put -> HttpMethod.Put
         | Delete -> HttpMethod.Delete
         | Head -> HttpMethod.Head
-        | Copy -> HttpMethod "Copy"
+        | Copy -> HttpMethod "COPY"
 
     let req = new HttpRequestMessage(method, url)
     
