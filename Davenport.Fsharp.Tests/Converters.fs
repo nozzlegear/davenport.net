@@ -291,7 +291,78 @@ let tests =
         }
 
         testCaseAsync "Deserializes a find result" <| async {
-            skiptest "Not implemented"
+            let warning, docs = 
+                """
+                {
+                    "docs": [
+                        {"type":"my-type","_id":"FishStew","_rev":"my-doc-rev","Foo":true,"Bar":17,"Hello":"world","Token":"test token","Thing":{"Descended":15},"OtherThing":"SomethingElse"},
+                        {"type":"my-type","_id":"PotatoStew","_rev":"my-doc-rev","Foo":true,"Bar":17,"Hello":"world","Token":"test token","Thing":{"Descended":15},"OtherThing":"SomethingElse"}
+                    ],
+                    "execution_stats": {
+                        "total_keys_examined": 0,
+                        "total_docs_examined": 200,
+                        "total_quorum_docs_examined": 0,
+                        "results_returned": 2,
+                        "execution_time_ms": 5.52
+                    }
+                }
+                """
+                |> JsonString
+                |> converter.ReadAsFindResult mapping
+
+            warning 
+            |> Expect.isNone "Warning should be None"
+
+            docs 
+            |> Seq.length 
+            |> Expect.equal "Should only have 2 docs" 2
+
+            docs 
+            |> Expect.all "All docs should have 'my-type' type." (fun d -> d.TypeName = Some "my-type")
+
+            let fishStew = 
+                docs 
+                |> Seq.map (fun d -> d.To<MyDoc>())
+                |> Seq.filter (fun d -> d.Id = "FishStew")
+                |> Seq.head
+
+            fishStew 
+            |> Expect.equal "Should equal defaultDoc with Id=FishStew" ({defaultDoc with Id = "FishStew"})
+
+            let potatoStew =
+                docs 
+                |> Seq.map (fun d -> d.To<MyDoc>())
+                |> Seq.filter (fun d -> d.Id = "PotatoStew")
+                |> Seq.head
+
+            potatoStew
+            |> Expect.equal "Should equal defaultDoc with Id=PotatoStew" ({defaultDoc with Id = "PotatoStew"})
+        }
+
+        testCaseAsync "Deserializes a FindResult with a warning and no docs" <| async {
+            let warning, docs = 
+                """
+                {
+                    "docs": [],
+                    "warning": "Hello world",
+                    "execution_stats": {
+                        "total_keys_examined": 0,
+                        "total_docs_examined": 200,
+                        "total_quorum_docs_examined": 0,
+                        "results_returned": 2,
+                        "execution_time_ms": 5.52
+                    }
+                }
+                """
+                |> JsonString
+                |> converter.ReadAsFindResult mapping
+
+            warning 
+            |> Expect.equal "Warning should be Some" (Some "Hello world")
+
+            docs 
+            |> Seq.length 
+            |> Expect.equal "Should have 0 docs" 0
         }
 
         testCaseAsync "Deserializes a BulkResult list" <| async {

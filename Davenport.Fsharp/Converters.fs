@@ -515,12 +515,22 @@ type DefaultConverter () =
         | _ -> failwithf "Failed to read json as PostPutCopyResponse. %s" (stringifyJsonKind json)
 
     override x.ReadAsFindResult mapping json = 
-        // x.ReadAsJToken mapping json
-        // |> fun (_, token) -> token.["rows"].AsJEnumerable()
-        // |> Seq.map (JsonToken >> x.ReadAsDocument mapping)
-        // |> List.ofSeq
+        let _, token = x.ReadAsJToken mapping json 
 
-        failwith "not implemented"
+        let docs = 
+            token.["docs"]
+            |> Option.ofObj 
+            |> Option.map (fun t -> t.AsJEnumerable() |> List.ofSeq)
+            |> Option.defaultValue []
+            |> Seq.map (JsonToken >> x.ReadAsDocument mapping)
+            |> List.ofSeq
+
+        let warning = 
+            token.["warning"]
+            |> Option.ofObj 
+            |> Option.map (fun t -> t.Value<string>())
+
+        warning, docs
 
     override x.ReadAsBulkResultList json = 
         x.ReadAsJToken Map.empty json
