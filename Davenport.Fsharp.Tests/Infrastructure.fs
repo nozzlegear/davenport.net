@@ -1,6 +1,6 @@
 module Tests.Infrastructure
 
-open System
+open Utils
 open Expecto
 open Expecto.Flip
 open Davenport.Infrastructure
