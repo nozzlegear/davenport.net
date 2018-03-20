@@ -231,7 +231,39 @@ let tests =
         }
 
         testCaseAsync "Deserializes a view result with docs" <| async {
-            skiptest "Not implemented"
+            let viewResult = 
+                """{"total_rows":133970,"offset":3,"rows":[{"id":"4_imported","key":1354773600000,"value":3,"doc":{"type":"my-type","_id":"my-doc-id","_rev":"my-doc-rev","Foo":true,"Bar":17,"Hello":"world","Token":"test token","Thing":{"Descended":15},"OtherThing":"SomethingElse"}},{"id":"10_imported","key":1354860000000,"value":2,"doc":{"type":"my-type","_id":"my-doc-id","_rev":"my-doc-rev","Foo":true,"Bar":17,"Hello":"world","Token":"test token","Thing":{"Descended":15},"OtherThing":"SomethingElse"}},{"id":"11_imported","key":1354860000000,"value":1,"doc":{"type":"my-type","_id":"my-doc-id","_rev":"my-doc-rev","Foo":true,"Bar":17,"Hello":"world","Token":"test token","Thing":{"Descended":15},"OtherThing":"SomethingElse"}}]}"""
+                |> converter.ReadAsViewResult mapping
+
+            viewResult.TotalRows
+            |> Expect.equal "Should return correct total row count" 133970
+
+            viewResult.Offset
+            |> Expect.equal "Should return correct offset" 3
+
+            viewResult.Rows
+            |> Seq.length
+            |> Expect.equal "Should return 3 rows" 3
+
+            viewResult.Rows
+            |> Seq.map (fun r -> r.Key)
+            |> Expect.all "All rows should have a single-item key" (function | ViewKey.Key _ -> true | ViewKey.KeyList _ -> false)
+
+            viewResult.Rows
+            |> Seq.map (fun r -> r.Value |> Option.map (fun v -> v.Raw.Type = Linq.JTokenType.Integer))
+            |> Expect.allEqual "All rows should have a Some value" (Some true)
+
+            viewResult.Rows 
+            |> Seq.map (fun r -> r.Doc)
+            |> Expect.all "All rows should have a Some .Doc" Option.isSome
+
+            viewResult.Rows
+            |> Seq.map (fun r -> r.Doc |> Option.map (fun d -> d.To<MyDoc>()) |> Option.get)
+            |> Expect.allEqual "All docs should equal defaultDoc" defaultDoc
+
+            viewResult.Rows
+            |> Seq.map (fun r -> r.Id)
+            |> Expect.all "All rows should have an id" (fun i -> String.length i > 0)
         }
 
         testCaseAsync "Deserializes a PostPutCopyResponse" <| async {
