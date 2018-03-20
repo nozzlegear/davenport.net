@@ -198,6 +198,38 @@ let tests =
             |> Expect.all "All rows should have an id" (fun i -> String.length i > 0)
         }
 
+        testCaseAsync "Deserializes a view result with single item keys" <| async {
+            let viewResult = 
+                """{"total_rows":133970,"offset":3,"rows":[{"id":"4_imported","key":1354773600000,"value":3},{"id":"10_imported","key":1354860000000,"value":2},{"id":"11_imported","key":1354860000000,"value":1}]}"""
+                |> converter.ReadAsViewResult mapping
+
+            viewResult.TotalRows
+            |> Expect.equal "Should return correct total row count" 133970
+
+            viewResult.Offset
+            |> Expect.equal "Should return correct offset" 3
+
+            viewResult.Rows
+            |> Seq.length
+            |> Expect.equal "Should return 3 rows" 3
+
+            viewResult.Rows
+            |> Seq.map (fun r -> r.Key)
+            |> Expect.all "All rows should have a single-item key" (function | ViewKey.Key _ -> true | ViewKey.KeyList _ -> false)
+
+            viewResult.Rows
+            |> Seq.map (fun r -> r.Value |> Option.map (fun v -> v.Raw.Type = Linq.JTokenType.Integer))
+            |> Expect.allEqual "All rows should have a Some value" (Some true)
+
+            viewResult.Rows 
+            |> Seq.map (fun r -> r.Doc)
+            |> Expect.all "All rows should have a None .Doc" Option.isNone
+
+            viewResult.Rows
+            |> Seq.map (fun r -> r.Id)
+            |> Expect.all "All rows should have an id" (fun i -> String.length i > 0)
+        }
+
         testCaseAsync "Deserializes a view result with docs" <| async {
             skiptest "Not implemented"
         }
