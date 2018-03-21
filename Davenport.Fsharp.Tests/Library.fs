@@ -524,7 +524,7 @@ let tests =
                 |> Async.Catch 
 
             match createDesignDoc with 
-            | Choice2Of2 (:? DavenportException as exn) when exn.StatusCode = 409 -> 
+            | Choice2Of2 (:? DavenportException as exn) when exn.Conflict -> 
                 printfn "Design doc already exists."
             | Choice2Of2 (:? DavenportException as exn) -> 
                 printfn "Failed to create design doc. %s. %s" exn.Message exn.ResponseBody
