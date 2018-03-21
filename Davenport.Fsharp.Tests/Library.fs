@@ -202,9 +202,133 @@ let tests =
             Expect.equal ".hello should match" defaultSecondRecord.hello doc.hello
         }
 
-        testCaseAsync "Bulk insert" <| async {
-            skiptest "Not implemented"
+        testCaseAsync "Bulk insert with auto-generated ids" <| async {
+            let! result = 
+                [1..5]
+                |> List.map (fun _ -> defaultRecord |> FirstDoc |> insertable)
+                |> bulkInsert BulkMode.AllowNewEdits 
+                <| client
+
+            result
+            |> List.length 
+            |> Expect.equal "Should return 5 inserts" 5
+
+            result 
+            |> Expect.all "All docs should have inserted without error" (function | BulkResult.Inserted _ -> true | BulkResult.Failed _ -> false)
+
+            let inserted = 
+                result 
+                |> List.map (function | BulkResult.Inserted p -> p | BulkResult.Failed _ -> failwith "Should have 0 failed insertions.")
+
+            inserted
+            |> Expect.all "All inserted docs should have an id" (fun d -> String.length d.Id > 0)
+
+            inserted 
+            |> Expect.all "All inserted docs should have a rev" (fun d -> String.length d.Rev > 0)
+
+            inserted 
+            |> Expect.all "All inserted docs should have a true Okay" (fun d -> d.Okay)
         }
+
+        testCaseAsync "Bulk insert with custom ids" <| async {
+            let ids = 
+                [1..5] 
+                |> List.map (fun _ -> System.Guid.NewGuid() |> string)
+
+            let! result = 
+                ids
+                |> List.map (fun i -> ({ defaultRecord with MyId = i }) |> FirstDoc |> insertable)
+                |> bulkInsert BulkMode.AllowNewEdits 
+                <| client
+
+            result
+            |> List.length 
+            |> Expect.equal "Should return 5 inserts" 5
+
+            result 
+            |> Expect.all "All docs should have inserted without error" (function | BulkResult.Inserted _ -> true | BulkResult.Failed _ -> false)
+
+            let inserted = 
+                result 
+                |> List.map (function | BulkResult.Inserted p -> p | BulkResult.Failed _ -> failwith "Should have 0 failed insertions.")
+
+            inserted
+            |> Expect.all "All inserted docs should have a known id" (fun i -> Seq.contains i.Id ids)
+
+            inserted 
+            |> Expect.all "All inserted docs should have a rev" (fun d -> String.length d.Rev > 0)
+
+            inserted 
+            |> Expect.all "All inserted docs should have a true Okay" (fun d -> d.Okay)
+        }        
+
+        testCaseAsync "Bulk insert with errors" <| async {
+            let ids = 
+                [1..5] 
+                |> List.map (fun _ -> System.Guid.NewGuid() |> string)
+
+            do!
+                ids
+                |> List.map (fun i -> ({ defaultRecord with MyId = i }) |> FirstDoc |> insertable)
+                |> bulkInsert BulkMode.AllowNewEdits 
+                <| client
+                |> Async.Ignore
+
+            let! result = 
+                [1..10]
+                |> List.map (fun i ->
+                    let id = 
+                        if i <= 5 then 
+                            ids.[i - 1] 
+                        else System.Guid.NewGuid() |> string
+
+                    ({ defaultRecord with MyId = id })
+                    |> FirstDoc 
+                    |> insertable)
+                |> bulkInsert BulkMode.AllowNewEdits 
+                <| client 
+
+            result
+            |> List.length 
+            |> Expect.equal "Should return 10 inserts" 10
+
+            result 
+            |> List.fold (fun (containsInsert, containsFailure) d -> match d with | BulkResult.Inserted _ -> (true, containsFailure) | BulkResult.Failed _ -> (containsInsert, true)) (false, false)
+            |> Expect.equal "Should contain both inserts and errors" (true, true)
+
+            let inserted, failed = 
+                result 
+                |> List.fold (fun (inserted, failed) d -> match d with | BulkResult.Inserted p -> (p::inserted, failed) | BulkResult.Failed p -> (inserted, p::failed)) ([], []) 
+
+            inserted 
+            |> List.length 
+            |> Expect.equal "Should return 5 insert successes" 5
+
+            inserted
+            |> Expect.all "All inserted docs should have a known id" (fun i -> Seq.contains i.Id ids)
+
+            inserted 
+            |> Expect.all "All inserted docs should have a rev" (fun d -> String.length d.Rev > 0)
+
+            inserted 
+            |> Expect.all "All inserted docs should have a true Okay" (fun d -> d.Okay)
+
+            failed 
+            |> List.length 
+            |> Expect.equal "Should return 5 insert failures" 5
+
+            failed 
+            |> Expect.all "All failed docs should have Conflict .Error" (fun d -> d.Error = BulkErrorType.Conflict)
+
+            failed 
+            |> Expect.all "All failed docs should have a Reason" (fun d -> String.length d.Reason > 0)
+
+            failed 
+            |> Expect.all "All failed docs should have a known id" (fun d -> Seq.contains d.Id ids)
+
+            failed
+            |> Expect.all "All failed docs should have no Rev" (fun d -> Option.isNone d.Rev)
+        }        
 
         testCaseAsync "Creates docs" <| async {
             let! (docId, docRev, ok) = create defaultInsert client |> postPutCopyTuple
