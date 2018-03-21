@@ -65,7 +65,7 @@ type DatabaseDoc =
 let insertable (doc: DatabaseDoc) : InsertedDocument<obj> =
     match doc with 
     | FirstDoc d -> Some MyTestClass.typeName, d :> obj
-    | SecondDoc d -> Some MyTestClass.typeName, d :> obj
+    | SecondDoc d -> Some MyOtherClass.typeName, d :> obj
 
 let defaultInsert = defaultRecord |> FirstDoc |> insertable
 
@@ -515,12 +515,22 @@ let tests =
             let viewName = "only-bazs-greater-than-10"
 
             // Make sure the design docs exist
-            do! 
+            let! createDesignDoc = 
                 Map.empty
                 |> Map.add viewName ("function (doc) { if (doc.Baz > 10) { emit(doc._id, doc.Baz) }}", None) 
                 |> DesignDoc.doc docName
                 |> createOrUpdateDesignDoc
                 <| client
+                |> Async.Catch 
+
+            match createDesignDoc with 
+            | Choice2Of2 (:? DavenportException as exn) when exn.StatusCode = 409 -> 
+                printfn "Design doc already exists."
+            | Choice2Of2 (:? DavenportException as exn) -> 
+                printfn "Failed to create design doc. %s. %s" exn.Message exn.ResponseBody
+                raise exn 
+            | Choice2Of2 exn -> raise exn
+            | _ -> ()
 
             // Create at least one doc that would match
             do!
