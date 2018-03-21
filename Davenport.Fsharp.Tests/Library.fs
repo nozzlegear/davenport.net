@@ -303,7 +303,8 @@ let tests =
                 get id (Some rev) client
                 |> Async.Map mapFirstDoc
 
-            Expect.equal updated.Foo newFoo "Failed to update doc's Foo property."
+            updated.Foo
+            |> Expect.equal "Failed to update doc's Foo property." newFoo
         }
 
         testCaseAsync "Deletes docs" <| async {
@@ -549,7 +550,7 @@ let tests =
 
             let docValues = 
                 viewResult.Rows
-                |> Seq.map ((fun r -> r.Value) >> Option.get >> fun d -> d.To<int>())
+                |> Seq.map (fun r -> r.Value |> Option.get |> fun d -> d.To<int>())
 
             Expect.isGreaterThan "View should return at least one result" (viewResult.TotalRows, 0)
             Expect.isGreaterThan "Offset should be at least 0" (viewResult.Offset, -1)
