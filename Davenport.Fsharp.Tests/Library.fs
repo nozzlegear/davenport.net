@@ -317,7 +317,7 @@ let tests =
             // Create at least one doc to list
             do! create defaultInsert client |> Async.Ignore
 
-            let! viewResult = allDocs WithDocs [] client
+            let! viewResult = listAll WithDocs [] client
 
             Expect.equal "List offset is not 0." viewResult.Offset 0
             Expect.isTrue "Total rows should be greater than 0" (viewResult.TotalRows > 0)
@@ -358,7 +358,7 @@ let tests =
             // Create at least one doc to list
             do! create defaultInsert client |> Async.Ignore
 
-            let! viewResult = allDocs WithoutDocs [] client
+            let! viewResult = listAll WithoutDocs [] client
 
             Expect.equal "List offset should be 0." viewResult.Offset 0
             Expect.isTrue "Total rows should be greater than 0" (viewResult.TotalRows > 0)

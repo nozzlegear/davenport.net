@@ -47,7 +47,7 @@ let get id rev props =
     getRaw id rev props
     |> Async.Map (JsonString >> props.converter.ReadAsDocument props.fieldMapping)
 
-let allDocsRaw includeDocs options props = 
+let listAllRaw includeDocs options props = 
     let includeDocs = 
         match includeDocs with 
         | WithDocs -> true
@@ -65,8 +65,8 @@ let allDocsRaw includeDocs options props =
     |> querystring qs
     |> send Get
 
-let allDocs includeDocs options props = 
-    allDocsRaw includeDocs options props 
+let listAll includeDocs options props = 
+    listAllRaw includeDocs options props 
     |> Async.Map (JsonString >> props.converter.ReadAsViewResult props.fieldMapping)
 
 let create (document: InsertedDocument<'a>) props = 
@@ -172,7 +172,7 @@ let find (findOptions: FindOption list) selector props = async {
 }
 
 let count = 
-    allDocs WithoutDocs [ListLimit 0] 
+    listAll WithoutDocs [ListLimit 0] 
     >> Async.Map (fun d -> d.TotalRows)
 
 /// <summary>
