@@ -355,17 +355,17 @@ let tests =
         }
 
         testCaseAsync "Lists without docs" <| async {
-            skiptest "Test not implemented. Must make list function return document revisions"
-            // // Create at least one doc to list
-            // do! create defaultRecord client |> Async.Ignore
+            // Create at least one doc to list
+            do! create defaultInsert client |> Async.Ignore
 
-            // let! list = listWithoutDocs None client
+            let! viewResult = allDocs WithoutDocs [] client
 
-            // Expect.equal list.Offset 0 "List offset is not 0."
-            // Expect.isNonEmpty list.Rows "List is empty"
-            // Expect.all list.Rows (fun r -> r.Doc.GetType() = typeof<Davenport.Entities.Revision>) "All docs should be of type Revision"
-            // Expect.all list.Rows (fun r -> not <| r.Id.StartsWith "_design") "No doc should start with _design"
-            // Expect.all list.Rows (fun r -> not <| String.IsNullOrEmpty r.Doc.Rev) "All docs should have a Rev property"
+            Expect.equal "List offset should be 0." viewResult.Offset 0
+            Expect.isTrue "Total rows should be greater than 0" (viewResult.TotalRows > 0)
+            Expect.isNonEmpty "List should not be empty." viewResult.Rows
+
+            viewResult.Rows 
+            |> Expect.all "No row should have a Doc" (fun r -> Option.isNone r.Doc)
         }
 
         // testCaseAsync "Finds docs with an expression" <| async {
