@@ -517,7 +517,7 @@ let tests =
             // Make sure the design docs exist
             do! 
                 Map.empty
-                |> Map.add viewName ("function (doc) { if (doc.Baz > 10 { emit(doc._id, doc.Baz) }) }", None) 
+                |> Map.add viewName ("function (doc) { if (doc.Baz > 10) { emit(doc._id, doc.Baz) }}", None) 
                 |> DesignDoc.doc docName
                 |> createOrUpdateDesignDoc
                 <| client
