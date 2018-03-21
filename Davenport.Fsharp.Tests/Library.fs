@@ -472,7 +472,11 @@ let tests =
 
         testCaseAsync "Creates and deletes databases" <| async {
             let name = "davenport_fsharp_delete_me"
-            let client = "localhost:5984" |> database name
+            let client = 
+                "localhost:5984" 
+                |> database name
+                |> maybeAddUsername couchUsername
+                |> maybeAddPassword couchPassword
 
             do! createDatabase client |> Async.Ignore
 
@@ -507,7 +511,7 @@ let tests =
         }
 
         testCaseAsync "Creates design docs and gets view results" <| async {
-            let docName = "_design/davenport_net_fsharp"
+            let docName = "my-design-doc"
             let viewName = "only-bazs-greater-than-10"
 
             // Make sure the design docs exist
