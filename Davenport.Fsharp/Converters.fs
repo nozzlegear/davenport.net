@@ -340,9 +340,11 @@ type DefaultConverter () =
     }
 
     override __.WriteIndexes name fields = jsonObject {
-        // Desired json looks like { "name" : "index-name", "fields": ["field1", "field2", "field3"]}
+        // Desired json looks like { "name" : "index-name", "index": {fields": ["field1", "field2", "field3"]}}
+        let fieldProp = ArrayProp("fields", fields |> List.map JsonValue.String)
+
         yield StringProp ("name", name)
-        yield ArrayProp ("fields", fields |> List.map JsonValue.String)
+        yield ObjectProp ("index", [fieldProp])
     }
 
     override __.WriteFindSelector options selector = jsonObject {
