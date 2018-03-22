@@ -263,15 +263,21 @@ let createOrUpdateDesignDoc ((id, views): DesignDoc) props =
 
 /// <summary>
 /// Creates indexes for the given fields. This makes querying with the Find methods and selectors faster.
-/// Will throw an ArgumentException if no indexes are given.
 /// </summary>
-let createIndexes (fields: IndexField list) props =
+let createIndexesRaw (fields: IndexField list) props =
     let name = sprintf "%s-indexes" props.databaseName
         
     props
     |> request "_index"
     |> body (props.converter.WriteIndexes name fields)
     |> send Post
+
+/// <summary>
+/// Creates indexes for the given fields. This makes querying with the Find methods and selectors faster.
+/// </summary>
+let createIndexes fields props = 
+    createIndexesRaw fields props
+    |> Async.Map (JsonString >> props.converter.ReadAsIndexInsertResult)
 
 module DesignDoc =
     let doc name views: DesignDoc = name, views

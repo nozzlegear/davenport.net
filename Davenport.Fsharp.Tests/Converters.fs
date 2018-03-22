@@ -478,4 +478,20 @@ let tests =
             chickenStew.Error
             |> Expect.equal "" (BulkErrorType.Other "hello_world")
         }
+
+        testCaseAsync "Deserializes an IndexInsertResult" <| async {
+            let result = 
+                """{"result":"created","id":"_design/a59b81275aafc24187371e9f965af971d06620f3","name":"davenport_net_fsharp-indexes"}"""
+                |> JsonString
+                |> converter.ReadAsIndexInsertResult
+
+            result.Id 
+            |> Expect.equal "" "_design/a59b81275aafc24187371e9f965af971d06620f3"
+
+            result.Name 
+            |> Expect.equal "" "davenport_net_fsharp-indexes"
+
+            result.Result 
+            |> Expect.equal "" CreateResult.Created
+        }
     ]

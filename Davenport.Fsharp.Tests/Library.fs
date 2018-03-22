@@ -777,4 +777,17 @@ let tests =
             Expect.equal "Date should be equal" dateTime.Date expectedDate
             Expect.equal "Decimal should be equal" decimal.Dec expectedDecimal
         }
+
+        testCaseAsync "Creates indexes" <| async {
+            let! result = 
+                ["Foo"; "Bar"]
+                |> createIndexes
+                <| client
+
+            result.Id 
+            |> Expect.notNullOrEmpty "Id should not be null or empty"
+
+            result.Name 
+            |> Expect.notNullOrEmpty "Name should not be null or empty"
+        }
     ]

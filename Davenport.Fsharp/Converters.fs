@@ -547,3 +547,16 @@ type DefaultConverter () =
         let _, doc = x.ReadAsJToken Map.empty json
 
         doc.Value<string> "version"
+
+    override x.ReadAsIndexInsertResult json = 
+        let _, doc = x.ReadAsJToken Map.empty json
+
+        let result = 
+            match doc.Value<string>("result") with 
+            | "created" -> CreateResult.Created
+            | "exists" -> CreateResult.AlreadyExisted
+            | s -> failwithf "Could not deserialize unknown doc.result value \"%s\"." s
+        
+        { Id = doc.Value<string>("id")
+          Name = doc.Value<string>("name")
+          Result = result }

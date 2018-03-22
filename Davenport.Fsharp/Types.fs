@@ -105,7 +105,7 @@ type Method =
     | Head
     | Copy
 
-type CreateDatabaseResult = 
+type CreateResult = 
     | Created
     | AlreadyExisted
 
@@ -171,6 +171,12 @@ type IndexName = string
 
 type IndexField = string
 
+type IndexInsertResult = {
+    Result: CreateResult 
+    Id: Id
+    Name: IndexName
+}
+
 type JsonKey = string
 
 type JsonValue = 
@@ -209,6 +215,7 @@ type ICouchConverter() =
     abstract ReadAsBulkResultList: JsonParseKind -> BulkResult list
     abstract ReadVersionToken: JsonParseKind -> string 
     abstract ReadAsJToken: FieldMapping -> JsonParseKind -> (TypeName option * JToken)
+    abstract ReadAsIndexInsertResult: JsonParseKind -> IndexInsertResult
 
 type CouchProps = 
     internal { 
