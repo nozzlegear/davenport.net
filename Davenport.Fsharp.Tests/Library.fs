@@ -305,7 +305,7 @@ let tests =
             |> Expect.equal "Should return 5 insert successes" 5
 
             inserted
-            |> Expect.all "All inserted docs should have a known id" (fun i -> Seq.contains i.Id ids)
+            |> Expect.all "All inserted docs should have an id" (fun i -> String.length i.Id > 0)
 
             inserted 
             |> Expect.all "All inserted docs should have a rev" (fun d -> String.length d.Rev > 0)
