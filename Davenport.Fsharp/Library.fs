@@ -263,6 +263,7 @@ let createOrUpdateDesignDoc ((id, views): DesignDoc) props =
 
 /// <summary>
 /// Creates indexes for the given fields. This makes querying with the Find methods and selectors faster.
+/// You can safely use this multiple times without fear of accidentally creating duplicate indexes, as CouchDB will return a `CreateResult.AlreadyExisted` if the index already exists.
 /// </summary>
 let createIndexesRaw (fields: IndexField list) props =
     let name = sprintf "%s-indexes" props.databaseName
@@ -274,6 +275,7 @@ let createIndexesRaw (fields: IndexField list) props =
 
 /// <summary>
 /// Creates indexes for the given fields. This makes querying with the Find methods and selectors faster.
+/// You can safely use this multiple times without fear of accidentally creating duplicate indexes, as CouchDB will return a `CreateResult.AlreadyExisted` if the index already exists.
 /// </summary>
 let createIndexes fields props = 
     createIndexesRaw fields props
