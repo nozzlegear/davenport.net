@@ -474,8 +474,19 @@ let tests =
                 |> String.IsNullOrEmpty 
                 |> not
 
-            Expect.all "No doc should have an empty id" hasId mappedDocs
-            Expect.all "No doc should have an empty rev" hasRev mappedDocs
+            // WARNING: I was using Expect.all to check that all docs had an id and a rev,
+            // but it was *extremely* slow for some reason, taking over 2 minutes to iterate through
+            // just 900 docs. Massively improved performance by doing the check with a simple Seq.filter
+            // and Seq.length instead.
+            mappedDocs
+            |> Seq.filter (hasId >> not)
+            |> Seq.length
+            |> Expect.equal "Should be 0 docs without an id" 0 
+
+            mappedDocs
+            |> Seq.filter (hasRev >> not)
+            |> Seq.length 
+            |> Expect.equal "Should be 0 docs without a rev" 0
         }
 
         testCaseAsync "Lists without docs" <| async {
