@@ -126,6 +126,16 @@ type ListOption =
     | Group of bool
     | GroupLevel of int
 
+type IndexName = string 
+
+type IndexField = string
+
+type IndexInsertResult = {
+    Result: CreateResult 
+    Id: Id
+    Name: IndexName
+}
+
 type SortFieldName = string
 
 type Sort = | Sort of SortFieldName * SortOrder
@@ -138,12 +148,19 @@ type FindOperator =
     | GreaterThanOrEqualTo of obj
     | LessThanOrEqualTo of obj
 
+type UseIndex = 
+    | FromDesignDoc of Id
+    | FromDesignDocAndIndex of Id * IndexName
+
 type FindOption = 
     | Fields of string list 
     | SortBy of Sort list 
     | FindLimit of int
     | Skip of int
-    | UseIndex of obj
+    /// <summary>
+    /// Optional: Instructs the query to use a specific index.
+    /// </summary>
+    | UseIndex of UseIndex
 
 type FindResult = Warning option * Document list
 
@@ -166,16 +183,6 @@ type ReduceFunction = string
 type Views = Map<ViewName, MapFunction * ReduceFunction option>
 
 type DesignDoc = Id * Views
-
-type IndexName = string 
-
-type IndexField = string
-
-type IndexInsertResult = {
-    Result: CreateResult 
-    Id: Id
-    Name: IndexName
-}
 
 type JsonKey = string
 

@@ -359,8 +359,15 @@ type DefaultConverter () =
                 getOptions rest (out@[IntProp("limit", l)])
             | FindOption.Skip s::rest ->
                 getOptions rest (out@[IntProp("skip", s)])
-            | UseIndex i::rest ->
-                getOptions rest (out@[RawProp("use_index", stringify i)])
+            | UseIndex (UseIndex.FromDesignDoc i)::rest ->
+                getOptions rest (out@[StringProp("use_index", i)])
+            | UseIndex (UseIndex.FromDesignDocAndIndex (docId, indexName))::rest ->
+                let index = [
+                    JsonValue.String docId
+                    JsonValue.String indexName
+                ]
+
+                getOptions rest (out@[ArrayProp("use_index", index)])
             | [] -> out
 
         let rec getSelector remaining out =

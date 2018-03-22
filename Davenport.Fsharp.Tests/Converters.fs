@@ -57,7 +57,7 @@ let tests =
                     SortBy [Sort("_id", Ascending); Sort("_rev", Descending)] 
                     FindLimit 10
                     FindOption.Skip 3
-                    UseIndex (Map.empty |> Map.add "not_sure" (Map.empty |> Map.add "some_key" 5))
+                    FindOption.UseIndex (FromDesignDocAndIndex ("DesignDocName", "IndexName"))
                 ]
             let selector: FindSelector = 
                 Map.empty 
@@ -65,7 +65,7 @@ let tests =
                 
             selector 
             |> converter.WriteFindSelector options 
-            |> Expect.equal "Should serialize a find selector" """{"fields":["_id"],"sort":[{"_id":"asc"},{"_rev":"desc"}],"limit":10,"skip":3,"use_index":{"not_sure":{"some_key":5}},"selector":{"fieldName":{"$eq":5,"$ne":"test","$gt":{"some_key":5},"$lt":20,"$gte":1,"$lte":15}}}"""
+            |> Expect.equal "Should serialize a find selector" """{"fields":["_id"],"sort":[{"_id":"asc"},{"_rev":"desc"}],"limit":10,"skip":3,"use_index":["DesignDocName","IndexName"],"selector":{"fieldName":{"$eq":5,"$ne":"test","$gt":{"some_key":5},"$lt":20,"$gte":1,"$lte":15}}}"""
         }
 
         testCaseAsync "Serializes indexes" <| async {
