@@ -1,117 +1,189 @@
-module Davenport.Fsharp.Infrastructure
+module Davenport.Infrastructure
 
-open Newtonsoft.Json
-open Newtonsoft.Json.Linq
+open System
+open System.Net.Http
+open System.Net.Http.Headers
+open Types
 
-/// Translates the C# PostPutCopyResponse, which contains a nullable book Ok prop, to F# removing the nullable bool.
-type FsPostPutCopyResponse = {
-    Id: string
-    Rev: string
-    Ok: bool
+module internal Async = 
+    let Map (fn: 't -> 'u) task = async {
+        let! result = task
+
+        return fn result
+    }
+
+    let MapSeq (fn: 't -> 'u) task = async {
+        let! result = task
+
+        return Seq.map fn result
+    }
+
+module internal String = 
+    let Lowercase (s: string) = s.ToLower()
+    let Uppercase (s: string) = s.ToUpper()
+    let EqualsIgnoreCase (s1: string) (s2: string) = String.Equals(s1, s2, StringComparison.OrdinalIgnoreCase)
+
+module internal List = 
+    let ofSingle x = [x]
+    let appendSingle x list = list@[x]
+
+module internal Option = 
+    let iterSeq fn list = list |> Seq.iter (Option.iter fn)
+    let defaultBindWith fn opt = 
+        match opt with 
+        | Some x -> Some x
+        | None -> fn()
+    /// <summary>
+    /// The same as Option.iter, but returns the option so it can be used further.
+    /// </summary>
+    let iter2 fn opt = 
+        opt 
+        |> Option.iter fn 
+
+        opt
+
+module internal Int = 
+    let parse s = 
+        try 
+            System.Int32.Parse s |> Some
+        with 
+        | _ -> None
+
+module internal Long = 
+    let parse s = 
+        try 
+            System.Int64.Parse s |> Some 
+        with 
+        | _ -> None
+
+// /// <summary>
+// /// Converts an F# expression to a LINQ expression, then converts that LINQ expression to a Map<string, Find> due to an incompatibility with the FsDoc and the types expected by Find, Exists and CountByExpression functions.
+// /// </summary>
+// let convertExprToMap<'a> (expr : Expr<'a -> bool>) =
+//     /// Source: https://stackoverflow.com/a/23390583
+//     let linq = LeafExpressionConverter.QuotationToExpression expr
+//     let call = linq :?> MethodCallExpression
+//     let lambda = call.Arguments.[0] :?> LambdaExpression
+    
+//     Expression.Lambda<Func<'a, bool>>(lambda.Body, lambda.Parameters)
+//     |> Davenport.Infrastructure.ExpressionParser.Parse
+
+let rec findDavenportExceptionOrRaise (exn: Exception) = 
+    match exn with 
+    | :? System.AggregateException as exn -> findDavenportExceptionOrRaise exn.InnerException 
+    | :? DavenportException as exn -> exn 
+    | _ -> raise exn
+
+let (|StartsWithProtocol|_|) (s: string) = 
+    [
+        Uri.UriSchemeHttp
+        Uri.UriSchemeHttps
+    ]
+    |> Seq.fold (fun state value -> 
+        match state, value with 
+        | Some x, _ -> Some x
+        | None, scheme when s.StartsWith(scheme, StringComparison.OrdinalIgnoreCase) -> Some s
+        | None, _ -> None) None
+    
+let makeUrl pathSegments (querystring: Map<string, string>) = 
+    let rec combinePaths (remaining: string list) output = 
+        match remaining with 
+        | segment::rest -> combinePaths rest (output@[segment.Trim '/'])
+        | [] -> output
+
+    let ub = 
+        match String.Join("/", combinePaths pathSegments []) with 
+        | StartsWithProtocol s -> s
+        | s -> sprintf "%s%s%s" Uri.UriSchemeHttp Uri.SchemeDelimiter s
+        |> System.UriBuilder
+        
+    ub.Query <- 
+        querystring 
+        |> Seq.map (fun kvp -> sprintf "%s=%s" kvp.Key (System.Net.WebUtility.UrlEncode kvp.Value))
+        |> fun s -> String.Join("&", s)
+
+    ub.ToString()
+
+// Because of the way http connections work, it's best to have one HttpClient instance for the whole application.
+// https://blogs.msdn.microsoft.com/alazarev/2017/12/29/disposable-finalizers-and-httpclient/
+let private httpClient = new HttpClient()
+
+let request path props = { 
+    querystring = None
+    headers = None 
+    body = None
+    couchProps = props
+    path = path
 }
 
-/// This type is combined with the custom json converter to allow consumers of this package to pass any F# record type to Davenport without turning their records into classes that inherit couchdoc.
-type FsDoc<'doctype>() =
-    inherit Davenport.Entities.CouchDoc()
-    member val Data: 'doctype option = None with get,set
+let querystring qs props = { props with querystring = Some qs }
 
-/// The Fable JsonConverter uses a cache, so it's best to just instantiate it once.
-let private fableConverter = Fable.JsonConverter()
+let headers headers props = { props with headers = Some headers }
 
-type FsConverter<'doctype>(idField: string, revField: string, customConverter: JsonConverter option) =
-    inherit JsonConverter()
+let body body props = { props with body = Some body }
 
-    member __.CustomConverter = Option.defaultWith (fun _ -> fableConverter :> JsonConverter) customConverter
+let send (method: Method) (request: RequestProps) = 
+    let props = request.couchProps
 
-    override x.CanConvert objectType =
-        // Only convert objects of the FsDoc<'doctype> type, or objects that the custom converter can convert
-        objectType = typeof<FsDoc<'doctype>> || x.CustomConverter.CanConvert objectType
+    let url = 
+        request.querystring
+        |> Option.defaultValue Map.empty
+        |> makeUrl [props.couchUrl; props.databaseName; request.path]
 
-    override x.ReadJson(reader: JsonReader, objectType: System.Type, existingValue: obj, serializer: JsonSerializer) =
-        if objectType <> typeof<FsDoc<'doctype>>
-        then
-            // Since this method will only be called if the type is FsDoc<'doctype> or a type that can be converted by the
-            // CustomConverter, we can safely use that converter here to read the value.
-            x.CustomConverter.ReadJson(reader, objectType, existingValue, serializer)
-        else
+    let method = 
+        match method with 
+        | Get -> HttpMethod.Get
+        | Post -> HttpMethod.Post
+        | Put -> HttpMethod.Put
+        | Delete -> HttpMethod.Delete
+        | Head -> HttpMethod.Head
+        | Copy -> HttpMethod "COPY"
 
-        let j = JObject.Load reader
-        let id: JToken option = Option.ofObj j.["_id"]
-        let rev: JToken option = Option.ofObj j.["_rev"]
+    let req = new HttpRequestMessage(method, url)
+    
+    match props.username, props.password with 
+    | None, None -> ()
+    | _, _ -> 
+        let username = Option.defaultValue "" props.username
+        let password = Option.defaultValue "" props.password
+        let combined = 
+            sprintf "%s:%s" username password 
+            |> System.Text.Encoding.UTF8.GetBytes 
+            |> System.Convert.ToBase64String
 
-        id
-        |> Option.iter (fun value ->
-            // Rename _id to idField
-            if idField <> "_id" then
-                j.Remove "_id" |> ignore
-                j.Add(idField, value)
-        )
+        req.Headers.Authorization <- AuthenticationHeaderValue("Basic", combined)
+        
+    match request.body with 
+    | None -> ()
+    | Some body -> 
+        let message = 
+            System.Text.Encoding.UTF8.GetBytes body
+            |> fun b -> new ByteArrayContent(b)
 
-        rev
-        |> Option.iter (fun value ->
-            // Rename _rev to revField
-            if revField <> "_rev" then
-                j.Remove "_rev" |> ignore
-                j.Add(revField, value)
-        )
+        message.Headers.ContentType <- MediaTypeHeaderValue "application/json"
+        req.Content <- message
 
-        let data = j.ToObject<'doctype>() // Warning: Adding serializer here causes Fable.JsonConverter to throw an exception when reading F# union types
-        let output = FsDoc<'doctype>()
+    match request.headers with 
+    | None -> ()
+    | Some headers -> Map.iter(fun key value -> req.Headers.Add(key, [value])) headers
 
-        output.Id <-
-            id
-            |> Option.bind (fun id -> id.Value<string>() |> Some)
-            |> Option.defaultValue ""
-        output.Rev <-
-            rev
-            |> Option.bind (fun rev -> rev.Value<string>() |> Some)
-            |> Option.defaultValue ""
-        output.Data <- Some data
+    async {
+        let! response = 
+            httpClient.SendAsync req
+            |> Async.AwaitTask
+        let! rawBody = 
+            response.Content.ReadAsStringAsync()
+            |> Async.AwaitTask
 
-        output :> obj
+        if not response.IsSuccessStatusCode 
+        then 
+            let code = int response.StatusCode
+            let message = 
+                sprintf "Error with %s request for CouchDB database %s at %s. %i %s"
+                    method.Method props.databaseName url code response.ReasonPhrase
 
-    override x.WriteJson(writer: JsonWriter, objValue: obj, serializer: JsonSerializer) =
-        // If the value is not an FsDoc use the Fable.JsonConverter to serialize it.
-        if objValue.GetType() <> typeof<FsDoc<'doctype>>
-        then
-            // Since this method will only be called if the type is FsDoc<'doctype> or a type that can be converted by the
-            // CustomConverter, we can safely use that converter here to write the value.
-            x.CustomConverter.WriteJson(writer, objValue, serializer)
-        else
+            DavenportException(message, code, response.ReasonPhrase, rawBody, url)
+            |> raise
 
-        writer.WriteStartObject()
-
-        let doc = objValue :?> FsDoc<'doctype>
-        let docType = typeof<'doctype>
-
-        // Load the data object into a JObject
-        let j = Option.get doc.Data |> JObject.FromObject
-
-        // Find the data object's id and rev fields.
-        // A JObject field will be null if it doesn't exist, but will return a JToken with Null value if the field does exist and it's null.
-        let id =
-            if isNull j.[idField]
-            then sprintf "Id field '%s' was not found on type %s." idField docType.FullName |> System.ArgumentException |> raise
-            else j.[idField]
-
-        let rev =
-            if isNull j.[revField]
-            then sprintf "Rev field '%s' was not found on type %s." revField docType.FullName |> System.ArgumentException |> raise
-            else j.[revField]
-
-        // Write the _id and _rev values if they aren't null or empty. Writing either one when it isn't intended can make CouchDB throw an error.
-        [id, "_id"; rev, "_rev"]
-        |> Seq.iter (fun (token, name) ->
-            let value = token.Value<string>()
-
-            if System.String.IsNullOrEmpty value |> not then
-                writer.WritePropertyName name
-                writer.WriteValue value
-        )
-
-        // Merge the FsDoc's data property with the doc being written so they're at the same level.
-        Seq.cast<JProperty> j
-        |> Seq.filter (fun prop -> prop.Name <> idField && prop.Name <> revField)
-        |> Seq.iter (fun prop -> prop.WriteTo(writer, [|x.CustomConverter|]))
-
-        writer.WriteEndObject()
+        return rawBody
+    }

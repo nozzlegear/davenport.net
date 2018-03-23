@@ -25,8 +25,8 @@ $csTests | % {
     }
 }
 
-# Execute F# tests
-$output = dotnet run -c Release -p $fsTestProj
+# Execute F# tests with --debug flag which prints test execution length details
+$output = dotnet run -c Release -p $fsTestProj --debug
 
 echo $output
 

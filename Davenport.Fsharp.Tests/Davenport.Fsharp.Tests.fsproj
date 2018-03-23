@@ -5,7 +5,10 @@
     <TargetFramework>netcoreapp2.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Tests.fs" />
+    <Compile Include="Utils.fs" />
+    <Compile Include="Converters.fs" />
+    <Compile Include="Infrastructure.fs" />
+    <Compile Include="Library.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
   <ItemGroup>

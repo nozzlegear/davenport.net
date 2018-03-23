@@ -1,376 +1,291 @@
-module Davenport.Fsharp.Wrapper
+module Davenport.Fsharp
 
-open Davenport.Fsharp.Infrastructure
-open Davenport.Entities
-open Newtonsoft.Json
-open System
-open System.Linq.Expressions
-open Microsoft.FSharp.Quotations
-open Microsoft.FSharp.Linq.RuntimeHelpers
+open Davenport.Infrastructure
+open Davenport.Converters
+open Davenport.Types
 
-type Find =
-    | EqualTo of obj
-    | NotEqualTo of obj
-    | GreaterThan of obj
-    | LesserThan of obj
-    | GreaterThanOrEqualTo of obj
-    | LessThanOrEqualTo of obj
-
-type CouchProps = private {
-    username: string option
-    password: string option
-    converter: JsonConverter option
-    databaseName: string
-    couchUrl: string
-    id: string
-    rev: string
-    onWarning: (IEvent<EventHandler<string>,string> -> unit) option
-}
-
-type ViewProps = private {
-    map: string option
-    reduce: string option
-}
-
-let private defaultCouchProps() = {
-        username = None
-        password = None
-        converter = None
-        databaseName = ""
-        couchUrl = ""
-        id = "_id"
-        rev = "_rev"
-        onWarning = None
-    }
-
-let private defaultViewProps() = {
-    map = None
-    reduce = None
-}
-
-let private toConfig<'doctype> (props: CouchProps) =
-    let config = Davenport.Configuration(props.couchUrl, props.databaseName)
-    config.Username <- Option.defaultValue "" props.username
-    config.Password <- Option.defaultValue "" props.password
-    config.Converter <- FsConverter<'doctype>(props.id, props.rev, props.converter) :> JsonConverter
-
-    props.onWarning
-    |> Option.iter (fun handler -> handler config.Warning)
-
-    config
-
-let private toClient<'doctype> = toConfig<'doctype> >> Davenport.Client<FsDoc<'doctype>>
-
-/// Converts an F# expression to a LINQ expression, then converts that LINQ expression to a Map<string, Find> due to an incompatibility with the FsDoc and the types expected by Find, Exists and CountByExpression functions.
-let private convertExprToMap<'a> (expr : Expr<'a -> bool>) =
-    /// Source: https://stackoverflow.com/a/23390583
-    let linq = LeafExpressionConverter.QuotationToExpression expr
-    let call = linq :?> MethodCallExpression
-    let lambda = call.Arguments.[0] :?> LambdaExpression
-
-    Expression.Lambda<Func<'a, bool>>(lambda.Body, lambda.Parameters)
-    |> Davenport.Infrastructure.ExpressionParser.Parse
-
-let private listedRowToDoctypeRow<'doctype> (row: ListedRow<FsDoc<'doctype>>) =
-    let newRow = ListedRow<'doctype>()
-    newRow.Doc <- Option.get row.Doc.Data
-    newRow.Id <- row.Id
-    newRow.Key <- row.Key
-    newRow.Value <- row.Value
-
-    newRow
-
-let private convertMapToDict (map: Map<string, Find list>) =
-    let rec convert remaining (expression: FindExpression) =
-        match remaining with
-        | EqualTo x::tail ->
-            expression.EqualTo <- x
-            convert tail expression
-        | NotEqualTo x::tail ->
-            expression.NotEqualTo <- x
-            convert tail expression
-        | GreaterThan x::tail ->
-            expression.GreaterThan <- x
-            convert tail expression
-        | LesserThan x::tail ->
-            expression.LesserThan <- x
-            convert tail expression
-        | GreaterThanOrEqualTo x::tail ->
-            expression.GreaterThanOrEqualTo <- x
-            convert tail expression
-        | LessThanOrEqualTo x::tail ->
-            expression.LesserThanOrEqualTo <- x
-            convert tail expression
-        | [] -> expression
-
-    map
-    |> Map.map (fun _ list -> convert list (FindExpression()))
-    |> Collections.Generic.Dictionary
-
-let private convertPostPutCopyResponse (r: PostPutCopyResponse) =
-    // Convert 'Ok' prop to false if it's null.
-    { Id = r.Id
-      Rev = r.Rev
-      Ok = Option.ofNullable r.Ok |> Option.defaultValue false }
-
-let rec private findDavenportExceptionOrRaise (exn: Exception) = 
-    match exn with 
-    | :? System.AggregateException as exn -> findDavenportExceptionOrRaise exn.InnerException 
-    | :? Davenport.Infrastructure.DavenportException as exn -> exn 
-    | _ -> raise exn
-
-let asyncMap (fn: 't -> 'u) task = async {
-    let! result = task
-
-    return fn result
-}
-
-let asyncMapSeq (fn: 't -> 'u) task = async {
-    let! result = task
-
-    return Seq.map fn result
-}
-
-/// Creates a sequence with a length of one out of the object given.
-let toSeq x = Seq.ofList [x]
-
-/// Used to create a DesignDoc view.
-let mapFunction func = { defaultViewProps() with map = Some func }
-
-/// Used to create a DesignDoc view.
-let reduceFunction func props = { props with reduce = Some func }
-
-/// Creates a DesignDoc view object.
-let view name (props: ViewProps) =
-    let v = View()
-    v.Name <- name
-    v.MapFunction <- Option.toObj props.map
-    v.ReduceFunction <- Option.toObj props.reduce
-    v
-
-/// Creates a DesignDoc object for use with the `configureDatabase` and `createDesignDocs` functions.
-let designDoc name (views: View seq) =
-    let d = DesignDocConfig()
-    d.Name <- name
-    d.Views <- views
-    d
+let private defaultProps =  
+    { username = None 
+      password = None 
+      converter = DefaultConverter()
+      databaseName = ""
+      couchUrl = ""
+      onWarning = Event<string>()
+      fieldMapping = Map.empty }
 
 let database name couchUrl =
-    { defaultCouchProps() with databaseName = name; couchUrl = couchUrl }
+    { defaultProps with databaseName = name; couchUrl = couchUrl }
 
 let username username config = { config with username = Some username }
 
 let password password config = { config with password = Some password }
 
-let idField name props = { props with id = name }
+let converter converter props = { props with converter = converter }
 
-let revField name props = { props with rev = name }
+/// <summary>
+/// Map custom field names to the CouchDB _id and _rev fields. This can be used multiple times. Any key that is already set and also exists in the new mapping will be overwritten.
+/// </summary>
+let mapFields mapping (props: CouchProps) = 
+    // Merge the new mapping into the old one, overwriting old keys if necessary.
+    let newMapping = Map.fold (fun state key value -> Map.add key value state) props.fieldMapping mapping
+    { props with fieldMapping = newMapping }
 
-let converter converter props = { props with converter = Some converter }
+let warning handler (props: CouchProps) = 
+    Event.add handler props.onWarning.Publish
+    props
 
-let warning handler props = { props with onWarning = Some handler }
+let getRaw id rev props = 
+    match rev with 
+    | None -> 
+        request id props 
+    | Some rev ->
+        request id props 
+        |> querystring (props.converter.ConvertRevToMap rev)
+    |> send Get
+
+let get id rev props = 
+    getRaw id rev props
+    |> Async.Map (JsonString >> props.converter.ReadAsDocument props.fieldMapping)
+
+let listAllRaw includeDocs options props = 
+    let includeDocs = 
+        match includeDocs with 
+        | WithDocs -> true
+        | WithoutDocs -> false
+        |> string 
+        |> String.Lowercase
+
+    let qs = 
+        options
+        |> props.converter.ConvertListOptionsToMap
+        |> Map.add "include_docs" (string includeDocs)
+
+    props
+    |> request "_all_docs"
+    |> querystring qs
+    |> send Get
+
+let listAll includeDocs options props = 
+    listAllRaw includeDocs options props 
+    |> Async.Map (JsonString >> props.converter.ReadAsViewResult props.fieldMapping)
+
+let create (document: InsertedDocument<'a>) props = 
+    request "" props
+    |> body (props.converter.WriteInsertedDocument props.fieldMapping document)
+    |> send Post
+    |> Async.Map (JsonString >> props.converter.ReadAsPostPutCopyResponse)
+
+let createWithId id (document: InsertedDocument<'a>) props = 
+    request id props
+    |> body (props.converter.WriteInsertedDocument props.fieldMapping document)
+    |> send Put
+    |> Async.Map (JsonString >> props.converter.ReadAsPostPutCopyResponse)
+
+let update id rev (document: InsertedDocument<'a>) props = 
+    props
+    |> request id
+    |> querystring (props.converter.ConvertRevToMap rev)
+    |> body (props.converter.WriteInsertedDocument props.fieldMapping document)
+    |> send Put
+    |> Async.Map (JsonString >> props.converter.ReadAsPostPutCopyResponse)
+
+let exists id rev props =
+    match rev with 
+    | None ->
+        request id props 
+    | Some rev -> 
+        request id props 
+        |> querystring (props.converter.ConvertRevToMap rev)
+    |> send Head
+    |> Async.Catch
+    // Doc exists if CouchDB didn't throw an error status code
+    |> Async.Map (function | Choice1Of2 _ -> true | Choice2Of2 _ -> false) 
+
+let copy oldId newId props = 
+    request oldId props
+    |> headers (Map.ofSeq ["Destination", newId])
+    |> send Copy
+    |> Async.Map (JsonString >> props.converter.ReadAsPostPutCopyResponse)
+
+let delete id rev props = 
+    props
+    |> request id
+    |> querystring (props.converter.ConvertRevToMap rev)
+    |> send Delete
+    |> Async.Ignore
+
+/// <summary>
+/// Queries a view and returns the unparsed JSON string. 
+/// NOTE: This function forces the `reduce` parameter to FALSE, i.e. it will NOT reduce. Use the `reduce` or `reduceRaw` functions instead.
+/// </summary>
+let viewRaw designDocName viewName options props = 
+    (sprintf "_design/%s/_view/%s" designDocName viewName, props)
+    ||> request
+    |> querystring (props.converter.ConvertListOptionsToMap options |> Map.add "reduce" "false")
+    |> send Get
+
+/// <summary>
+/// Queries a view. 
+/// NOTE: This function forces the `reduce` parameter to FALSE, i.e. it will NOT reduce. Use the `reduce` or `reduceRaw` functions instead.
+/// </summary>
+let view designDocName viewName options props = 
+    props
+    |> viewRaw designDocName viewName options
+    |> Async.Map (JsonString >> props.converter.ReadAsViewResult props.fieldMapping)
+
+/// <summary>
+/// Queries a view and reduces it, returning the raw JSON string.
+/// NOTE: This function forces the `reduce` parameter to TRUE< i.e. will ALWAYS reduce. Use the `view` or `ViewRaw` functions to query a view's docs instead.
+/// </summary>
+let reduceRaw designDocName viewName options props = 
+    (sprintf "_design/%s/_view/%s" designDocName viewName, props)
+    ||> request
+    |> querystring (props.converter.ConvertListOptionsToMap options |> Map.add "reduce" "true")
+    |> send Get
+
+/// <summary>
+/// Queries a view and reduces it.
+/// NOTE: This function forces the `reduce` parameter to TRUE< i.e. will ALWAYS reduce. Use the `view` or `ViewRaw` functions to query a view's docs instead.
+/// </summary>
+let reduce designDocName viewName options props = 
+    props 
+    |> reduceRaw designDocName viewName options
+    |> Async.Map (JsonString >> props.converter.ReadAsDocument props.fieldMapping)
+
+let findRaw findOptions selector props =
+    props 
+    |> request "_find"
+    |> body (props.converter.WriteFindSelector findOptions selector)
+    |> send Post
+
+/// <summary>
+/// Searches for documents matching the given selector.
+/// </summary>
+let find (findOptions: FindOption list) selector props = async {
+    let! (warning, docs) = 
+        findRaw findOptions selector props
+        |> Async.Map (JsonString >> props.converter.ReadAsFindResult props.fieldMapping)
+
+    Option.iter props.onWarning.Trigger warning
+
+    return docs
+}
+
+let count = 
+    listAll WithoutDocs [ListLimit 0] 
+    >> Async.Map (fun d -> d.TotalRows)
+
+/// <summary>
+/// Retrieves a count of all documents matching the given selector.
+/// NOTE: Internally this uses the Find API and may be slower than normal operations. Performance may be improved by using indexes.
+/// </summary>
+let countBySelector selector = 
+    // Selectors must use the Find API, which means they must return documents too. Limit the bandwidth by just returning _id.
+    find [Fields ["_id"]] selector
+    >> Async.Map Seq.length
+
+/// <summary>
+/// Checks that a document matching the given selector exists.
+/// NOTE: Internally this uses the Find API and may be slower than normal operations. Performance may be improved by using indexes.
+/// </summary>
+let existsBySelector selector = 
+    // Selectors must use the Find API, which means they must return documents too. Limit the bandwidth by just returning _id.
+    find [Fields ["_id"]] selector
+    >> Async.Catch
+    // Doc exists if CouchDB didn't throw an error status code
+    >> Async.Map (function | Choice1Of2 _ -> true | Choice2Of2 _ -> false) 
+
+/// <summary>
+/// Inserts, updates or deletes multiple documents at the same time. 
+/// 
+/// Omitting the id property from a document will cause CouchDB to generate the id itself.
+/// 
+/// When updating a document, the `_rev` property is required.
+/// 
+/// To delete a document, set the `_deleted` property to `true`. 
+/// 
+/// Note that CouchDB will return in the response an id and revision for every document passed as content to a bulk insert, even for those that were just deleted.  
+/// 
+/// If the `_rev` does not match the current version of the document, then that particular document will not be saved and will be reported as a conflict, but this does not prevent other documents in the batch from being saved. 
+/// 
+/// If the new edits are *not* allowed (to push existing revisions instead of creating new ones) the response will not include entries for any of the successful revisions (since their rev IDs are already known to the sender), only for the ones that had errors. Also, the `"conflict"` error will never appear, since in this mode conflicts are allowed. 
+/// </summary>
+let bulkInsert mode (docs: InsertedDocument<'a> list) props = 
+    props    
+    |> request "_bulk_docs"
+    |> body (props.converter.WriteBulkInsertList props.fieldMapping mode docs)
+    |> send Post
+    |> Async.Map (JsonString >> props.converter.ReadAsBulkResultList)
 
 let getCouchVersion props =
-    toConfig props
-    |> Davenport.Configuration.GetVersionAsync
-    |> Async.AwaitTask
+    request "" props
+    |> send Get 
+    |> Async.Map (JsonString >> props.converter.ReadVersionToken)
 
-let isVersion2OrAbove = Davenport.Configuration.IsVersion2OrAbove
+let isVersion2OrAbove = 
+    getCouchVersion
+    >> Async.Map (fun str ->
+        let version = System.Convert.ToInt32(str.Split('.').[0])
 
+        version >= 2
+    )
+
+/// <summary>
 /// Creates a CouchDB database if it doesn't exist.
+/// </summary>
 let createDatabase props =
-    toConfig props
-    |> Davenport.Configuration.CreateDatabaseAsync
-    |> Async.AwaitTask
+    request "" props
+    |> send Put 
+    |> Async.Catch
+    |> Async.Map (
+        function
+        | Choice1Of2 _ -> Created
+        | Choice2Of2 (:? DavenportException as exn) when exn.StatusCode = 412 -> AlreadyExisted
+        | Choice2Of2 exn -> raise exn
+    )
 
-/// Creates the given design docs. Will check that each view in each design doc has functions that perfectly match the ones found in the database, and update them if they don't match.
-/// Will throw an ArgumentException if no design docs are given.
-let createDesignDocs (docs: Davenport.Entities.DesignDocConfig seq) props =
-    let config = toConfig props
-
-    Davenport.Configuration.CreateDesignDocsAsync(config, docs)
-    |> Async.AwaitTask
-
-/// Creates indexes for the given fields. This makes querying with the Find methods and selectors faster.
-/// Will throw an ArgumentException if no indexes are given.
-let createIndexes (indexes: string seq) props =
-    let config = toConfig props
-
-    Davenport.Configuration.CreateDatabaseIndexesAsync(config, indexes)
-    |> Async.AwaitTask
-
-/// Combines the createDatabase, createDesignDocs and createIndexes functions, running all three at once.
-let configureDatabase (designDocs: Davenport.Entities.DesignDocConfig seq) (indexes: string seq) props = async {
-    let config = toConfig props
-
-    do!
-        Davenport.Configuration.ConfigureDatabaseAsync<FsDoc<obj>>(config, indexes, designDocs)
-        |> Async.AwaitTask
-        |> Async.Ignore
-}
-
+/// <summary>
 /// Deletes the database. This cannot be undone!
-let deleteDatabase props =
-    let client = toClient props
+/// </summary>
+let deleteDatabase =
+    request ""
+    >> send Delete
+    >> Async.Ignore
 
-    client.DeleteDatabaseAsync()
-    |> Async.AwaitTask
+/// <summary>
+/// Creates the given design docs. This is a dumb function and will overwrite the data of any design doc that shares its id.
+/// </summary>
+let createOrUpdateDesignDoc ((id, views): DesignDoc) props =
+    request (sprintf "_design/%s" id) props
+    |> body (props.converter.WriteDesignDoc views)
+    |> send Put
+    |> Async.Ignore
 
-/// Creates the given document and assigns a random id. If you want to choose the id, use the createWithId.
-let create<'doctype> data props =
-    let client = toClient<'doctype> props
-    let doc = FsDoc()
-    doc.Data <- Some data
+/// <summary>
+/// Creates indexes for the given fields. This makes querying with the Find methods and selectors faster.
+/// You can safely use this multiple times without fear of accidentally creating duplicate indexes, as CouchDB will return a `CreateResult.AlreadyExisted` if the index already exists.
+/// </summary>
+let createIndexesRaw (fields: IndexField list) props =
+    let name = sprintf "%s-indexes" props.databaseName
+        
+    props
+    |> request "_index"
+    |> body (props.converter.WriteIndexes name fields)
+    |> send Post
 
-    client.PostAsync doc
-    |> Async.AwaitTask
-    |> asyncMap convertPostPutCopyResponse
+/// <summary>
+/// Creates indexes for the given fields. This makes querying with the Find methods and selectors faster.
+/// You can safely use this multiple times without fear of accidentally creating duplicate indexes, as CouchDB will return a `CreateResult.AlreadyExisted` if the index already exists.
+/// </summary>
+let createIndexes fields props = 
+    createIndexesRaw fields props
+    |> Async.Map (JsonString >> props.converter.ReadAsIndexInsertResult)
 
-/// Creates the document using the given id. This will result in a 409 conflict error if the id is already taken.
-let createWithId<'doctype> id data props =
-    let client = toClient<'doctype> props
-    let doc = FsDoc()
-    doc.Data <- Some data
+module DesignDoc =
+    let doc name views: DesignDoc = name, views
 
-    // Passing a null rev to the PutAsync function will create the doc using the specified id.
-    client.PutAsync(id, doc, null)
-    |> Async.AwaitTask
-    |> asyncMap convertPostPutCopyResponse
+    let addView viewName mapFunc revFunc ((name, previousViews): DesignDoc): DesignDoc = 
+        name, previousViews |> Map.add viewName (mapFunc, revFunc)
 
-/// Updates the document with the given id and revision.
-let update<'doctype> id rev data props =
-    let client = toClient<'doctype> props
-    let doc = FsDoc()
-    doc.Data <- Some data
-
-    client.PutAsync(id, doc, rev)
-    |> Async.AwaitTask
-    |> asyncMap convertPostPutCopyResponse
-
-/// Copies the document with the oldId and assigns the newId to the copy.
-let copy oldId newId props =
-    let client = toClient props
-
-    client.CopyAsync(oldId, newId)
-    |> Async.AwaitTask
-    |> asyncMap convertPostPutCopyResponse
-
-/// Deletes the document with the given id and revision.
-let delete id rev props =
-    let client = toClient props
-
-    client.DeleteAsync(id, rev)
-    |> Async.AwaitTask
-
-/// Executes the view with the given designDocName and viewName.
-let executeView<'returnType> designDocName viewName (viewOptions: ViewOptions option) props =
-    let client = toClient props
-    let options = Option.toObj viewOptions
-
-    client.ViewAsync<'returnType>(designDocName, viewName, options)
-    |> Async.AwaitTask
-
-/// Gets the document with the given id. If a revision is given, that specific version will be returned.
-let get<'doctype> id (rev: string option) props = async {
-    let client = toClient<'doctype> props
-    let! doc =
-        client.GetAsync(id, Option.toObj rev)
-        |> Async.AwaitTask
-        |> Async.Catch
-
-    return
-        match doc with
-        | Choice1Of2 doc -> Option.get doc.Data |> Some // We want this to fail if, for some reason, the jsonconverter was unable to convert FsDoc.Data
-        | Choice2Of2 exn ->
-            match findDavenportExceptionOrRaise exn with 
-            | exn when exn.StatusCode = 404 -> None 
-            | exn -> raise exn
-}
-
-/// Lists all documents on the database.
-let listWithDocs<'doctype> (listOptions: ListOptions option) props = async {
-    let client = toClient<'doctype> props
-    let options = Option.toObj listOptions
-
-    let! result =
-        client.ListWithDocsAsync options
-        |> Async.AwaitTask
-
-    let newRows =
-        result.Rows
-        |> Seq.map listedRowToDoctypeRow<'doctype>
-
-    let response = ListResponse<'doctype>()
-    response.DesignDocs <- result.DesignDocs
-    response.Offset <- result.Offset
-    response.Rows <- newRows
-    response.TotalRows <- result.TotalRows
-
-    return response
-}
-
-/// Lists all documents on the database, but does not return the documents themselves.
-let listWithoutDocs (listOptions: ListOptions option) props =
-    let client = toClient props
-    let options = Option.toObj listOptions
-
-    client.ListWithoutDocsAsync options
-    |> Async.AwaitTask
-
-let private findByDictionary<'doctype> selector (findOptions: FindOptions option) props =
-    let client = toClient<'doctype> props
-    let options = Option.toObj findOptions
-
-    client.FindBySelectorAsync (selector, options)
-    |> Async.AwaitTask
-    |> asyncMapSeq (fun doc -> Option.get doc.Data)
-
-/// Searches for documents matching the given selector.
-let findBySelector<'doctype> = convertMapToDict >> findByDictionary<'doctype>
-
-/// Searches for documents matching the given selector.
-/// Usage: findByExpr<DocType> (<@ fun (c: DocType) -> c.SomeProp = SomeValue @>)
-/// NOTE: Davenport currently only supports simple 1 argument selectors.
-let findByExpr<'doctype> = convertExprToMap<'doctype> >> findByDictionary<'doctype>
-
-/// Returns a count of all documents, *including design documents*.
-let count props =
-    let client = toClient props
-
-    client.CountAsync()
-    |> Async.AwaitTask
-
-let private countByDictionary selector props =
-    let client = toClient props
-
-    client.CountBySelectorAsync selector
-    |> Async.AwaitTask
-
-/// Retrieves a count of all documents matching the given selector.
-let countBySelector = convertMapToDict >> countByDictionary
-
-/// Retrieves a count of all documents matching the given selector.
-/// Usage: countByExpr<DocType> (<@ fun (c: DocType) -> c.SomeProp = SomeValue @>)
-/// NOTE: Davenport currently only supports simple 1 argument selectors.
-let countByExpr<'doctype> = convertExprToMap<'doctype> >> countByDictionary
-
-/// Checks whether a document with the given id exists. If a revision is given, it will check whether that specific version exists.
-let exists id (rev: string option) props =
-    let client = toClient props
-
-    client.ExistsAsync(id, Option.toObj rev)
-    |> Async.AwaitTask
-
-let private existsByDictionary selector props =
-    let client = toClient props
-
-    client.ExistsBySelectorAsync selector
-    |> Async.AwaitTask
-
-/// Checks that a document matching the given selector exists.
-let existsBySelector = convertMapToDict >> existsByDictionary
-
-/// Checks that a document matching the given selector exists.
-/// Usage: existsByExpr<DocType> (<@ fun (c: DocType) -> c.SomeProp = SomeValue @>)
-/// NOTE: Davenport currently only supports simple 1 argument selectors.
-let existsByExpr<'doctype> = convertExprToMap<'doctype> >> existsByDictionary
+    let addViews views ((name, previousViews): DesignDoc): DesignDoc = 
+        name, (Map.fold (fun state key value -> Map.add key value state) previousViews views)

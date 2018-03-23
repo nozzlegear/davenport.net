@@ -9,6 +9,8 @@ Davenport is the comfiest .NET wrapper for CouchDB. Its goal is to simplify inte
 |[![Davenport.Fsharp NuGet](https://img.shields.io/nuget/v/Davenport.Fsharp.svg?maxAge=3600)](https://www.nuget.org/packages/Davenport.Fsharp/)| Davenport.Fsharp package|
 |[![license](https://img.shields.io/github/license/nozzlegear/davenport.net.svg?maxAge=3600)](https://raw.githubusercontent.com/nozzlegear/davenport.net/master/LICENSE)| License|
 
+**Davenport and Davenport.Fsharp will soon be merged into the same Davenport package, with the C# package wrapping the F# package.**
+
 ## Installation
 
 Davenport is published on [Nuget](https://nuget.org/packages/davenport). You can install Davenport from the dotnet command line:
@@ -169,257 +171,171 @@ var docs = await client.FindBySelectorAsync(new Dictionary<string, FindExpressio
 });
 ```
 
-### Getting around `where DocumentType : CouchDoc`
-
-If you chafe under the rule that all documents must inherit from `CouchDoc`, you can circumvent this requirement by passing your own custom `JsonConverter` to the `Configuration` object used when creating a `Client`. In fact, this is exactly what the F# wrapper for Davenport does to allow passing any F# record type to Davenport. Here's the general strategy:
-
-**Step one:** Create a class that inherits from CouchDoc, but has a `Data` property of the type you're expecting to send to CouchDB (or make it accept any type by using `object` as the F# wrapper does):
-
-```cs
-class CouchDocWrapper : CouchDoc
-{
-    public AnotherClass Data { get; set; }
-}
-```
-
-**Step two:** Create a custom JsonConverter that will serialize and deserialize all instances of that wrapper class:
-
-```cs
-class WrapperConverter : JsonConverter
-{
-    public override CanConvert(Type objectType)
-    {
-        // Only convert CouchDocWrapper instances
-        return objectType == typeof(CouchDocWrapper);
-    }
-}
-```
-
-**Step three:** Implement the `ReadJson` override:
-
-```cs
-class WrapperConverter : JsonConverter
-{
-    public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
-    {
-        // This method reads the json returned by CouchDB and converting it to a CouchDocWrapper
-
-        var j = JObject.Load(reader);
-        JToken id = j["_id"]; // Will be null if the field doesn't exist
-        JToken rev = j["_rev"]; // Will be null if the field doesn't exist
-
-        if (id != null)
-        {
-            // Remove the _id field
-            j.Remove("_id");
-        }
-
-        if (rev != null)
-        {
-            // Remove the _rev field
-            j.Remove("_rev");
-        }
-
-        // Let the other converters parse the remaining data to "AnotherClass"
-        var data = j.ToObject<AnotherClass>();
-
-        // Return a CouchDocWrapper
-        return new CouchDocWrapper()
-        {
-            Id = id.Value<string>(),
-            Rev = rev.Value<string>(),
-            Data = data
-        };
-    }
-}
-```
-
-**Step four:** Implement the `WriteJson` override:
-
-```cs
-class WrapperConverter : JsonConverter
-{
-    public override void WriteJson(JsonWriter writer, object objValue, JsonSerializer serializer)
-    {
-        if (objValue == null)
-        {
-            serializer.Serialize(writer, null);
-
-            return;
-        }
-
-        // Because of the CanConvert override we know that this object is going to be a CouchDocWrapper
-        var doc = (CouchDocWrapper) objValue;
-
-        writer.WriteStartObject();
-
-        var id = doc.Id;
-        var rev = doc.Rev;
-        var data = JObject.FromObject(doc.Data);
-
-        // Write the _id and _rev values if they aren't null or empty. Writing either one when it isn't intended can make CouchDB throw an error
-        if (!String.IsNullOrEmpty(id))
-        {
-            writer.WritePropertyName("_id");
-            writer.WriteValue(id);
-        }
-
-        if (!String.IsNullOrEmpty(rev))
-        {
-            writer.WritePropertyName("_rev");
-            writer.WriteValue(rev);
-        }
-
-        // Merge the data property with the doc so they're at the same level
-        foreach (var prop in data.Cast<JProperty>().Where(p => p.Name != "Id" && p.Name != "Rev"))
-        {
-            prop.WriteTo(writer);
-        }
-
-        writer.WriteEndObject();
-    }
-}
-```
-
-And finally, to use your new custom converter, pass it to the Configuration object you use to configure the database or construct the client:
-
-```cs
-var config = new Configuration("http://localhost:5984", "my_database")
-{
-    Converter = new WrapperConverter()
-};
-var client = new Client(config);
-```
-
 ## F\# documentation
 
-I've built Davenport with an F# wrapper for the C# methods, making the package much more functional, idiomatic and easier to use with F#. To install the wrapper, just add the following to your `paket.dependencies` file:
+I had previously build built Davenport with an F# wrapper for the C# methods, making the package much more functional, idiomatic and easier to use with F#. However, I really wanted to make it possible to store several different object types in the same CouchDB database (as is idiomatic for most CouchDB usage). This resulted in a complete rewrite of the F# package; it no longer wraps any C# methods, nor is constrained by any C#-style thinking like it was previously. 
+
+In fact, soon the C# client will be itself rewritten to *wrap the F# client*.
+
+To install the F# package for Davenport, just add the following to your `paket.dependencies` file:
 
 ```sh
-nuget davenport
 nuget davenport.fsharp
 ```
 
-## Fable.JsonConverter
+## Microsoft.FsharpLu.Json JsonConverter
 
-**IMPORTANT**: The default JsonConverter used by the F# package uses the `Fable.JsonConverter` package internally to serialize things like Options, Union Types and so-on to a friendly JSON format that can then be easily deserialized by the same converter.
+**IMPORTANT**: The default `ICouchConverter` in the F# package uses the `Microsoft.FsharpLu.Json.Compact` package internally to serialize things like Options, Union Types and so-on to a friendly JSON format that can then be easily deserialized by the same converter.
 
-To summarize, this means that some values in the CouchDB database may not be in the same format or even the same type that you might be expecting. For example, the converter will convert the `int64` value `123456789L` to a string `"+123456789"`.
+To summarize, this means that some values in the CouchDB database may not be in the same format that you might expect if you had serialized them with a plain `Newtonsoft.Json.JsonConverter`, but it will look much more like "normal" json.
 
-In practice, if you're using Davenport.Fsharp to serialize and deserialize the database's documents everything will work just fine. If you're using other tools to *also* interact with those documents (such as the admin UI or apps built with other languages), you'll need to be aware of how Fable.JsonConverter converts those types.
-
-If you run into problems with this I would strongly recommend building your own JsonConverter and passing it to the database configuration (see usage below). [You can look at the Infrastructure file to see how the `FsConverter` is implemented in Davenport](https://github.com/nozzlegear/davenport.net/blob/02436e8/Davenport.Fsharp/Infrastructure.fs#L18). Your custom converter **must be able to, at the very least, serialize and deserialize the `FsDoc<'doctype>` class.**
-
-### Usage
-
-Note that the code sample below does not cover all functions, just a fraction of them to show what's possible.
+For example, this F# data:
 
 ```fs
-open Davenport.Fsharp.Wrapper
-
 type MyDoc = {
-    MyId: string
-    MyRev: string
-    Foo: string
+    _id: string
+    _rev: string
+    numbers: int option list
 }
 
-let client =
-    "localhost:5984"
-    |> database "my_database" //All requests will be to "my_database"
-    |> idField "MyId" //Map the "MyId" record label to the database's "_id" field
-    |> revField "MyRev" //Map the "MyRev" record label to the database's "_rev" field
-    |> username "username" //Optionally use a username to login
-    |> password "password" //Optionally use a password to login
-    |> converter someJsonConverter //Optionally use your own custom converter. NOTE: This must map your id and rev fields for you.
-
-// Create the database if it doesn't exist
-do! createDatabase client
-
-// Create a doc
-let! myDoc = client |> create ({ MyId = "SomeId"; MyRev = "SomeRev"; Foo = "Hello world!"})
-
-// Get a doc
-let! getResult = client |> get docId None
-let doc =
-    match getResult with
-    | Some d -> d
-    | None -> //No doc was found
-
-// Get a doc by a specific revision
-let! getResult = client |> get docId (Some rev)
-let doc =
-    match getResult with
-    | Some d -> d
-    | None -> //No doc was found
-
-// Find docs by the value of their Foo property. NOTE: Currently the expression parser can only parse simple
-// single condition statements , e.g. it can't combine d.Foo = "Hello world" && d.Bar = 5. To
-// Use more than one condition, use the findBySelector function instead.
-let! docs = client |> findByExpr <@ fun (d: MyDoc) -> d.Foo = "Hello world!" @> None
-// Or use a map
-let! docs = client |> findBySelector (Map.ofSeq ["Foo", EqualTo "Hello world!"; ]) None
+let doc = {
+    _id = "someId"
+    _rev = "someRev"
+    numbers = [Some 5; None; Some 6]
 ```
 
-## Finding by, Counting by and Exists by caveats
+Will get converted to this JSON when sent to CouchDB:
 
-Right now Davenport's expression parser can only parse simple single condition statements when searching with the Find By, Count By and Exists By methods/functions:
-
-```cs
-// This works
-var result = await client.FindByExpressionAsync(doc => doc.Foo == "Hello world");
-
-// This does not work
-var result = await client.FindByExpressionAsync(doc => doc.Foo == "Hello world" && doc.Bar > 5 && doc.Bar <= 15)
-```
-
-```fs
-// This works
-let! result = client |> findByExpr <@ fun (doc: DocType) -> doc.Foo = "Hello world" @> None
-
-// This does not work
-let! result = client |> findByExpr <@ fun (doc: DocType) -> doc.Foo = "Hello world" && doc.Bar > 5 && doc.Bar < 15 @> None
-```
-
-If you need to add more conditions to your searches you can instead use the `Find/Count/ExistsBySelectorAsync` (C#) or the `find/count/existsBySelector` (F#) functions. The same broken queries above could be written like this for each language:
-
-```cs
-// Find documents where Foo = "Hello world" and Bar > 5 and Bar <= 15
-var result = await client.FindBySelectorAsync(new Dictionary<string, FindExpression>()
+```json
 {
-    {
-        "Foo",
-        new FindExpression()
-        {
-            EqualTo = "Hello world"
-        }
-    },
-    {
-        "Bar",
-        new FindExpression()
-        {
-            // Find Bar where it's greater than five and less or equal to 15
-            GreaterThan = 5,
-            LesserThanOrEqualTo = 15
-        }
-    }
-});
+    "_id": "someId",
+    "_rev": "someRev",
+    "numbers": [5, 6]
+}
 ```
+
+Whereas if we had used the default `Newtonsoft.Json.JsonConverter` it would have come out more like this:
+
+```json
+{
+    "_id": "someId",
+    "_rev": "someRev",
+    "numbers": [
+        {
+            "Case": "Some",
+            "Fields": [ 5 ]
+        },
+        null,
+        {
+            "Case": "Some",
+            "Fields": [ 6 ]
+        }
+    ]
+}
+```
+
+## Usage
+
+Where the C# package for Davenport only supports *one* type of document stored per database (and it must extend the `CouchDoc` type), the F# package has no such constraints. It lets you pass in an (optional) map containing type names (which map to custom Id/Rev labels on your records), and then stores those type names with the document. 
+
+When you retrieve the document you'll receive a `string option * Document` tuple -- where the `string option` is the doc's type name if it's found -- which you can use to decide how the document should be deserialized.
+
+### General usage example
 
 ```fs
-let selector =
+
+type FirstDoc = {
+    Id: string
+    Rev: string 
+    Numbers: int option list
+}
+
+type SecondDoc = {
+    DocId: string
+    DocRev: string
+    Hello: string
+}
+
+let docMapping: FieldMapping = 
+    Map.empty 
+    // Tell Davenport to map the 'first-doc' Id to _id and Rev to _rev
+    |> Map.add "first-doc" ("Id", "Rev") 
+    // Tell Davenport to map the 'second-doc' DocId to _id and DocRev to _rev
+    |> Map.add "second-doc" ("DocId", "DocRev")
+
+// Create a client connection
+let client = 
+    "localhost:5984"
+    |> database "my_database" // All requests will be to "my_database"
+    |> mapFields docMapping   // Tell Davenport which types have custom _id/_rev field names.
+    |> username "username"    // Optionally use a username to login
+    |> password "password"    // Optionally use a password to login
+    |> converter someICouchConverter // Optionally use your own custom converter. 
+                                     // NOTE: This must map your id and rev fields for you.
+
+type MyDoc = 
+    | First of FirstDoc
+    | Second of SecondDoc
+
+// The Insertable type tells Davenport what string to store as the `type` prop on the doc.
+let insertable doc: Insertable<obj> = 
+    match doc with 
+    | MyDoc.First as d -> Some "first-doc", d :> obj
+    | MyDoc.Second as d -> Some "second-doc", d :> obj
+
+// Insert multiple documents in one request
+let! bulkInsertResult = 
     [
-        "Foo", [EqualTo "Hello world"]
-        "Bar", [GreaterThan 5; LessThanOrEqualTo 15]
+        // CouchDB will fill in the Id and Rev values when the docs are created
+        { Id = null; Rev = null; Numbers = [Some 5; Some 10] }
+        |> MyDoc.First
+        |> insertable
+
+        { MyId = null; MyRev = null; Hello = "world" }
+        |> MyDoc.Second
+        |> insertable
     ]
-    |> Map.ofSeq
-let! result = client |> findBySelector selector None
+    |> bulkInsert BulkMode.AllowNewEdits
+    <| client
+
+// Next, we'll list all of the documents that were just inserted since CouchDB doesn't 
+// return the full document after insert (only Id and Rev values).
+
+let keys = 
+    bulkInsertResult
+    |> List.filter (function | BulkResult.Inserted _ -> true | BulkResult.Failed _ -> false)
+    |> List.map (fun (d: PostPutCopyResponse) -> d.Id)
+    |> ListOption.Keys
+
+let! listResult = 
+    client
+    |> listAll WithDocs [keys]
+
+let docs = 
+    listResult 
+    |> List.map (fun d ->
+        match d.TypeName with 
+        | Some "first-doc" ->
+            d.To<FirstDoc>()
+            |> MyDoc.First
+            |> Some
+        | Some "second-doc" ->
+            d.To<SecondDoc>()
+            |> MyDoc.Second
+            |> Some
+        | _ ->
+            // Unknown doc type
+            None)
+    |> List.filter Option.isSome
+
+// You now have a list of MyDoc.First and MyDoc.Second!    
 ```
 
-As a final note, none of these methods currently support "or conditions". That is to say, you can't do a search where `Foo == "hello" || Foo == "world"`, but it's something on my radar.
+For more usage examples, check out the Davenport.Fsharp.Tests folder which contains tests for every function in the package.
 
 ## Warnings
 
-Though rare if your database and indexes are configured properly, CouchDB may return a warning with `find` requests, particularly ones that used an index that wasn't configured in your database. Instead of logging to Console.WriteLine, Davenport includes a Warning event on all Configuration objects which you can use to log the message in a way more conducive to your application.
+Though rare if your database and indexes are configured properly, CouchDB may return a warning with `find` requests (and all those that use them: `countBySelector` and `existsBySelector`), particularly `find` requests that used an index that wasn't configured in your database. Instead of logging to Console.WriteLine, Davenport includes a Warning event on all Configuration objects which you can use to log the message in a way more conducive to your application.
 
 To use it in C#:
 
@@ -441,16 +357,13 @@ And to use it in F#:
 let client =
     "localhost:5984"
     |> database "my_database"
-    |> warning (Event.add (fun message -> printfn "%s" message))
+    |> warning (fun message -> printfn "%s" message)
 ```
 
-There are four different events that will create a warning message:
+There are a few different events that will create a warning message:
 
-1. You executed a `FindBy*Async` operation and looked up documents based on indexes (properties) that weren't configured in your database.
-    - Hint: You can use `Davenport.Configuration.ConfigureDatabaseAsync` to create indexes. Using indexes improves the performance of your `FindAsync` calls.
-2. Davenport is updating or creating a design doc when configuring a database.
-3. Your CouchDB installation is using a version less than 2.0.0.
-    - If this is the case, you won't be able to use `FindBy*Async` methods, or any other Davenport methods that use `FindBy*Async` internally, e.g. `ExistsBy*Async` and `CountBy*Async`.
-4. You're attempting to delete a document with `DeleteAsync`, but you don't pass a document revision id.
-    - In some cases, this may cause a document conflict error.
-
+1. (C# and F#) You executed a `Find` operation and looked up documents based on indexes (properties) that weren't configured in your database.
+    - Hint: You can use `Davenport.Configuration.ConfigureDatabaseAsync` in C#, or `createIndexes` in F#. Using indexes improves the performance of any request that uses the `Find` operation (`Find`, `CountBy` and `ExistsBy`).
+2. (C#) Davenport is updating or creating a design doc when configuring a database.
+3. (C#) Your CouchDB installation is using a version less than 2.0.0.
+    - If this is the case, you won't be able to use `Find` methods, or any other request that uses the `Find` operation (`Find`, `CountBy` and `ExistsBy`).
