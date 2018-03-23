@@ -1,3 +1,4 @@
+fsharp.core
 newtonsoft.json
-flurl
-flurl.http
+fable.jsonconverter
+microsoft.fsharplu.json
