@@ -173,7 +173,7 @@ var docs = await client.FindBySelectorAsync(new Dictionary<string, FindExpressio
 
 ## F\# documentation
 
-I had previously build built Davenport with an F# wrapper for the C# methods, making the package much more functional, idiomatic and easier to use with F#. However, I really wanted to make it possible to store several different object types in the same CouchDB database (as is idiomatic for most CouchDB usage). This resulted in a complete rewrite of the F# package; it no longer wraps any C# methods, nor is constrained by any C#-style thinking like it was previously. 
+I had previously built Davenport with an F# wrapper for the C# methods, making the package much more functional, idiomatic and easier to use with F#. However, I really wanted to make it possible to store several different object types in the same CouchDB database (as is idiomatic for most CouchDB usage). This resulted in a complete rewrite of the F# package; it no longer wraps any C# methods, nor is constrained by any C#-style thinking like it was previously. 
 
 In fact, soon the C# client will be itself rewritten to *wrap the F# client*.
 
@@ -183,7 +183,7 @@ To install the F# package for Davenport, just add the following to your `paket.d
 nuget davenport.fsharp
 ```
 
-## Microsoft.FsharpLu.Json JsonConverter
+### Microsoft.FsharpLu.Json JsonConverter
 
 **IMPORTANT**: The default `ICouchConverter` in the F# package uses the `Microsoft.FsharpLu.Json.Compact` package internally to serialize things like Options, Union Types and so-on to a friendly JSON format that can then be easily deserialized by the same converter.
 
@@ -234,7 +234,7 @@ Whereas if we had used the default `Newtonsoft.Json.JsonConverter` it would have
 }
 ```
 
-## Usage
+### Usage
 
 Where the C# package for Davenport only supports *one* type of document stored per database (and it must extend the `CouchDoc` type), the F# package has no such constraints. It lets you pass in an (optional) map containing type names (which map to custom Id/Rev labels on your records), and then stores those type names with the document. 
 
