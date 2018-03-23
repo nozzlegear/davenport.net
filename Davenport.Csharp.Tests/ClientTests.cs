@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
-using Davenport.Entities;
+using Davenport.Csharp;
 using Xunit;
 
 namespace Davenport.Tests

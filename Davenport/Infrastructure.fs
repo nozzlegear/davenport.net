@@ -56,6 +56,11 @@ module internal Long =
         with 
         | _ -> None
 
+let (|NotNullOrEmpty|_|) (s: string) = 
+    match String.IsNullOrEmpty s with 
+    | true -> None
+    | false -> Some s
+
 // /// <summary>
 // /// Converts an F# expression to a LINQ expression, then converts that LINQ expression to a Map<string, Find> due to an incompatibility with the FsDoc and the types expected by Find, Exists and CountByExpression functions.
 // /// </summary>

@@ -5,16 +5,9 @@ open Newtonsoft.Json.Linq
 open Types
 open Infrastructure
 
-// The Fable JsonConverter uses a cache, so it's best to just instantiate it once.
-// let fableConverter = Fable.JsonConverter()
-
-// let defaultSerializerSettings = JsonSerializerSettings()
-// defaultSerializerSettings.NullValueHandling <- NullValueHandling.Ignore
-// defaultSerializerSettings.Converters.Add fableConverter
 let defaultSerializerSettings = Microsoft.FSharpLu.Json.Compact.Internal.Settings.settings
 defaultSerializerSettings.NullValueHandling <- NullValueHandling.Ignore
 defaultSerializerSettings.MissingMemberHandling <- MissingMemberHandling.Ignore
-    // Microsoft.FSharpLu.Json.Default.Internal.DefaultSettings.settings
 
 let defaultSerializer = JsonSerializer.Create(defaultSerializerSettings)
 
