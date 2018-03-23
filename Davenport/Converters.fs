@@ -107,50 +107,6 @@ type JsonObjectBuilder() =
 
 let jsonObject = JsonObjectBuilder()
 
-// 2018-03-13
-// Another problem: our alias types such as InsertedDocument aren't passed to the WriteJson function. Instead
-// they come through as the underlying (string option * 'a) type. 
-//
-// First solution coming to mind is to just dump the json converter and add type-specific functions for reading
-// and writing.
-
-// 2018-03-12
-// Current problem: It's now set up to easily pass the Id and Rev field names when writing to JSON, but
-// this converter currently has no way to know what to parse them back to. That is to say, it knows what 
-// they're named when writing json, but it doesn't know what they're named when reading json.
-// 
-// Easiest solution to this, I think, is having some sane defaults. We can read the _id and _rev properties
-// and also add them to Id and Rev, id and rev, ID and REV, _ID and _REV as long as they don't exist. When 
-// deserialized the JsonConverter will just discard the unnecessary ones.
-//
-// We could then extend those defaults with a field on the couchProps that ofJson and toJson already get.
-// Those two functions will have to somehow assemble/disassemble those fields. Maybe some kind of Union
-// type, CustomFields of (fieldName: string list) * (json: string).
-
-// 2018-03-10
-// Thinking it would be really easy to handle the typenames by making the Davenport methods
-// require a union type of InsertedDoc (typename: string * data: obj). We don't need to care about
-// the deserialized data type because the dev will be able determine that using the type string.
-// It could even use a union type for the data object, letting users pass a raw json string or an
-// object that will be stringified by the converter.
-
-// 2018-03-06 16:50 
-// Current intended usage:
-// singleDocType typeof<RandomType> "random-type"
-// |> ...configure other client stuff
-// |> get id rev
-// |> fun (typeName, jtoken, defaultConverter) -> if typeName == "random-type" then jtoken.ToObject<RandomType>()
-// for custom deserialization
-// OR
-// |> deserialize<RandomType> for default deserialization
-
-// 2018-03-05 
-// Trying to figure out how to get from this point, where we know the string type that was written by x.WriteJson,
-// to converting the result to a union type.
-// Maybe add a `multipleDocTypes` function to the library itself, and that function accepts a list of the TypeString * System.Type * Id field * Rev field
-// to map all the types it will deal with. Then the original FsConverter receives those types (if it's not in multiple doc mode the converter still receives the
-// list, just with one single element.)
-
 type DefaultConverter () = 
     inherit ICouchConverter()
 
