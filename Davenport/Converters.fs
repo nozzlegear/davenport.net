@@ -203,6 +203,9 @@ type DefaultConverter () =
             | GroupLevel l::rest ->
                 Map.add "group_level" (string l) qs
                 |> inner rest
+            | IncludeDocs i::rest ->
+                Map.add "include_docs" (string i) qs 
+                |> inner rest
             | [] -> qs
 
         inner options Map.empty

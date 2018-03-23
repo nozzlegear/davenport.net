@@ -9,18 +9,67 @@ open System.Threading.Tasks
 open Newtonsoft.Json
 open System.Collections.Generic
 
-[<AbstractClass>]
-type CouchDoc() = 
-    abstract member Id: string with get, set
-    abstract member Rev: string with get, set
+module Types = 
 
-type Configuration(couchUrl: string, databaseName: string) = 
-    member val CouchUrl = couchUrl with get, set
-    member val DatabaseName = databaseName with get, set
-    member val Username = "" with get, set
-    member val Password = "" with get, set
-    member val JsonConverter: JsonConverter = null with get, set
-    member val Warning: EventHandler<string> = null with get, set
+    [<AbstractClass>]
+    type CouchDoc() = 
+        abstract member Id: string with get, set
+        abstract member Rev: string with get, set
+
+    type Revision(rev) = 
+        new() = Revision("")
+        member val Rev: string = rev with get, set
+
+    type ListedRow<'doctype>(doc) = 
+        member val Id = "" with get, set
+        member val Key: obj = null with get, set
+        member val Value: Revision = Revision("") with get, set
+        member val Doc: 'doctype = doc with get, set
+
+    type ListResponse<'doctype>() = 
+        member val Offset = 0 with get, set
+        member val TotalRows = 0 with get, set 
+        member val Rows: IEnumerable<ListedRow<'doctype>> = Seq.empty with get, set
+        member val DesignDocs: IEnumerable<ListedRow<obj>> = Seq.empty with get, set
+
+    type ViewResult<'value, 'doc>(value) = 
+        member val Key: obj = null with get, set 
+        member val Value: 'value = value with get, set
+        member val Doc: 'doc option = None with get, set
+
+    type ViewConfig() = 
+        member val Name: string = "" with get, set
+        member val MapFunction: string = "" with get, set
+        member val ReduceFunction: string = "" with get, set
+
+    type DesignDocument() = 
+        inherit CouchDoc()
+        override val Id = "" with get, set
+        override val Rev = "" with get, set
+        member val Views: IEnumerable<ViewConfig> = Seq.empty with get, set
+
+    type ListOptions() = 
+        member val Limit = System.Nullable<int>() with get, set
+        member val Key: obj = null with get, set
+        member val Keys: obj seq = Seq.empty with get, set
+        member val StartKey: obj = null with get, set
+        member val EndKey: obj = null with get, set
+        member val InclusiveEnd = System.Nullable<bool>() with get, set
+        member val Descending = System.Nullable<bool>() with get, set
+        member val Skip = System.Nullable<int>() with get, set
+        member val Group = System.Nullable<bool>() with get, set
+        member val GroupLevel = System.Nullable<int>() with get, set
+
+    type Configuration(couchUrl: string, databaseName: string) = 
+        member val CouchUrl = couchUrl with get, set
+        member val DatabaseName = databaseName with get, set
+        member val Username = "" with get, set
+        member val Password = "" with get, set
+        member val JsonConverter: JsonConverter = null with get, set
+        member val Warning: EventHandler<string> = null with get, set
+
+open Types
+open System.Collections
 
 type Client<'doctype when 'doctype :> CouchDoc>(config: Configuration) = 
     let maybeAddConverter (converter: JsonConverter option) (props: CouchProps) =
@@ -49,6 +98,37 @@ type Client<'doctype when 'doctype :> CouchDoc>(config: Configuration) =
         |> mapFields (Map.empty |> Map.add typeName ("Id", "Rev"))
 
     let toDoc (d: Document) = d.To<'doctype>()
+
+    let toDesignDoc (d: Document): DesignDocument = 
+        failwith "not implemented"
+
+    let listOptionsToFs (o: ListOptions) = 
+        let keysToOption (k: obj seq) = 
+            match List.ofSeq k with 
+            | [] -> None 
+            | keys -> ListOption.Keys keys |> Some
+
+        let descendingToOption (d: bool option) = 
+            match d with 
+            | Some true -> Some (ListOption.Direction SortOrder.Descending)
+            | Some false -> Some (ListOption.Direction SortOrder.Ascending )
+            | _ -> None
+
+        [
+            Option.ofNullable o.Limit |> Option.map ListOption.ListLimit
+            Option.ofObj o.Key |> Option.map ListOption.Key 
+            keysToOption o.Keys
+            Option.ofObj o.StartKey |> Option.map ListOption.StartKey
+            Option.ofObj o.EndKey |> Option.map ListOption.EndKey 
+            Option.ofNullable o.InclusiveEnd |> Option.map ListOption.InclusiveEnd
+            Option.ofNullable o.Descending |> descendingToOption
+            Option.ofNullable o.Skip |> Option.map ListOption.Skip
+            Option.ofNullable o.Group |> Option.map ListOption.Group 
+            Option.ofNullable o.GroupLevel |> Option.map ListOption.GroupLevel
+            // Do not include the Reduce option in this list, as the view function will figure that out instead.
+        ]
+        |> List.filter Option.isSome 
+        |> List.map Option.get
 
     let task = Async.StartAsTask
 
@@ -97,7 +177,7 @@ type Client<'doctype when 'doctype :> CouchDoc>(config: Configuration) =
     member __.ExistsBySelectorAsync (dict): Task<bool> = 
         failwith "Not implemented"
 
-    member __.ListWithDocsAsync (?options): Task<ListResponse<DocumentType>> =
+    member __.ListWithDocsAsync (?options): Task<ListResponse<'doctype>> =
         failwith "Not implemented"
 
     member __.ListWithoutDocsAsync (?options): Task<ListResponse<Revision>> = 
@@ -124,10 +204,38 @@ type Client<'doctype when 'doctype :> CouchDoc>(config: Configuration) =
         |> delete id rev 
         |> task
 
-    member __.ViewAsync<'returnType> (designDocName, viewName, ?options): Task<IEnumerable<ViewResult<'returnType>>> = 
-        // TODO: Determine if we should use the `view` or `reduce` functions based on the options passed in.
-        failwith "Not implemented"
+    member __.ViewAsync<'returnType, 'docType> (designDocName, viewName, ?options: ListOptions): Task<IEnumerable<ViewResult<'returnType, 'docType>>> = 
+        options
+        |> Option.map (listOptionsToFs)
+        |> Option.defaultValue []
+        |> view designDocName viewName
+        <| client
+        |> Async.Map (fun result -> result.Rows)
+        |> Async.MapSeq (fun row ->
+                let vr = ViewResult<'returnType, 'docType>(row.Value.Value.To<'returnType>())
+                vr.Key <- row.Key 
+                vr.Doc <- row.Doc |> Option.map (fun d -> d.To<'docType>())
+                vr )
+        |> task
 
+    member __.ReduceAsync<'returnType> (designDocName, viewName, ?options) = 
+        failwith "not implemented"
+
+    /// <summary>
+    /// Inserts, updates or deletes multiple documents at the same time. 
+    /// 
+    /// Omitting the id property from a document will cause CouchDB to generate the id itself.
+    /// 
+    /// When updating a document, the `_rev` property is required.
+    /// 
+    /// To delete a document, set the `_deleted` property to `true`. 
+    /// 
+    /// Note that CouchDB will return in the response an id and revision for every document passed as content to a bulk insert, even for those that were just deleted.  
+    /// 
+    /// If the `_rev` does not match the current version of the document, then that particular document will not be saved and will be reported as a conflict, but this does not prevent other documents in the batch from being saved. 
+    /// 
+    /// If the new edits are *not* allowed (to push existing revisions instead of creating new ones) the response will not include entries for any of the successful revisions (since their rev IDs are already known to the sender), only for the ones that had errors. Also, the `"conflict"` error will never appear, since in this mode conflicts are allowed. 
+    /// </summary>
     member __.BulkInsert (allowNewEdits: bool, docs: IEnumerable<'doctype>): Task<IEnumerable<BulkResult>> = 
         let mode = 
             match allowNewEdits with 
@@ -142,18 +250,32 @@ type Client<'doctype when 'doctype :> CouchDoc>(config: Configuration) =
         |> Async.Map Seq.ofList
         |> task
 
+    /// <summary>
+    /// Creates a CouchDB database if it doesn't exist.
+    /// </summary>
     member __.CreateDatabaseAsync(): Task<CreateResult> = 
         client 
         |> createDatabase 
         |> task
 
+    /// <summary>
+    /// Deletes the database. This cannot be undone!
+    /// </summary>
     member __.DeleteDatabaseAsync(): Task<unit> = 
         client 
         |> deleteDatabase 
         |> task
 
-    member __.CreateOrUpdateDesignDocAsync (doc): Task<IEnumerable<PostPutCopyResult>> = 
-        failwith "Not implemented"
+    /// <summary>
+    /// Creates the given design docs. This is a dumb function and will overwrite the data of any design doc that shares its id.
+    /// </summary>
+    member __.CreateOrUpdateDesignDocAsync (name: string, views: IEnumerable<ViewConfig>): Task<unit> = 
+        views 
+        |> Seq.fold (fun views view -> views |> Map.add view.Name (view.MapFunction, Option.ofString view.ReduceFunction)) Map.empty
+        |> DesignDoc.doc name
+        |> createOrUpdateDesignDoc
+        <| client 
+        |> task
 
     member __.CreateIndexesAsync (indexes: IEnumerable<string>): Task<IndexInsertResult> = 
         client 

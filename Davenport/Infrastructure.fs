@@ -5,6 +5,11 @@ open System.Net.Http
 open System.Net.Http.Headers
 open Types
 
+let (|NotNullOrEmpty|_|) (s: string) = 
+    match String.IsNullOrEmpty s with 
+    | true -> None
+    | false -> Some s
+
 module internal Async = 
     let Map (fn: 't -> 'u) task = async {
         let! result = task
@@ -41,6 +46,10 @@ module internal Option =
         |> Option.iter fn 
 
         opt
+    let ofString s = 
+        match s with 
+        | NotNullOrEmpty s -> Some s
+        | _ -> None
 
 module internal Int = 
     let parse s = 
@@ -55,11 +64,6 @@ module internal Long =
             System.Int64.Parse s |> Some 
         with 
         | _ -> None
-
-let (|NotNullOrEmpty|_|) (s: string) = 
-    match String.IsNullOrEmpty s with 
-    | true -> None
-    | false -> Some s
 
 // /// <summary>
 // /// Converts an F# expression to a LINQ expression, then converts that LINQ expression to a Map<string, Find> due to an incompatibility with the FsDoc and the types expected by Find, Exists and CountByExpression functions.
