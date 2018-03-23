@@ -125,6 +125,7 @@ type ListOption =
     | Reduce of bool
     | Group of bool
     | GroupLevel of int
+    | IncludeDocs of bool
 
 type IndexName = string 
 
@@ -165,10 +166,6 @@ type FindOption =
 type FindResult = Warning option * Document list
 
 type FindSelector = Map<string, FindOperator list>        
-
-type IncludeDocs = 
-    | WithDocs
-    | WithoutDocs
 
 type BulkMode = 
     | AllowNewEdits
