@@ -60,6 +60,14 @@ module Types =
         member val Group = System.Nullable<bool>() with get, set
         member val GroupLevel = System.Nullable<int>() with get, set
 
+    type FindExpression() = 
+        member val EqualTo: obj = null with get, set
+        member val NotEqualTo: obj = null with get, set
+        member val GreaterThan: obj = null with get, set
+        member val GreaterThanOrEqualTo: obj = null with get, set
+        member val LesserThan: obj = null with get, set
+        member val LesserThanOrEqualTo: obj = null with get, set
+
     type Configuration(couchUrl: string, databaseName: string) = 
         member val CouchUrl = couchUrl with get, set
         member val DatabaseName = databaseName with get, set
@@ -130,6 +138,23 @@ type Client<'doctype when 'doctype :> CouchDoc>(config: Configuration) =
         |> List.filter Option.isSome 
         |> List.map Option.get
 
+    let findExpressionToFs (o: FindExpression) = 
+        [
+            Option.ofObj o.EqualTo |> Option.map FindOperator.EqualTo
+            Option.ofObj o.NotEqualTo |> Option.map FindOperator.NotEqualTo
+            Option.ofObj o.GreaterThan |> Option.map FindOperator.GreaterThan
+            Option.ofObj o.GreaterThanOrEqualTo |> Option.map FindOperator.GreaterThanOrEqualTo
+            Option.ofObj o.LesserThan |> Option.map FindOperator.LesserThan 
+            Option.ofObj o.LesserThanOrEqualTo |> Option.map FindOperator.LessThanOrEqualTo
+        ]
+        |> List.filter Option.isSome
+        |> List.map Option.get
+
+    let dictToMap fn (dict: Dictionary<'a, 'b>) = 
+        dict 
+        |> Seq.map (fun kvp -> kvp.Key, fn kvp.Value)
+        |> Map.ofSeq
+
     let task = Async.StartAsTask
 
     new(couchUrl, databaseName) = Client(Configuration(couchUrl, databaseName))
@@ -143,11 +168,13 @@ type Client<'doctype when 'doctype :> CouchDoc>(config: Configuration) =
     member __.FindByExpressionAsync (exp, ?options): Task<IEnumerable<'doctype>> = 
         failwith "Not implemented"
 
-    member __.FindByObjectAsync (obj, ?options): Task<IEnumerable<'doctype>> =
-        failwith "Not implemented"
-
     member __.FindBySelectorAsync (dict, ?options): Task<IEnumerable<'doctype>> = 
-        failwith "Not implemented"
+        // TODO: Convert options param to FindOption list
+        dict 
+        |> dictToMap findExpressionToFs 
+        |> find options 
+        <| client 
+        |> task
 
     member __.CountAsync(): Task<int> = 
         client 
@@ -157,11 +184,12 @@ type Client<'doctype when 'doctype :> CouchDoc>(config: Configuration) =
     member __.CountByExpressionAsync (exp): Task<int> = 
         failwith "Not implemented"
 
-    member __.CountByObjectAsync (obj): Task<int> =
-        failwith "Not implemented"
-
     member __.CountBySelectorAsync (dict): Task<int> = 
-        failwith "Not implemented"
+        dict
+        |> dictToMap findExpressionToFs 
+        |> countBySelector 
+        <| client
+        |> task
 
     member __.ExistsAsync (id, ?rev: string): Task<bool> = 
         client 
@@ -171,11 +199,12 @@ type Client<'doctype when 'doctype :> CouchDoc>(config: Configuration) =
     member __.ExistsByExpressionAsync (expr): Task<bool> = 
         failwith "Not implemented"
 
-    member __.ExistsByObjectAsync (obj): Task<bool> = 
-        failwith "Not implemented"
-
     member __.ExistsBySelectorAsync (dict): Task<bool> = 
-        failwith "Not implemented"
+        dict 
+        |> dictToMap findExpressionToFs
+        |> existsBySelector
+        <| client
+        |> task
 
     member __.ListWithDocsAsync (?options): Task<ListResponse<'doctype>> =
         failwith "Not implemented"
