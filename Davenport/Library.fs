@@ -160,7 +160,7 @@ let find (findOptions: FindOption list) selector props = async {
 }
 
 let count = 
-    listAll WithoutDocs [ListLimit 0] 
+    listAll [ListLimit 0; IncludeDocs false] 
     >> Async.Map (fun d -> d.TotalRows)
 
 /// <summary>
