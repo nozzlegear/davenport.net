@@ -32,8 +32,8 @@ module Types =
         member val Rows: IEnumerable<ListedRow<'doctype>> = Seq.empty with get, set
         member val DesignDocs: IEnumerable<ListedRow<obj>> = Seq.empty with get, set
 
-    type ViewResult<'value, 'doc>(value) = 
-        member val Key: obj = null with get, set 
+    type ViewResponse<'value, 'doc>(key, value) = 
+        member val Key: ViewKey = key with get, set 
         member val Value: 'value = value with get, set
         member val Doc: 'doc option = None with get, set
 
@@ -204,22 +204,35 @@ type Client<'doctype when 'doctype :> CouchDoc>(config: Configuration) =
         |> delete id rev 
         |> task
 
-    member __.ViewAsync<'returnType, 'docType> (designDocName, viewName, ?options: ListOptions): Task<IEnumerable<ViewResult<'returnType, 'docType>>> = 
+    /// <summary>
+    /// Queries a view. 
+    /// NOTE: This function forces the `reduce` parameter to FALSE, i.e. it will NOT reduce. Use the `reduce` functions instead.
+    /// </summary>
+    member __.ViewAsync<'returnType, 'docType> (designDocName, viewName, ?options): Task<IEnumerable<ViewResponse<'returnType, 'docType>>> = 
         options
-        |> Option.map (listOptionsToFs)
+        |> Option.map listOptionsToFs
         |> Option.defaultValue []
         |> view designDocName viewName
         <| client
         |> Async.Map (fun result -> result.Rows)
         |> Async.MapSeq (fun row ->
-                let vr = ViewResult<'returnType, 'docType>(row.Value.Value.To<'returnType>())
-                vr.Key <- row.Key 
+                let vr = ViewResponse<'returnType, 'docType>(row.Key, row.Value.Value.To<'returnType>())
                 vr.Doc <- row.Doc |> Option.map (fun d -> d.To<'docType>())
                 vr )
         |> task
 
-    member __.ReduceAsync<'returnType> (designDocName, viewName, ?options) = 
-        failwith "not implemented"
+    /// <summary>
+    /// Queries a view and reduces it.
+    /// NOTE: This function forces the `reduce` parameter to TRUE< i.e. will ALWAYS reduce. Use the `view` or function to query a view's docs instead.
+    /// </summary>
+    member __.ReduceAsync<'returnType> (designDocName, viewName, ?options): Task<'returnType> = 
+        options 
+        |> Option.map listOptionsToFs
+        |> Option.defaultValue []
+        |> reduce designDocName viewName 
+        <| client 
+        |> Async.Map (fun d -> d.To<'returnType>())
+        |> task
 
     /// <summary>
     /// Inserts, updates or deletes multiple documents at the same time. 
