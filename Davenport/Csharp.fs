@@ -68,6 +68,28 @@ module Types =
         member val LesserThan: obj = null with get, set
         member val LesserThanOrEqualTo: obj = null with get, set
 
+    type SortingOrder = 
+        | Ascending 
+        | Descending
+
+    type Sorting(fieldName: string, order: SortingOrder) =
+        member val FieldName = fieldName with get, set
+        member val Order = order with get, set
+
+    type UsableIndexType = 
+        | FromDesignDoc
+        | FromDesignDocAndIndex
+
+    type UsableIndex (designDocId: string, ?indexName: string) =
+        member val DesignDocId = designDocId with get, set
+        member val IndexName = (indexName |> Option.defaultValue "") with get, set
+
+    type FindOptions(?useIndex) = 
+        member val Fields: string list = [] with get, set
+        member val SortBy: Sorting list = [] with get, set
+        member val Limit = System.Nullable<int>() with get, set
+        member val UseIndex: UsableIndex option = useIndex with get, set
+
     type Configuration(couchUrl: string, databaseName: string) = 
         member val CouchUrl = couchUrl with get, set
         member val DatabaseName = databaseName with get, set
