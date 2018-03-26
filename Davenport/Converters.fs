@@ -388,13 +388,13 @@ type DefaultConverter () =
         let offset = j.Value<int>("offset")
         let totalRows = j.Value<int>("total_rows")
         
-        let rec keyValue (d: JToken): KeyValue = 
+        let rec toViewKey (d: JToken): ViewKey = 
             match d.Type with 
             | JTokenType.Null -> 
-                KeyValue.Null
+                ViewKey.Null
             | JTokenType.String -> 
                 d.Value<string>()
-                |> KeyValue.String 
+                |> ViewKey.String 
             | JTokenType.Integer ->
                 let str = d.Value<string>()
 
@@ -402,29 +402,29 @@ type DefaultConverter () =
                 // If both parses fail, fall back to returning the value as a string.
                 str 
                 |> Int.parse
-                |> Option.map KeyValue.Int
+                |> Option.map ViewKey.Int
                 |> Option.defaultBindWith(fun _ ->
                     str 
                     |> Long.parse 
-                    |> Option.map KeyValue.Long)
-                |> Option.defaultValue (KeyValue.String str)
+                    |> Option.map ViewKey.Long)
+                |> Option.defaultValue (ViewKey.String str)
             | JTokenType.Float ->
                 d.Value<float>()
-                |> KeyValue.Float 
+                |> ViewKey.Float 
             | JTokenType.Date ->
                 d.Value<System.DateTime>()
-                |> KeyValue.Date
+                |> ViewKey.Date
             | JTokenType.Boolean -> 
                 d.Value<bool>()
-                |> KeyValue.Bool 
+                |> ViewKey.Bool 
             | JTokenType.Array ->
                 d.AsJEnumerable()
-                |> Seq.map keyValue
+                |> Seq.map toViewKey
                 |> List.ofSeq
-                |> KeyValue.List
+                |> ViewKey.List
             | _ -> 
                 d 
-                |> KeyValue.JToken
+                |> ViewKey.JToken
 
         let parseViewDoc (d: JObject): ViewDoc = 
             // This id prop should not be mapped to a field
@@ -435,13 +435,12 @@ type DefaultConverter () =
                 | JTokenType.Null -> failwith "View doc's key was null"
                 | JTokenType.Array -> 
                     keyToken.AsJEnumerable()
-                    |> Seq.map keyValue
+                    |> Seq.map toViewKey
                     |> List.ofSeq 
-                    |> ViewKey.KeyList
+                    |> ViewKey.List
                 | _ -> 
                     keyToken 
-                    |> keyValue
-                    |> ViewKey.Key
+                    |> toViewKey
 
             let tokenToDoc (tokenName: string) = 
                 tokenName 

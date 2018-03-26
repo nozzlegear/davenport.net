@@ -156,7 +156,7 @@ let tests =
 
             viewResult.Rows
             |> Seq.map (fun r -> r.Key)
-            |> Expect.all "All rows should have a key array" (function | ViewKey.Key _ -> false | ViewKey.KeyList _ -> true)
+            |> Expect.all "All rows should have a key array" (function | ViewKey.List _ -> true | _ -> false)
 
             viewResult.Rows
             |> Seq.map (fun r -> r.Value)
@@ -189,7 +189,7 @@ let tests =
 
             viewResult.Rows
             |> Seq.map (fun r -> r.Key)
-            |> Expect.all "All rows should have a key array" (function | ViewKey.Key _ -> false | ViewKey.KeyList _ -> true)
+            |> Expect.all "All rows should have a key array" (function | ViewKey.List _ -> true | _ -> false)
 
             viewResult.Rows
             |> Seq.map (fun r -> r.Value |> Option.map (fun v -> v.Raw.Type = Linq.JTokenType.Integer))
@@ -222,7 +222,7 @@ let tests =
 
             viewResult.Rows
             |> Seq.map (fun r -> r.Key)
-            |> Expect.all "All rows should have a single-item key" (function | ViewKey.Key _ -> true | ViewKey.KeyList _ -> false)
+            |> Expect.all "All rows should have a single-item key" (function | ViewKey.List _ -> false | _ -> true)
 
             viewResult.Rows
             |> Seq.map (fun r -> r.Value |> Option.map (fun v -> v.Raw.Type = Linq.JTokenType.Integer))
@@ -255,7 +255,7 @@ let tests =
 
             viewResult.Rows
             |> Seq.map (fun r -> r.Key)
-            |> Expect.all "All rows should have a single-item key" (function | ViewKey.Key _ -> true | ViewKey.KeyList _ -> false)
+            |> Expect.all "All rows should have a single-item key" (function | ViewKey.List _ -> false | _ -> true)
 
             viewResult.Rows
             |> Seq.map (fun r -> r.Value |> Option.map (fun v -> v.Raw.Type = Linq.JTokenType.Integer))
