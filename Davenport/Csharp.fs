@@ -242,12 +242,18 @@ module ExpressionParser =
             |> raise
 
 type Client<'doctype when 'doctype :> CouchDoc>(config: Configuration) = 
-    let maybeAddConverter (converter: JsonConverter option) (props: CouchProps) =
-        match converter with 
+    let maybeAddConverter (jsonConverter: JsonConverter option) (props: CouchProps) =
+        match jsonConverter with 
         | None -> props
         | Some j -> 
-            // TODO: build jsonserializersettings, add the converter and pass it to default converter
-            props
+            let settings = Converters.makeDefaultSettings()
+            settings.Converters.Add j
+
+            let serializer = Converters.makeDefaultSerializer settings
+            serializer.Converters.Add j
+
+            props 
+            |> converter (DefaultConverter(serializer, settings))
 
     let maybeAddWarning (evtHandler: EventHandler<string> option) (props: CouchProps) = 
         match evtHandler with 
