@@ -80,11 +80,13 @@ module Types =
         | FromDesignDoc
         | FromDesignDocAndIndex
 
-    type UsableIndex (designDocId: string, ?indexName: string) =
+    type UsableIndex (designDocId: string, indexName: string option) =
+        new (designDocId: string, indexName: string) = UsableIndex(designDocId, Some indexName)
         member val DesignDocId = designDocId with get, set
         member val IndexName = (indexName |> Option.defaultValue "") with get, set
 
-    type FindOptions(?useIndex) = 
+    type FindOptions(useIndex: UsableIndex option) = 
+        new () = FindOptions(None)
         member val Fields: string list = [] with get, set
         member val SortBy: Sorting list = [] with get, set
         member val Limit = System.Nullable<int>() with get, set
@@ -172,6 +174,9 @@ type Client<'doctype when 'doctype :> CouchDoc>(config: Configuration) =
         |> List.filter Option.isSome
         |> List.map Option.get
 
+    let findOptionsToFs (o: FindOptions): FindOption list = 
+        failwith "not implemented"
+
     let dictToMap fn (dict: Dictionary<'a, 'b>) = 
         dict 
         |> Seq.map (fun kvp -> kvp.Key, fn kvp.Value)
@@ -191,11 +196,16 @@ type Client<'doctype when 'doctype :> CouchDoc>(config: Configuration) =
         failwith "Not implemented"
 
     member __.FindBySelectorAsync (dict, ?options): Task<IEnumerable<'doctype>> = 
-        // TODO: Convert options param to FindOption list
+        let opts = 
+            options 
+            |> Option.map findOptionsToFs
+            |> Option.defaultValue []
+
         dict 
         |> dictToMap findExpressionToFs 
-        |> find options 
+        |> find opts 
         <| client 
+        |> Async.MapSeq toDoc
         |> task
 
     member __.CountAsync(): Task<int> = 
