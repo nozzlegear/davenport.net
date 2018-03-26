@@ -68,6 +68,9 @@ module Types =
         member val LesserThan: obj = null with get, set
         member val LesserThanOrEqualTo: obj = null with get, set
 
+    /// <remarks>
+    /// SortingOrder is the same as SortOrder (F# version), but replicated here so the C# client can (theoretically) never need to open the Types module and pollute their scope with F# types.
+    /// </remarks>
     type SortingOrder = 
         | Ascending 
         | Descending
@@ -90,6 +93,7 @@ module Types =
         member val Fields: string list = [] with get, set
         member val SortBy: Sorting list = [] with get, set
         member val Limit = System.Nullable<int>() with get, set
+        member val Skip = System.Nullable<int>() with get, set
         member val UseIndex: UsableIndex option = useIndex with get, set
 
     type Configuration(couchUrl: string, databaseName: string) = 
@@ -269,11 +273,6 @@ type Client<'doctype when 'doctype :> CouchDoc>(config: Configuration) =
         failwith "not implemented"
 
     let listOptionsToFs (o: ListOptions) = 
-        let keysToOption (k: obj seq) = 
-            match List.ofSeq k with 
-            | [] -> None 
-            | keys -> ListOption.Keys keys |> Some
-
         let descendingToOption (d: bool option) = 
             match d with 
             | Some true -> Some (ListOption.Direction SortOrder.Descending)
@@ -283,7 +282,7 @@ type Client<'doctype when 'doctype :> CouchDoc>(config: Configuration) =
         [
             Option.ofNullable o.Limit |> Option.map ListOption.ListLimit
             Option.ofObj o.Key |> Option.map ListOption.Key 
-            keysToOption o.Keys
+            Option.ofSeq o.Keys |> Option.map (List.ofSeq >> ListOption.Keys)
             Option.ofObj o.StartKey |> Option.map ListOption.StartKey
             Option.ofObj o.EndKey |> Option.map ListOption.EndKey 
             Option.ofNullable o.InclusiveEnd |> Option.map ListOption.InclusiveEnd
@@ -308,8 +307,25 @@ type Client<'doctype when 'doctype :> CouchDoc>(config: Configuration) =
         |> List.filter Option.isSome
         |> List.map Option.get
 
+    let usableIndexToFs (index: UsableIndex) = 
+        match index.IndexName with 
+        | NotNullOrEmpty indexName -> UseIndex.FromDesignDocAndIndex(index.DesignDocId, indexName)
+        | _ -> UseIndex.FromDesignDoc index.DesignDocId
+
+    let sortingToFs (sorts: Sorting list): Sort list = 
+        sorts 
+        |> List.map (fun sort -> Sort (sort.FieldName, match sort.Order with SortingOrder.Ascending -> SortOrder.Ascending | SortingOrder.Descending -> SortOrder.Descending))
+
     let findOptionsToFs (o: FindOptions): FindOption list = 
-        failwith "not implemented"
+        [
+            Option.ofSeq o.Fields |> Option.map FindOption.Fields
+            Option.ofSeq o.SortBy |> Option.map (sortingToFs >> FindOption.SortBy)
+            Option.ofNullable o.Limit |> Option.map FindOption.FindLimit 
+            Option.ofNullable o.Skip |> Option.map FindOption.Skip 
+            o.UseIndex |> Option.map (usableIndexToFs >> FindOption.UseIndex)
+        ]
+        |> List.filter Option.isSome 
+        |> List.map Option.get
 
     let dictToMap fn (dict: Dictionary<'a, 'b>) = 
         dict 

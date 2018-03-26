@@ -50,6 +50,12 @@ module internal Option =
         match s with 
         | NotNullOrEmpty s -> Some s
         | _ -> None
+    
+    /// <summary>
+    /// Converts a sequence to an option, returning `Some sequence` if the length is greater than 0, else `None`.
+    /// </summary>
+    let ofSeq s = 
+        if Seq.length s > 0 then Some s else None
 
 module internal Int = 
     let parse s = 
