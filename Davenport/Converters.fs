@@ -5,12 +5,6 @@ open Newtonsoft.Json.Linq
 open Types
 open Infrastructure
 
-let defaultSerializerSettings = Microsoft.FSharpLu.Json.Compact.Internal.Settings.settings
-defaultSerializerSettings.NullValueHandling <- NullValueHandling.Ignore
-defaultSerializerSettings.MissingMemberHandling <- MissingMemberHandling.Ignore
-
-let defaultSerializer = JsonSerializer.Create(defaultSerializerSettings)
-
 type JsonObjectBuilder() = 
     member __.Yield(x: JsonValue) = [x]
     member __.Yield(x: JsonValue list) = x
@@ -100,7 +94,16 @@ type JsonObjectBuilder() =
 
 let jsonObject = JsonObjectBuilder()
 
-type DefaultConverter () = 
+let makeDefaultSettings() = 
+    let settings = Microsoft.FSharpLu.Json.Compact.Internal.Settings.settings
+    settings.NullValueHandling <- NullValueHandling.Ignore
+    settings.MissingMemberHandling <- MissingMemberHandling.Ignore
+    settings
+
+let makeDefaultSerializer (settings: JsonSerializerSettings) = 
+    JsonSerializer.Create(settings)
+
+type DefaultConverter (defaultSerializer: JsonSerializer, defaultSerializerSettings: JsonSerializerSettings) = 
     inherit ICouchConverter()
 
     let stringify o = JsonConvert.SerializeObject(o, defaultSerializerSettings)
@@ -161,6 +164,10 @@ type DefaultConverter () =
               Reason = token.Value<string>("reason")
               Rev = rev }
             |> Some
+
+    new() = 
+        let settings = makeDefaultSettings()
+        DefaultConverter(makeDefaultSerializer settings, settings)
 
     override __.ConvertListOptionsToMap options = 
         let rec inner remaining qs = 
