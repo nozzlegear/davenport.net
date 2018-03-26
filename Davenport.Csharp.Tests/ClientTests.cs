@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
-using Davenport.Csharp;
+using Davenport.Csharp.Types;
 using Xunit;
 
 namespace Davenport.Tests
@@ -22,6 +22,7 @@ namespace Davenport.Tests
 
         public ClientTests(TestConfiguration fixture)
         {
+            
             this.Fixture = fixture;
         }
 

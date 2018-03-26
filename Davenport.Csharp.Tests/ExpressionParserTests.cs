@@ -1,5 +1,5 @@
 using System.Linq;
-using Davenport.Infrastructure;
+using static Davenport.Infrastructure;
 using Xunit;
 
 namespace Davenport.Tests
