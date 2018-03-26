@@ -100,8 +100,142 @@ module Types =
         member val JsonConverter: JsonConverter = null with get, set
         member val Warning: EventHandler<string> = null with get, set
 
+module ExpressionParser = 
+    open System.Linq.Expressions
+
+    type Value = obj
+
+    type IsPropName = bool
+
+    type PropName = string 
+
+    let private (|BinaryExp|_|) (exp: Expression<_>) = 
+        match exp.Body with 
+        | :? BinaryExpression as x -> Some x
+        | _ -> None
+
+    let invokeExpression(exp: Expression): Value = 
+        Expression.Lambda(exp).Compile().DynamicInvoke()
+
+    let getMemberValue(exp: MemberExpression): IsPropName * Value = 
+        try 
+            false, invokeExpression exp
+        with 
+        | _ -> true, exp.Member.Name :> obj
+
+    let rec getExpressionValue(exp: Expression): IsPropName * Value = 
+        match exp.NodeType with 
+        | ExpressionType.Constant -> 
+            let cnst = exp :?> ConstantExpression
+
+            false, cnst.Value 
+        | ExpressionType.MemberAccess -> 
+            exp :?> MemberExpression 
+            |> getMemberValue
+        | ExpressionType.Convert -> 
+            let unary = exp :?> UnaryExpression
+
+            getExpressionValue unary.Operand
+        | _ -> 
+            sprintf "Expression type %A is invalid." exp.NodeType 
+            |> ArgumentException
+            |> raise
+
+    let getExpressionParts(exp: BinaryExpression): PropName * Value = 
+        let leftIsPropName, leftValue = getExpressionValue exp.Left 
+        let _, rightValue = getExpressionValue exp.Right 
+
+        match leftIsPropName with 
+        | true -> leftValue :?> string, rightValue
+        | false -> rightValue :?> string, leftValue
+
+    let private partsToOperator (fn: obj -> FindOperator) exp =
+        let propName, value = getExpressionParts exp 
+
+        propName, fn value  
+
+    let private (|EqualExpr|_|) (exp: BinaryExpression) = 
+        match exp.NodeType with 
+        | ExpressionType.Equal -> 
+            exp 
+            |> partsToOperator FindOperator.EqualTo 
+            |> Some
+        | _ -> None
+
+    let private (|NotEqualExpr|_|) (exp: BinaryExpression) = 
+        match exp.NodeType with 
+        | ExpressionType.NotEqual -> 
+            exp 
+            |> partsToOperator FindOperator.NotEqualTo 
+            |> Some
+        | _ -> None 
+
+    let private (|GreaterThanExpr|_|) (exp: BinaryExpression) = 
+        match exp.NodeType with 
+        | ExpressionType.GreaterThan -> 
+            exp 
+            |> partsToOperator FindOperator.GreaterThan
+            |> Some
+        | _ -> None
+
+    let private (|GTEExpr|_|) (exp: BinaryExpression) = 
+        match exp.NodeType with 
+        | ExpressionType.GreaterThanOrEqual ->
+            exp 
+            |> partsToOperator FindOperator.GreaterThanOrEqualTo
+            |> Some 
+        | _ -> None
+
+    let private (|LessThanExpr|_|) (exp: BinaryExpression) = 
+        match exp.NodeType with 
+        | ExpressionType.LessThan ->
+            exp 
+            |> partsToOperator FindOperator.LesserThan 
+            |> Some
+        | _ -> None
+
+    let private (|LTEExpr|_|) (exp: BinaryExpression) = 
+        match exp.NodeType with 
+        | ExpressionType.LessThanOrEqual ->
+            exp 
+            |> partsToOperator FindOperator.LessThanOrEqualTo
+            |> Some 
+        | _ -> None
+
+    let private (|OrExpr|_|) (exp: BinaryExpression) = 
+        match exp.NodeType with 
+        | ExpressionType.Or 
+        | ExpressionType.OrElse -> Some exp 
+        | _ -> None
+
+    let parse<'doctype>(exp: Expression<Func<'doctype, bool>>): FindSelector = 
+        match exp with 
+        | BinaryExp exp -> 
+            let propName, operator =
+                match exp with 
+                | EqualExpr x -> x
+                | NotEqualExpr x -> x 
+                | GreaterThanExpr x -> x
+                | GTEExpr x -> x 
+                | LessThanExpr x -> x
+                | LTEExpr x -> x 
+                | OrExpr _ ->
+                    "CouchDB's find method does not support || expressions. We recommend constructing a view instead."
+                    |> ArgumentException
+                    |> raise
+                | _ -> 
+                    sprintf "Davenport currently only supports == expressions. Type received: %A." exp.NodeType
+                    |> ArgumentException 
+                    |> raise
+
+            Map.empty 
+            |> Map.add propName [operator]
+        | _ -> 
+            "Invalid expression. Expression must be in the form of e.g. x => x.Foo == 5 and must use the document parameter passed in."
+            |> ArgumentException 
+            |> raise
+
 open Types
-open System.Collections
 
 type Client<'doctype when 'doctype :> CouchDoc>(config: Configuration) = 
     let maybeAddConverter (converter: JsonConverter option) (props: CouchProps) =
@@ -193,7 +327,17 @@ type Client<'doctype when 'doctype :> CouchDoc>(config: Configuration) =
         |> task
 
     member __.FindByExpressionAsync (exp, ?options): Task<IEnumerable<'doctype>> = 
-        failwith "Not implemented"
+        let opts = 
+            options 
+            |> Option.map findOptionsToFs 
+            |> Option.defaultValue []
+
+        exp 
+        |> ExpressionParser.parse 
+        |> find opts 
+        <| client 
+        |> Async.MapSeq toDoc 
+        |> task
 
     member __.FindBySelectorAsync (dict, ?options): Task<IEnumerable<'doctype>> = 
         let opts = 
@@ -214,7 +358,11 @@ type Client<'doctype when 'doctype :> CouchDoc>(config: Configuration) =
         |> task
 
     member __.CountByExpressionAsync (exp): Task<int> = 
-        failwith "Not implemented"
+        exp 
+        |> ExpressionParser.parse 
+        |> countBySelector 
+        <| client 
+        |> task
 
     member __.CountBySelectorAsync (dict): Task<int> = 
         dict
@@ -228,14 +376,18 @@ type Client<'doctype when 'doctype :> CouchDoc>(config: Configuration) =
         |> exists id rev
         |> task
 
-    member __.ExistsByExpressionAsync (expr): Task<bool> = 
-        failwith "Not implemented"
-
     member __.ExistsBySelectorAsync (dict): Task<bool> = 
         dict 
         |> dictToMap findExpressionToFs
         |> existsBySelector
         <| client
+        |> task
+
+    member __.ExistsByExpressionAsync (exp): Task<bool> = 
+        exp 
+        |> ExpressionParser.parse
+        |> existsBySelector
+        <| client 
         |> task
 
     member __.ListWithDocsAsync (?options): Task<ListResponse<'doctype>> =
