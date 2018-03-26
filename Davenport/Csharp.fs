@@ -23,8 +23,8 @@ module Types =
     type ListedRow<'doctype>(doc) = 
         member val Id = "" with get, set
         member val Key: obj = null with get, set
-        member val Value: Revision = Revision("") with get, set
-        member val Doc: 'doctype = doc with get, set
+        member val Value: Revision option = None with get, set
+        member val Doc: 'doctype option = doc with get, set
 
     type ListResponse<'doctype>() = 
         member val Offset = 0 with get, set
@@ -42,11 +42,11 @@ module Types =
         member val MapFunction: string = "" with get, set
         member val ReduceFunction: string = "" with get, set
 
-    type DesignDocument() = 
-        inherit CouchDoc()
-        override val Id = "" with get, set
-        override val Rev = "" with get, set
-        member val Views: IEnumerable<ViewConfig> = Seq.empty with get, set
+    // type DesignDocument() = 
+    //     inherit CouchDoc()
+    //     override val Id = "" with get, set
+    //     override val Rev = "" with get, set
+    //     member val Views: IEnumerable<ViewConfig> = Seq.empty with get, set
 
     type ListOptions() = 
         member val Limit = System.Nullable<int>() with get, set
@@ -103,6 +103,8 @@ module Types =
         member val Password = "" with get, set
         member val JsonConverter: JsonConverter = null with get, set
         member val Warning: EventHandler<string> = null with get, set
+
+open Types
 
 module ExpressionParser = 
     open System.Linq.Expressions
@@ -239,8 +241,6 @@ module ExpressionParser =
             |> ArgumentException 
             |> raise
 
-open Types
-
 type Client<'doctype when 'doctype :> CouchDoc>(config: Configuration) = 
     let maybeAddConverter (converter: JsonConverter option) (props: CouchProps) =
         match converter with 
@@ -269,8 +269,15 @@ type Client<'doctype when 'doctype :> CouchDoc>(config: Configuration) =
 
     let toDoc (d: Document) = d.To<'doctype>()
 
-    let toDesignDoc (d: Document): DesignDocument = 
-        failwith "not implemented"
+    let toObj (d: Document) = d.To<obj>()
+
+    let toRevision (d: Document) = d.To<Revision>()
+
+    let rec viewKeyToObj = function
+        | ViewKey.Null -> null :> obj 
+        | ViewKey.JToken k -> k.ToObject<obj>()
+        | ViewKey.List k -> (k |> List.map viewKeyToObj) :> obj
+        | k -> k :> obj 
 
     let listOptionsToFs (o: ListOptions) = 
         let descendingToOption (d: bool option) = 
@@ -335,6 +342,37 @@ type Client<'doctype when 'doctype :> CouchDoc>(config: Configuration) =
     let task = Async.StartAsTask
 
     new(couchUrl, databaseName) = Client(Configuration(couchUrl, databaseName))
+
+    /// <remarks>
+    /// Made this function into a class member, because the private class functions can't use generics -- they must be moved out of the class to the module instead.
+    /// </remarks>
+    member private __.ToListResponse<'d>(r: ViewResult): ListResponse<'d> = 
+        let rows, designDocs = 
+            r.Rows
+            |> Seq.fold (fun (rows: ListedRow<'d> list, designDocs: ListedRow<obj> list) row -> 
+                match row.Id with 
+                | i when i.StartsWith "_design" -> 
+                    let result = ListedRow<obj>(row.Doc |> Option.map toObj)
+                    result.Id <- row.Id
+                    result.Key <- viewKeyToObj row.Key
+                    result.Value <- row.Value |> Option.map toRevision
+
+                    rows, (designDocs@[result])
+                | _ -> 
+                    let result = ListedRow<'d>(row.Doc |> Option.map (fun d -> d.To<'d>()))
+                    result.Id <- row.Id 
+                    result.Key <- viewKeyToObj row.Key 
+                    result.Value <- row.Value |> Option.map toRevision
+
+                    (rows@[result]), designDocs) 
+                ([], [])
+
+        let resp = ListResponse<'d>()
+        resp.TotalRows <- r.TotalRows 
+        resp.Offset <- r.Offset
+        resp.Rows <- Seq.ofList rows 
+        resp.DesignDocs <- Seq.ofList designDocs
+        resp
 
     member __.GetAsync(id: string, ?rev: string): Task<'doctype> =
         client 
@@ -406,11 +444,29 @@ type Client<'doctype when 'doctype :> CouchDoc>(config: Configuration) =
         <| client 
         |> task
 
-    member __.ListWithDocsAsync (?options): Task<ListResponse<'doctype>> =
-        failwith "Not implemented"
+    member x.ListWithDocsAsync (?options): Task<ListResponse<'doctype>> =
+        let opts = 
+            options 
+            |> Option.map listOptionsToFs
+            |> Option.defaultValue []
+            |> List.append [ListOption.IncludeDocs true]
 
-    member __.ListWithoutDocsAsync (?options): Task<ListResponse<Revision>> = 
-        failwith "Not implemented"
+        client 
+        |> listAll opts
+        |> Async.Map x.ToListResponse<'doctype>
+        |> task
+
+    member x.ListWithoutDocsAsync (?options): Task<ListResponse<obj>> = 
+        let opts = 
+            options 
+            |> Option.map listOptionsToFs
+            |> Option.defaultValue []
+            |> List.append [ListOption.IncludeDocs false]
+
+        client 
+        |> listAll opts
+        |> Async.Map x.ToListResponse<obj>
+        |> task
 
     member __.CreateAsync (doc: 'doctype): Task<PostPutCopyResult> = 
         client 
