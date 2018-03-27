@@ -473,7 +473,7 @@ namespace Davenport.Csharp
             <| client 
             |> task
 
-        member x.ListWithDocsAsync ([<Optional; DefaultParameterValue(null)>] ?options): Task<ListResponse<'doctype>> =
+        member x.ListWithDocsAsync ([<Optional; DefaultParameterValue(null)>] ?options: ListOptions): Task<ListResponse<'doctype>> =
             let opts = 
                 options 
                 |> Option.map listOptionsToFs
@@ -485,7 +485,7 @@ namespace Davenport.Csharp
             |> Async.Map x.ToListResponse<'doctype>
             |> task
 
-        member x.ListWithoutDocsAsync ([<Optional; DefaultParameterValue(null)>]?options): Task<ListResponse<obj>> = 
+        member x.ListWithoutDocsAsync ([<Optional; DefaultParameterValue(null)>]?options: ListOptions): Task<ListResponse<obj>> = 
             let opts = 
                 options 
                 |> Option.map listOptionsToFs
