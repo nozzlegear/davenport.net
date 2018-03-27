@@ -135,6 +135,7 @@ namespace Davenport.Csharp
     open System.Threading.Tasks
     open System.Collections.Generic
     open Davenport.Csharp.Types
+    open System.Runtime.InteropServices
 
     module ExpressionParser = 
         open System.Linq.Expressions
@@ -402,13 +403,13 @@ namespace Davenport.Csharp
             resp.DesignDocs <- Seq.ofList designDocs
             resp
 
-        member __.GetAsync(id: string, ?rev: string): Task<'doctype> =
+        member __.GetAsync(id: string, [<Optional; DefaultParameterValue(null)>] ?rev: string): Task<'doctype> =
             client 
             |> get id rev
             |> Async.Map toDoc
             |> task
 
-        member __.FindByExpressionAsync (exp, ?options): Task<IEnumerable<'doctype>> = 
+        member __.FindByExpressionAsync (exp, [<Optional; DefaultParameterValue(null)>] ?options): Task<IEnumerable<'doctype>> = 
             let opts = 
                 options 
                 |> Option.map findOptionsToFs 
@@ -421,7 +422,7 @@ namespace Davenport.Csharp
             |> Async.MapSeq toDoc 
             |> task
 
-        member __.FindBySelectorAsync (dict, ?options): Task<IEnumerable<'doctype>> = 
+        member __.FindBySelectorAsync (dict, [<Optional; DefaultParameterValue(null)>] ?options): Task<IEnumerable<'doctype>> = 
             let opts = 
                 options 
                 |> Option.map findOptionsToFs
@@ -439,7 +440,7 @@ namespace Davenport.Csharp
             |> count 
             |> task
 
-        member __.CountByExpressionAsync (exp): Task<int> = 
+        member __.CountByExpressionAsync (exp: Linq.Expressions.Expression<Func<'doctype, bool>>): Task<int> = 
             exp 
             |> ExpressionParser.parse 
             |> countBySelector 
@@ -453,7 +454,7 @@ namespace Davenport.Csharp
             <| client
             |> task
 
-        member __.ExistsAsync (id, ?rev: string): Task<bool> = 
+        member __.ExistsAsync (id, [<Optional; DefaultParameterValue(null)>] ?rev: string): Task<bool> = 
             client 
             |> exists id rev
             |> task
@@ -472,7 +473,7 @@ namespace Davenport.Csharp
             <| client 
             |> task
 
-        member x.ListWithDocsAsync (?options): Task<ListResponse<'doctype>> =
+        member x.ListWithDocsAsync ([<Optional; DefaultParameterValue(null)>] ?options): Task<ListResponse<'doctype>> =
             let opts = 
                 options 
                 |> Option.map listOptionsToFs
@@ -484,7 +485,7 @@ namespace Davenport.Csharp
             |> Async.Map x.ToListResponse<'doctype>
             |> task
 
-        member x.ListWithoutDocsAsync (?options): Task<ListResponse<obj>> = 
+        member x.ListWithoutDocsAsync ([<Optional; DefaultParameterValue(null)>]?options): Task<ListResponse<obj>> = 
             let opts = 
                 options 
                 |> Option.map listOptionsToFs
@@ -521,7 +522,7 @@ namespace Davenport.Csharp
         /// Queries a view. 
         /// NOTE: This function forces the `reduce` parameter to FALSE, i.e. it will NOT reduce. Use the `reduce` functions instead.
         /// </summary>
-        member __.ViewAsync<'returnType, 'docType> (designDocName, viewName, ?options): Task<IEnumerable<ViewResponse<'returnType, 'docType>>> = 
+        member __.ViewAsync<'returnType, 'docType> (designDocName, viewName, [<Optional; DefaultParameterValue(null)>] ?options): Task<IEnumerable<ViewResponse<'returnType, 'docType>>> = 
             options
             |> Option.map listOptionsToFs
             |> Option.defaultValue []
@@ -538,7 +539,7 @@ namespace Davenport.Csharp
         /// Queries a view and reduces it.
         /// NOTE: This function forces the `reduce` parameter to TRUE< i.e. will ALWAYS reduce. Use the `view` or function to query a view's docs instead.
         /// </summary>
-        member __.ReduceAsync<'returnType> (designDocName, viewName, ?options): Task<'returnType> = 
+        member __.ReduceAsync<'returnType> (designDocName, viewName, [<Optional; DefaultParameterValue(null)>] ?options): Task<'returnType> = 
             options 
             |> Option.map listOptionsToFs
             |> Option.defaultValue []
