@@ -4,6 +4,7 @@ namespace Davenport.Csharp.Types
     open Davenport.Infrastructure
     open System
     open System.Collections.Generic
+    open System.Linq.Expressions
 
     [<AbstractClass>]
     type CouchDoc() = 
@@ -61,6 +62,34 @@ namespace Davenport.Csharp.Types
         member val GreaterThanOrEqualTo: obj = null with get, set
         member val LesserThan: obj = null with get, set
         member val LesserThanOrEqualTo: obj = null with get, set
+        static member Create(expType: ExpressionType, value) = 
+            let exp = FindExpression()
+
+            match expType with 
+            | ExpressionType.Equal -> 
+                exp.EqualTo <- value 
+            | ExpressionType.NotEqual ->
+                exp.NotEqualTo <- value 
+            | ExpressionType.GreaterThan ->
+                exp.GreaterThan <- value 
+            | ExpressionType.GreaterThanOrEqual ->
+                exp.GreaterThanOrEqualTo <- value 
+            | ExpressionType.LessThan -> 
+                exp.LesserThan <- value
+            | ExpressionType.LessThanOrEqual ->
+                exp.LesserThanOrEqualTo <- value
+            | ExpressionType.Or 
+            | ExpressionType.OrElse ->
+                "CouchDB's find method does not support || expressions. We recommend constructing a view instead."
+                |> ArgumentException
+                |> raise
+            | _ -> 
+                sprintf "Attempted to create a FindExpression with an unsupported ExpressionType: %A." expType
+                |> ArgumentException 
+                |> raise
+
+            exp
+            
 
     /// <remarks>
     /// SortingOrder is the same as SortOrder (F# version), but replicated here so the C# client can (theoretically) never need to open the Types module and pollute their scope with F# types.
