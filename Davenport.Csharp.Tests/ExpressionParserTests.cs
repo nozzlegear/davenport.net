@@ -1,5 +1,5 @@
 using System.Linq;
-using static Davenport.Infrastructure;
+using Davenport.Csharp;
 using Xunit;
 
 namespace Davenport.Tests
@@ -17,7 +17,7 @@ namespace Davenport.Tests
         [Fact(DisplayName = "Parser FromClass"), Trait("Category", "Parser")]
         public void FromClass()
         {
-            var result = ExpressionParser.Parse<MyTestClass>(x => x.Baz == TestClass.Baz);
+            var result = ExpressionParser.parse<MyTestClass>(x => x.Baz == TestClass.Baz);
 
             Assert.Contains(result, kvp => kvp.Key == "Baz" && (int)kvp.Value.EqualTo == TestClass.Baz);
         }
@@ -26,7 +26,7 @@ namespace Davenport.Tests
         public void FromVariable()
         {
             string searchString = "test";
-            var result = ExpressionParser.Parse<MyTestClass>(x => x.Foo == searchString);
+            var result = ExpressionParser.parse<MyTestClass>(x => x.Foo == searchString);
 
             Assert.Contains(result, kvp => kvp.Key == "Foo" && (string)kvp.Value.EqualTo == searchString);
         }
@@ -34,7 +34,7 @@ namespace Davenport.Tests
         [Fact(DisplayName = "Parser FromConstant"), Trait("Category", "Parser")]
         public void FromConstant()
         {
-            var result = ExpressionParser.Parse<MyTestClass>(x => x.Bar == false);
+            var result = ExpressionParser.parse<MyTestClass>(x => x.Bar == false);
 
             Assert.Contains(result, kvp => kvp.Key == "Bar" && (bool)kvp.Value.EqualTo == false);
         }
@@ -42,7 +42,7 @@ namespace Davenport.Tests
         [Fact(DisplayName = "Parser WithNullValue"), Trait("Category", "Parser")]
         public void WithNullValue()
         {
-            var result = ExpressionParser.Parse<MyTestClass>(x => x.Bat == null);
+            var result = ExpressionParser.parse<MyTestClass>(x => x.Bat == null);
 
             Assert.Contains(result, kvp => kvp.Key == "Bat" && kvp.Value.EqualTo == null);
         }
@@ -50,7 +50,7 @@ namespace Davenport.Tests
         [Fact(DisplayName = "Parser GreaterThan"), Trait("Category", "Parser")]
         public void GreaterThan()
         {
-            var result = ExpressionParser.Parse<MyTestClass>(x => x.Baz > TestClass.Baz);
+            var result = ExpressionParser.parse<MyTestClass>(x => x.Baz > TestClass.Baz);
 
             Assert.Contains(result, kvp => kvp.Key == "Baz" && (int)kvp.Value.GreaterThan == TestClass.Baz);
         }
@@ -58,7 +58,7 @@ namespace Davenport.Tests
         [Fact(DisplayName = "Parser GreaterThanOrEqualTo"), Trait("Category", "Parser")]
         public void GreaterThanOrEqualTo()
         {
-            var result = ExpressionParser.Parse<MyTestClass>(x => x.Baz >= TestClass.Baz);
+            var result = ExpressionParser.parse<MyTestClass>(x => x.Baz >= TestClass.Baz);
 
             Assert.Contains(result, kvp => kvp.Key == "Baz" && (int)kvp.Value.GreaterThanOrEqualTo == TestClass.Baz);
         }
@@ -66,7 +66,7 @@ namespace Davenport.Tests
         [Fact(DisplayName = "Parser LesserThan"), Trait("Category", "Parser")]
         public void LesserThan()
         {
-            var result = ExpressionParser.Parse<MyTestClass>(x => x.Baz < TestClass.Baz);
+            var result = ExpressionParser.parse<MyTestClass>(x => x.Baz < TestClass.Baz);
 
             Assert.Contains(result, kvp => kvp.Key == "Baz" && (int)kvp.Value.LesserThan == TestClass.Baz);
         }
@@ -74,7 +74,7 @@ namespace Davenport.Tests
         [Fact(DisplayName = "Parser LesserThanOrEqualTo"), Trait("Category", "Parser")]
         public void LesserThanOrEqualTo()
         {
-            var result = ExpressionParser.Parse<MyTestClass>(x => x.Baz <= TestClass.Baz);
+            var result = ExpressionParser.parse<MyTestClass>(x => x.Baz <= TestClass.Baz);
 
             Assert.Contains(result, kvp => kvp.Key == "Baz" && (int)kvp.Value.LesserThanOrEqualTo == TestClass.Baz);
         }
@@ -82,7 +82,7 @@ namespace Davenport.Tests
         [Fact(DisplayName = "Parser NotEqual"), Trait("Category", "Parser")]
         public void NotEqual()
         {
-            var result = ExpressionParser.Parse<MyTestClass>(x => x.Baz != TestClass.Baz);
+            var result = ExpressionParser.parse<MyTestClass>(x => x.Baz != TestClass.Baz);
 
             Assert.Contains(result, kvp => kvp.Key == "Baz" && (int)kvp.Value.NotEqualTo == TestClass.Baz);
         }
@@ -90,7 +90,7 @@ namespace Davenport.Tests
         [Fact(DisplayName = "Parser Backwards"), Trait("Category", "Parser")]
         public void Backwards()
         {
-            var result = ExpressionParser.Parse<MyTestClass>(x => 5 == x.Baz);
+            var result = ExpressionParser.parse<MyTestClass>(x => 5 == x.Baz);
 
             Assert.Contains(result, kvp => kvp.Key == "Baz" && (int)kvp.Value.EqualTo == 5);
         }

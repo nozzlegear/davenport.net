@@ -1,4 +1,4 @@
-using Davenport.Entities;
+using Davenport.Csharp.Types;
 
 namespace Davenport.Tests
 {
@@ -9,6 +9,10 @@ namespace Davenport.Tests
         {
             Data = data;
         }
+
+        public override string Id { get; set; }
+
+        public override string Rev { get; set; }
 
         public CustomDocData Data { get; set; }
     }

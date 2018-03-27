@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
-using Davenport.Entities;
+using Davenport.Csharp;
+using Davenport.Csharp.Types;
 using Xunit;
 
 namespace Davenport.Tests
@@ -16,32 +18,26 @@ namespace Davenport.Tests
 
         public async Task InitializeAsync()
         {
-            var designDocs = new DesignDocConfig[]
-            {
-                new DesignDocConfig()
-                {
-                    Name = "list",
-                    Views = new View[]
-                    {
-                        new View()
-                        {
-                            Name = "only-bazs-greater-than-10",
-                            MapFunction = @"function (doc) {
-                                if (doc.Baz > 10) {
-                                    emit(doc._id, doc);
-                                }
-                            }",
-                            ReduceFunction = "_count"
-                        }
-                    }
-                }
-            };
             var config = new Configuration("http://localhost:5984", "davenport_net");
 
             config.Warning += (object sender, string message) => Console.WriteLine(message);
 
+            Client = new Client<MyTestClass>(config);
+
             // Make sure the database exists
-            Client = await Configuration.ConfigureDatabaseAsync<MyTestClass>(config, designDocs: designDocs);
+            await Client.CreateDatabaseAsync();
+            await Client.CreateOrUpdateDesignDocAsync("list", new List<ViewConfig>()
+            {
+                new ViewConfig()
+                {
+                    Name = "only-bazs-greater-than-10",
+                    MapFunction = @"function (doc) {
+                        if (doc.Baz > 10) {
+                            emit(doc._id, doc);
+                        }
+                    }"
+                }
+            });
         }
     }
 }
