@@ -409,7 +409,7 @@ namespace Davenport.Csharp
             |> Async.Map toDoc
             |> task
 
-        member __.FindByExpressionAsync (exp, [<Optional; DefaultParameterValue(null)>] ?options): Task<IEnumerable<'doctype>> = 
+        member __.FindByExpressionAsync (exp: Linq.Expressions.Expression<Func<'doctype, bool>>, [<Optional; DefaultParameterValue(null)>] ?options: FindOptions): Task<IEnumerable<'doctype>> = 
             let opts = 
                 options 
                 |> Option.map findOptionsToFs 
@@ -422,7 +422,7 @@ namespace Davenport.Csharp
             |> Async.MapSeq toDoc 
             |> task
 
-        member __.FindBySelectorAsync (dict, [<Optional; DefaultParameterValue(null)>] ?options): Task<IEnumerable<'doctype>> = 
+        member __.FindBySelectorAsync (dict, [<Optional; DefaultParameterValue(null)>] ?options: FindOptions): Task<IEnumerable<'doctype>> = 
             let opts = 
                 options 
                 |> Option.map findOptionsToFs
@@ -466,7 +466,7 @@ namespace Davenport.Csharp
             <| client
             |> task
 
-        member __.ExistsByExpressionAsync (exp): Task<bool> = 
+        member __.ExistsByExpressionAsync (exp: Linq.Expressions.Expression<Func<'doctype, bool>>): Task<bool> = 
             exp 
             |> ExpressionParser.parse
             |> existsBySelector
