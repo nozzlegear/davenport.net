@@ -70,8 +70,8 @@ let tests =
 
         testCaseAsync "Serializes indexes" <| async {
             ["field1"; "field2"; "field3"]
-            |> converter.WriteIndexes "index-name"
-            |> Expect.equal "Should serialize indexes" """{"name":"index-name","index":{"fields":["field1","field2","field3"]}}"""
+            |> converter.WriteIndexes [IndexOption.Name "index-name"]
+            |> Expect.equal "Should serialize indexes" """{"index":{"fields":["field1","field2","field3"]},"name":"index-name"}"""
         }
 
         testCaseAsync "Serializes design docs" <| async {

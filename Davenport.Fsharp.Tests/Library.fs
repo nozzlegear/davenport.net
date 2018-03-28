@@ -781,7 +781,7 @@ let tests =
         testCaseAsync "Creates indexes" <| async {
             let! result = 
                 ["Foo"; "Bar"]
-                |> createIndexes
+                |> createIndexes []
                 <| client
 
             result.Id 

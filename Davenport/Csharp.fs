@@ -119,6 +119,14 @@ namespace Davenport.Csharp.Types
         member val Skip = System.Nullable<int>() with get, set
         member val UseIndex: UsableIndex option = useIndex with get, set
 
+    type TypeOfIndex = 
+        | Json 
+
+    type IndexOptions() = 
+        member val DDoc = "" with get, set
+        member val Name = "" with get, set 
+        member val Type = TypeOfIndex.Json with get, set
+
     type Configuration(couchUrl: string, databaseName: string) = 
         member val CouchUrl = couchUrl with get, set
         member val DatabaseName = databaseName with get, set
@@ -359,6 +367,19 @@ namespace Davenport.Csharp
                 Option.ofNullable o.Limit |> Option.map FindOption.FindLimit 
                 Option.ofNullable o.Skip |> Option.map FindOption.Skip 
                 o.UseIndex |> Option.map (usableIndexToFs >> FindOption.UseIndex)
+            ]
+            |> List.filter Option.isSome 
+            |> List.map Option.get
+
+        let indexOptionsToFs (o: IndexOptions): IndexOption list = 
+            let type' = 
+                match o.Type with 
+                | TypeOfIndex.Json -> IndexOption.Type IndexType.Json
+
+            [
+                Option.ofString o.DDoc |> Option.map IndexOption.DDoc 
+                Option.ofString o.Name |> Option.map IndexOption.Name 
+                type' |> Some
             ]
             |> List.filter Option.isSome 
             |> List.map Option.get
@@ -604,9 +625,14 @@ namespace Davenport.Csharp
             <| client 
             |> task
 
-        member __.CreateIndexesAsync (indexes: IEnumerable<string>): Task<IndexInsertResult> = 
+        member __.CreateIndexesAsync (indexes: IEnumerable<string>, [<Optional; DefaultParameterValue(null)>] ?options: IndexOptions): Task<IndexInsertResult> = 
+            let opts = 
+                options 
+                |> Option.map indexOptionsToFs
+                |> Option.defaultValue []
+
             client 
-            |> createIndexes (List.ofSeq indexes)
+            |> createIndexes opts (List.ofSeq indexes)
             |> task
 
         member __.GetCouchVersion(): Task<string> = 

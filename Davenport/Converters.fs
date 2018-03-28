@@ -304,12 +304,25 @@ type DefaultConverter (defaultSerializer: JsonSerializer, defaultSerializerSetti
         yield StringProp("language", "javascript")
     }
 
-    override __.WriteIndexes name fields = jsonObject {
+    override __.WriteIndexes opts fields = jsonObject {
         // Desired json looks like { "name" : "index-name", "index": {fields": ["field1", "field2", "field3"]}}
+        let rec convertOptions remaining output = 
+            match remaining with 
+            | [] -> output 
+            | IndexOption.Name name::rest -> 
+                (output@[StringProp("name", name)])
+                |> convertOptions rest 
+            | IndexOption.DDoc ddoc::rest ->
+                (output@[StringProp("ddoc", ddoc)])
+                |> convertOptions rest 
+            | IndexOption.Type (IndexType.Json)::rest ->
+                (output@[StringProp("type", "json")])
+                |> convertOptions rest
+
         let fieldProp = ArrayProp("fields", fields |> List.map JsonValue.String)
 
-        yield StringProp ("name", name)
         yield ObjectProp ("index", [fieldProp])
+        yield convertOptions opts []
     }
 
     override __.WriteFindSelector options selector = jsonObject {

@@ -123,6 +123,14 @@ type ListOption =
     | GroupLevel of int
     | IncludeDocs of bool
 
+type IndexType = 
+    | Json
+
+type IndexOption = 
+    | DDoc of string     
+    | Name of string 
+    | Type of IndexType 
+
 type IndexName = string 
 
 type IndexField = string
@@ -206,7 +214,7 @@ type ICouchConverter() =
     abstract WriteBulkInsertList: FieldMapping -> BulkMode -> InsertedDocument<'a> list -> string
     abstract WriteInsertedDocument: FieldMapping -> InsertedDocument<'a> -> string
     abstract WriteDesignDoc: Views -> string
-    abstract WriteIndexes: IndexName -> IndexField list -> string
+    abstract WriteIndexes: IndexOption list -> IndexField list -> string
     abstract WriteFindSelector: FindOption list -> FindSelector -> string
     abstract ReadAsDocument: FieldMapping -> JsonParseKind -> Document
     abstract ReadAsViewResult: FieldMapping -> JsonParseKind -> ViewResult 
