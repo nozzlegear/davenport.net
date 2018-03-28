@@ -1,6 +1,6 @@
 dotnet restore;
 dotnet build -c Release;
-dotnet pack --no-build -c Release Davenport/davenport.fsproj;
+dotnet pack --no-build -c Release Davenport/Davenport.fsproj;
 
 $nupkg = (gci "Davenport/bin/Release/*.nupkg")[0];
 
