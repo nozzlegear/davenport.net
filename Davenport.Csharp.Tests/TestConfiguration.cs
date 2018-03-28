@@ -49,7 +49,7 @@ namespace Davenport.Tests
                         Name = "only-bazs-greater-than-10",
                         MapFunction = @"function (doc) {
                             if (doc.Baz > 10) {
-                                emit(doc._id, doc);
+                                emit(doc._id, doc.Baz);
                             }
                         }"
                     }
