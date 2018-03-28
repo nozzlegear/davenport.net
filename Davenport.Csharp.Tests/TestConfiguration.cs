@@ -11,6 +11,9 @@ namespace Davenport.Tests
     {
         internal Client<MyTestClass> Client { get; private set; }
 
+        public string Username = System.Environment.GetEnvironmentVariable("COUCHDB_USERNAME");
+        public string Password = System.Environment.GetEnvironmentVariable("COUCHDB_PASSWORD");
+
         public Task DisposeAsync()
         {
             return Task.CompletedTask;
@@ -19,6 +22,16 @@ namespace Davenport.Tests
         public async Task InitializeAsync()
         {
             var config = new Configuration("http://localhost:5984", "davenport_net");
+            
+            if (!String.IsNullOrEmpty(Username))
+            {
+                config.Username = Username;
+            }
+
+            if (!String.IsNullOrEmpty(Password))
+            {
+                config.Password = Password;
+            }
 
             config.Warning += (object sender, string message) => Console.WriteLine(message);
 
