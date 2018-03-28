@@ -30,7 +30,7 @@ namespace Davenport.Tests
         {
             var result = ExpressionParser.parse<MyTestClass>(x => x.Baz == TestClass.Baz);
 
-            Assert.Contains(result, kvp => FindMatch(kvp, "Baz", op => op.IsEqualTo && ((Types.FindOperator.EqualTo) op).Item == (object) TestClass.Baz));
+            Assert.Contains(result, kvp => FindMatch(kvp, "Baz", op => op.IsEqualTo && ((int) ((Types.FindOperator.EqualTo) op).Item) == TestClass.Baz));
         }
 
         [Fact(DisplayName = "Parser FromVariable"), Trait("Category", "Parser")]
@@ -39,7 +39,7 @@ namespace Davenport.Tests
             string searchString = "test";
             var result = ExpressionParser.parse<MyTestClass>(x => x.Foo == searchString);
 
-            Assert.Contains(result, kvp => FindMatch(kvp, "Foo", op => op.IsEqualTo && ((Types.FindOperator.EqualTo) op).Item == (object) searchString));
+            Assert.Contains(result, kvp => FindMatch(kvp, "Foo", op => op.IsEqualTo && ((string) ((Types.FindOperator.EqualTo) op).Item) == searchString));
         }
 
         [Fact(DisplayName = "Parser FromConstant"), Trait("Category", "Parser")]
@@ -47,7 +47,7 @@ namespace Davenport.Tests
         {
             var result = ExpressionParser.parse<MyTestClass>(x => x.Bar == false);
 
-            Assert.Contains(result, kvp => FindMatch(kvp, "Bar", op => op.IsEqualTo && ((Types.FindOperator.EqualTo) op).Item == (object) false));
+            Assert.Contains(result, kvp => FindMatch(kvp, "Bar", op => op.IsEqualTo && ((bool) ((Types.FindOperator.EqualTo) op).Item) == false));
         }
 
         [Fact(DisplayName = "Parser WithNullValue"), Trait("Category", "Parser")]
@@ -55,7 +55,7 @@ namespace Davenport.Tests
         {
             var result = ExpressionParser.parse<MyTestClass>(x => x.Bat == null);
 
-            Assert.Contains(result, kvp => FindMatch(kvp, "Bat", op => op.IsEqualTo && ((Types.FindOperator.EqualTo) op).Item == null));
+            Assert.Contains(result, kvp => FindMatch(kvp, "Bat", op => op.IsEqualTo && ((int?) ((Types.FindOperator.EqualTo) op).Item) == null));
         }
 
         [Fact(DisplayName = "Parser GreaterThan"), Trait("Category", "Parser")]
@@ -63,7 +63,7 @@ namespace Davenport.Tests
         {
             var result = ExpressionParser.parse<MyTestClass>(x => x.Baz > TestClass.Baz);
 
-            Assert.Contains(result, kvp => FindMatch(kvp, "Baz", op => op.IsGreaterThan && ((Types.FindOperator.GreaterThan) op).Item == (object) TestClass.Baz));
+            Assert.Contains(result, kvp => FindMatch(kvp, "Baz", op => op.IsGreaterThan && ((int) ((Types.FindOperator.GreaterThan) op).Item) == TestClass.Baz));
         }
 
         [Fact(DisplayName = "Parser GreaterThanOrEqualTo"), Trait("Category", "Parser")]
@@ -71,7 +71,7 @@ namespace Davenport.Tests
         {
             var result = ExpressionParser.parse<MyTestClass>(x => x.Baz >= TestClass.Baz);
 
-            Assert.Contains(result, kvp => FindMatch(kvp, "Baz", op => op.IsGreaterThanOrEqualTo && ((Types.FindOperator.GreaterThanOrEqualTo) op).Item == (object) TestClass.Baz));
+            Assert.Contains(result, kvp => FindMatch(kvp, "Baz", op => op.IsGreaterThanOrEqualTo && ((int) ((Types.FindOperator.GreaterThanOrEqualTo) op).Item) == TestClass.Baz));
         }
 
         [Fact(DisplayName = "Parser LesserThan"), Trait("Category", "Parser")]
@@ -79,7 +79,7 @@ namespace Davenport.Tests
         {
             var result = ExpressionParser.parse<MyTestClass>(x => x.Baz < TestClass.Baz);
 
-            Assert.Contains(result, kvp => FindMatch(kvp, "Baz", op => op.IsLesserThan && ((Types.FindOperator.LesserThan) op).Item == (object) TestClass.Baz));
+            Assert.Contains(result, kvp => FindMatch(kvp, "Baz", op => op.IsLesserThan && ((int) ((Types.FindOperator.LesserThan) op).Item) == TestClass.Baz));
         }
 
         [Fact(DisplayName = "Parser LesserThanOrEqualTo"), Trait("Category", "Parser")]
@@ -87,7 +87,7 @@ namespace Davenport.Tests
         {
             var result = ExpressionParser.parse<MyTestClass>(x => x.Baz <= TestClass.Baz);
 
-            Assert.Contains(result, kvp => FindMatch(kvp, "Baz", op => op.IsLessThanOrEqualTo && ((Types.FindOperator.LessThanOrEqualTo) op).Item == (object) TestClass.Baz));
+            Assert.Contains(result, kvp => FindMatch(kvp, "Baz", op => op.IsLessThanOrEqualTo && ((int) ((Types.FindOperator.LessThanOrEqualTo) op).Item) == TestClass.Baz));
         }
 
         [Fact(DisplayName = "Parser NotEqual"), Trait("Category", "Parser")]
@@ -95,7 +95,7 @@ namespace Davenport.Tests
         {
             var result = ExpressionParser.parse<MyTestClass>(x => x.Baz != TestClass.Baz);
 
-            Assert.Contains(result, kvp => FindMatch(kvp, "Baz", op => op.IsNotEqualTo && ((Types.FindOperator.NotEqualTo) op).Item == (object) TestClass.Baz));
+            Assert.Contains(result, kvp => FindMatch(kvp, "Baz", op => op.IsNotEqualTo && ((int) ((Types.FindOperator.NotEqualTo) op).Item) == TestClass.Baz));
         }
 
         [Fact(DisplayName = "Parser Backwards"), Trait("Category", "Parser")]
@@ -103,7 +103,7 @@ namespace Davenport.Tests
         {
             var result = ExpressionParser.parse<MyTestClass>(x => 5 == x.Baz);
 
-            Assert.Contains(result, kvp => FindMatch(kvp, "Baz", op => op.IsEqualTo && ((Types.FindOperator.EqualTo) op).Item == (object) 5));
+            Assert.Contains(result, kvp => FindMatch(kvp, "Baz", op => op.IsEqualTo && ((int) ((Types.FindOperator.EqualTo) op).Item) == 5));
         }
     }
 }
