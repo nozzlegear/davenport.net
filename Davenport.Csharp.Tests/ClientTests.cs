@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
-using Davenport.Entities;
+using Davenport.Csharp.Types;
 using Xunit;
 
 namespace Davenport.Tests
@@ -28,17 +28,17 @@ namespace Davenport.Tests
         [Fact(DisplayName = "Client PostAsync"), Trait("Category", "Client")]
         public async Task PostAsync()
         {
-            var doc = await Fixture.Client.PostAsync(ExampleClass);
+            var doc = await Fixture.Client.CreateAsync(ExampleClass);
 
             Assert.False(string.IsNullOrEmpty(doc.Id));
             Assert.False(string.IsNullOrEmpty(doc.Rev));
-            Assert.True(doc.Ok);
+            Assert.True(doc.Okay);
         }
 
         [Fact(DisplayName = "Client GetAsync"), Trait("Category", "Client")]
         public async Task GetAsync()
         {
-            var created = await Fixture.Client.PostAsync(ExampleClass);
+            var created = await Fixture.Client.CreateAsync(ExampleClass);
             var doc = await Fixture.Client.GetAsync(created.Id);
 
             Assert.Equal("test value", doc.Foo);
@@ -51,7 +51,7 @@ namespace Davenport.Tests
         [Fact(DisplayName = "Client CountAsync"), Trait("Category", "Client")]
         public async Task CountAsync()
         {
-            await Fixture.Client.PostAsync(ExampleClass);
+            await Fixture.Client.CreateAsync(ExampleClass);
 
             var count = await Fixture.Client.CountAsync();
 
@@ -70,8 +70,8 @@ namespace Davenport.Tests
                 Bat = ExampleClass.Bat
             };
 
-            await Fixture.Client.PostAsync(cust);
-            await Fixture.Client.PostAsync(ExampleClass);
+            await Fixture.Client.CreateAsync(cust);
+            await Fixture.Client.CreateAsync(ExampleClass);
 
             var count = await Fixture.Client.CountByExpressionAsync(doc => doc.Foo == expected);
             var totalCount = await Fixture.Client.CountAsync();
@@ -83,7 +83,7 @@ namespace Davenport.Tests
         [Fact(DisplayName = "Client PutAsync"), Trait("Category", "Client")]
         public async Task PutAsync()
         {
-            var created = await Fixture.Client.PostAsync(ExampleClass);
+            var created = await Fixture.Client.CreateAsync(ExampleClass);
             var retrieved = await Fixture.Client.GetAsync(created.Id, created.Rev);
 
             retrieved.Foo = "test value 2";
@@ -91,7 +91,7 @@ namespace Davenport.Tests
             retrieved.Baz = 9;
             retrieved.Bat = null;
 
-            var updated = await Fixture.Client.PutAsync(created.Id, retrieved, created.Rev);
+            var updated = await Fixture.Client.UpdateAsync(created.Id, retrieved, created.Rev);
             retrieved = await Fixture.Client.GetAsync(updated.Id, updated.Rev);
 
             Assert.Equal("test value 2", retrieved.Foo);
@@ -104,7 +104,7 @@ namespace Davenport.Tests
         [Fact(DisplayName = "Client DeleteAsync"), Trait("Category", "Client")]
         public async Task DeleteAsync()
         {
-            var created = await Fixture.Client.PostAsync(ExampleClass);
+            var created = await Fixture.Client.CreateAsync(ExampleClass);
 
             await Fixture.Client.DeleteAsync(created.Id, created.Rev);
         }
@@ -112,18 +112,20 @@ namespace Davenport.Tests
         [Fact(DisplayName = "Client ListWithDocsAsync"), Trait("Category", "Client")]
         public async Task ListWithDocsAsync()
         {
-            await Fixture.Client.PostAsync(ExampleClass);
+            await Fixture.Client.CreateAsync(ExampleClass);
 
             var list = await Fixture.Client.ListWithDocsAsync();
+            
 
             Assert.NotNull(list);
             Assert.Equal(0, list.Offset);
             Assert.True(list.Rows.Count() > 0);
             Assert.True(list.DesignDocs.Count() > 0);
-            Assert.True(list.Rows.All(row => row.Doc.GetType() == typeof(MyTestClass)));
             Assert.True(list.Rows.All(row => !row.Id.StartsWith("_design")));
-            Assert.True(list.Rows.All(row => !string.IsNullOrEmpty(row.Doc.Id)));
-            Assert.True(list.Rows.All(row => !string.IsNullOrEmpty(row.Doc.Rev)));
+            Assert.True(list.Rows.All(row => row.Doc != null && row.Doc.Value != null), "All row docs should not be null.");
+            Assert.True(list.Rows.All(row => row.Doc.Value.GetType() == typeof(MyTestClass)));
+            Assert.True(list.Rows.All(row => !string.IsNullOrEmpty(row.Doc.Value.Id)));
+            Assert.True(list.Rows.All(row => !string.IsNullOrEmpty(row.Doc.Value.Rev)));
             Assert.True(list.DesignDocs.All(doc => doc.Id.StartsWith("_design")));
             Assert.True(list.DesignDocs.All(doc => doc.Doc != null)); ;
         }
@@ -131,7 +133,7 @@ namespace Davenport.Tests
         [Fact(DisplayName = "Client ListWithoutDocsAsync"), Trait("Category", "Client")]
         public async Task ListWithoutDocsAsync()
         {
-            await Fixture.Client.PostAsync(ExampleClass);
+            await Fixture.Client.CreateAsync(ExampleClass);
 
             var list = await Fixture.Client.ListWithoutDocsAsync();
 
@@ -139,17 +141,17 @@ namespace Davenport.Tests
             Assert.Equal(0, list.Offset);
             Assert.True(list.Rows.Count() > 0, "Rows.Count should be greater than 0.");
             Assert.True(list.DesignDocs.Count() > 0, "Rows.DesignDocs.Count should be greater than 0.");
-            Assert.True(list.Rows.All(row => row.Doc.GetType() == typeof(Revision)), "All row docs should be of type Revision.");
-            Assert.True(list.Rows.All(row => !string.IsNullOrEmpty(row.Doc.Rev)), "All rows should have a Doc.Rev value.");
+            Assert.True(list.Rows.All(row => row.Value.Value.GetType() == typeof(Revision)), "All row values should be of type Revision.");
             Assert.True(list.Rows.All(row => !row.Id.StartsWith("_design")), "All row ids should not start with _design.");
             Assert.True(list.DesignDocs.All(doc => doc.Id.StartsWith("_design")), "All design doc ids should start with _design.");
-            Assert.True(list.DesignDocs.All(doc => doc.Doc != null), "All design doc documents should not be null."); ;
+            Assert.True(list.DesignDocs.All(doc => doc.Value != null), "All design doc values should not be null.");
+            Assert.True(list.DesignDocs.All(row => row.Value.Value.GetType() == typeof(Revision)), "All design doc values should be of type Revision.");
         }
 
         [Fact(DisplayName = "Client FindByExpressionAsync"), Trait("Category", "Client")]
         public async Task FindByExpressionAsync()
         {
-            var created = await Fixture.Client.PostAsync(new MyTestClass()
+            var created = await Fixture.Client.CreateAsync(new MyTestClass()
             {
                 Foo = "test value 2"
             });
@@ -160,7 +162,7 @@ namespace Davenport.Tests
             Assert.True(equalsResult.All(row => !string.IsNullOrEmpty(row.Id)));
             Assert.True(equalsResult.All(row => !string.IsNullOrEmpty(row.Rev)));
 
-            created = await Fixture.Client.PostAsync(new MyTestClass()
+            created = await Fixture.Client.CreateAsync(new MyTestClass()
             {
                 Foo = "test value"
             });
@@ -172,68 +174,30 @@ namespace Davenport.Tests
             Assert.True(notEqualsResult.All(row => !string.IsNullOrEmpty(row.Rev)));
         }
 
-        [Fact(DisplayName = "Client FindByDictionaryAsync"), Trait("Category", "Client")]
-        public async Task FindByDictionaryAsync()
+        [Fact(DisplayName = "Client FindBySelectorAsync"), Trait("Category", "Client")]
+        public async Task FindBySelectorAsync()
         {
-            var created = await Fixture.Client.PostAsync(new MyTestClass()
+            var created = await Fixture.Client.CreateAsync(new MyTestClass()
             {
                 Foo = "test value 2"
             });
             var equalsResult = await Fixture.Client.FindBySelectorAsync(new Dictionary<string, FindExpression>()
             {
-                { "Foo", new FindExpression(ExpressionType.Equal, "test value 2") }
+                { "Foo", FindExpression.Create(ExpressionType.Equal, "test value 2") }
             });
 
             Assert.NotNull(equalsResult);
             Assert.True(equalsResult.All(row => row.Foo == "test value 2"));
             Assert.True(equalsResult.All(row => !string.IsNullOrEmpty(row.Id)));
             Assert.True(equalsResult.All(row => !string.IsNullOrEmpty(row.Rev)));
-
-            created = await Fixture.Client.PostAsync(new MyTestClass()
+            
+            created = await Fixture.Client.CreateAsync(new MyTestClass()
             {
                 Foo = "test value"
             });
             var notEqualsResult = await Fixture.Client.FindBySelectorAsync(new Dictionary<string, FindExpression>()
             {
-                { "Foo", new FindExpression(ExpressionType.NotEqual, "test value 2") }
-            });
-
-            Assert.NotNull(notEqualsResult);
-            Assert.True(notEqualsResult.All(row => row.Foo != "test value 2"));
-            Assert.True(notEqualsResult.All(row => !string.IsNullOrEmpty(row.Id)));
-            Assert.True(notEqualsResult.All(row => !string.IsNullOrEmpty(row.Rev)));
-        }
-
-        [Fact(DisplayName = "Client FindByObjectAsync"), Trait("Category", "Client")]
-        public async Task FindByObjectAsync()
-        {
-            var created = await Fixture.Client.PostAsync(new MyTestClass()
-            {
-                Foo = "test value 2"
-            });
-            var equalsResult = await Fixture.Client.FindByObjectAsync(new
-            {
-                Foo = new Dictionary<string, object>
-                {
-                    { "$eq", "test value 2" }
-                }
-            });
-
-            Assert.NotNull(equalsResult);
-            Assert.True(equalsResult.All(row => row.Foo == "test value 2"));
-            Assert.True(equalsResult.All(row => !string.IsNullOrEmpty(row.Id)));
-            Assert.True(equalsResult.All(row => !string.IsNullOrEmpty(row.Rev)));
-
-            created = await Fixture.Client.PostAsync(new MyTestClass()
-            {
-                Foo = "test value"
-            });
-            var notEqualsResult = await Fixture.Client.FindByObjectAsync(new
-            {
-                Foo = new Dictionary<string, object>
-                {
-                    { "$ne", "test value 2" }
-                }
+                { "Foo", FindExpression.Create(ExpressionType.NotEqual, "test value 2") }
             });
 
             Assert.NotNull(notEqualsResult);
@@ -245,7 +209,7 @@ namespace Davenport.Tests
         [Fact(DisplayName = "Client ExistsAsync"), Trait("Category", "Client")]
         public async Task ExistsAsync()
         {
-            var created = await Fixture.Client.PostAsync(ExampleClass);
+            var created = await Fixture.Client.CreateAsync(ExampleClass);
             var exists = await Fixture.Client.ExistsAsync(created.Id);
             var existsWithRev = await Fixture.Client.ExistsAsync(created.Id, created.Rev);
 
@@ -256,7 +220,7 @@ namespace Davenport.Tests
         [Fact(DisplayName = "Client ExistsByExpressionAsync"), Trait("Category", "Client")]
         public async Task ExistsByExpressionAsync()
         {
-            var created = await Fixture.Client.PostAsync(new MyTestClass()
+            var created = await Fixture.Client.CreateAsync(new MyTestClass()
             {
                 Foo = "test value 2"
             });
@@ -265,34 +229,16 @@ namespace Davenport.Tests
             Assert.True(exists);
         }
 
-        [Fact(DisplayName = "Client ExistsByDictionaryAsync"), Trait("Category", "Client")]
-        public async Task ExistsByDictionaryAsync()
+        [Fact(DisplayName = "Client ExistsBySelectorAsync"), Trait("Category", "Client")]
+        public async Task ExistsBySelectorAsync()
         {
-            var created = await Fixture.Client.PostAsync(new MyTestClass()
+            var created = await Fixture.Client.CreateAsync(new MyTestClass()
             {
                 Foo = "test value 2"
             });
             var exists = await Fixture.Client.ExistsBySelectorAsync(new Dictionary<string, FindExpression>()
             {
-                { "Foo", new FindExpression(ExpressionType.Equal, "test value 2") }
-            });
-
-            Assert.True(exists);
-        }
-
-        [Fact(DisplayName = "Client ExistsByObjectAsync"), Trait("Category", "Client")]
-        public async Task ExistsByObjectAsync()
-        {
-            var created = await Fixture.Client.PostAsync(new MyTestClass()
-            {
-                Foo = "test value 2"
-            });
-            var exists = await Fixture.Client.ExistsByObjectAsync(new
-            {
-                Foo = new Dictionary<string, object>
-                {
-                    { "$eq", "test value 2" }
-                }
+                { "Foo", FindExpression.Create(ExpressionType.Equal, "test value 2") }
             });
 
             Assert.True(exists);
@@ -302,7 +248,7 @@ namespace Davenport.Tests
         public async Task CopyAsync()
         {
             var uuid = $"a-unique-string-{DateTime.Now.Millisecond}";
-            var createResult = await Fixture.Client.PostAsync(ExampleClass);
+            var createResult = await Fixture.Client.CreateAsync(ExampleClass);
             var copyResult = await Fixture.Client.CopyAsync(createResult.Id, uuid);
 
             Assert.Equal(copyResult.Id, uuid);
@@ -311,12 +257,12 @@ namespace Davenport.Tests
         [Fact(DisplayName = "Client ViewAsync"), Trait("Category", "Client")]
         public async Task ViewAsync()
         {
-            var created = await Fixture.Client.PostAsync(new MyTestClass()
+            var created = await Fixture.Client.CreateAsync(new MyTestClass()
             {
                 Foo = "test value",
                 Baz = 15,
             });
-            var viewResult = await Fixture.Client.ViewAsync<int>("list", "only-bazs-greater-than-10");
+            var viewResult = await Fixture.Client.ViewAsync<int, object>("list", "only-bazs-greater-than-10");
 
             Assert.True(viewResult.Count() > 0);
             Assert.True(viewResult.Sum(doc => doc.Value) > 0);
@@ -326,19 +272,21 @@ namespace Davenport.Tests
         public async Task CreateAndDeleteDatabaseAsync()
         {
             string name = "davenport_net_delete_me";
-            var newDb = new Davenport.Client<MyTestClass>("http://localhost:5984", name);
-            var createResult = await newDb.CreateDatabaseAsync();
+            var config = new Configuration("http://localhost:5984", name)
+            {
+                Username = Fixture.Username,
+                Password = Fixture.Password
+            };
+            var newDb = new Davenport.Csharp.Client<MyTestClass>(config);
 
-            Assert.True(createResult.Ok);
+            await newDb.CreateDatabaseAsync();
 
             // Create the database again to ensure .AlreadyExisted works.
-            createResult = await newDb.CreateDatabaseAsync();
+            var createResult = await newDb.CreateDatabaseAsync();
 
-            Assert.True(createResult.AlreadyExisted);
+            Assert.True(createResult.IsAlreadyExisted);
 
-            var deleteResult = await newDb.DeleteDatabaseAsync();
-
-            Assert.True(deleteResult.Ok);
+            await newDb.DeleteDatabaseAsync();
         }
     }
 }

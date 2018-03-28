@@ -47,26 +47,14 @@ let get id rev props =
     getRaw id rev props
     |> Async.Map (JsonString >> props.converter.ReadAsDocument props.fieldMapping)
 
-let listAllRaw includeDocs options props = 
-    let includeDocs = 
-        match includeDocs with 
-        | WithDocs -> true
-        | WithoutDocs -> false
-        |> string 
-        |> String.Lowercase
-
-    let qs = 
-        options
-        |> props.converter.ConvertListOptionsToMap
-        |> Map.add "include_docs" (string includeDocs)
-
+let listAllRaw options props = 
     props
     |> request "_all_docs"
-    |> querystring qs
+    |> querystring (props.converter.ConvertListOptionsToMap options)
     |> send Get
 
-let listAll includeDocs options props = 
-    listAllRaw includeDocs options props 
+let listAll options props = 
+    listAllRaw options props 
     |> Async.Map (JsonString >> props.converter.ReadAsViewResult props.fieldMapping)
 
 let create (document: InsertedDocument<'a>) props = 
@@ -172,7 +160,7 @@ let find (findOptions: FindOption list) selector props = async {
 }
 
 let count = 
-    listAll WithoutDocs [ListLimit 0] 
+    listAll [ListLimit 0; IncludeDocs false] 
     >> Async.Map (fun d -> d.TotalRows)
 
 /// <summary>
@@ -255,9 +243,15 @@ let deleteDatabase =
 /// <summary>
 /// Creates the given design docs. This is a dumb function and will overwrite the data of any design doc that shares its id.
 /// </summary>
-let createOrUpdateDesignDoc ((id, views): DesignDoc) props =
+let createOrUpdateDesignDoc (rev: string option) ((id, views): DesignDoc) props =
+    let qs = 
+        rev 
+        |> Option.map props.converter.ConvertRevToMap
+        |> Option.defaultValue Map.empty
+
     request (sprintf "_design/%s" id) props
     |> body (props.converter.WriteDesignDoc views)
+    |> querystring qs
     |> send Put
     |> Async.Ignore
 

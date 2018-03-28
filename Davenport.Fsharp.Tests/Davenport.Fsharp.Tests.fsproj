@@ -12,7 +12,7 @@
     <Compile Include="Main.fs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Davenport.Fsharp\Davenport.Fsharp.fsproj" />
+    <ProjectReference Include="..\Davenport\Davenport.fsproj" />
   </ItemGroup>
   <ItemGroup>
     <DotNetCliToolReference Include="Microsoft.DotNet.Watcher.Tools" Version="1.0.0" />

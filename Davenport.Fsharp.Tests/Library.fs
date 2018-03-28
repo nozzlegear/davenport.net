@@ -441,7 +441,7 @@ let tests =
             // Create at least one doc to list
             do! create defaultInsert client |> Async.Ignore
 
-            let! viewResult = listAll WithDocs [] client
+            let! viewResult = listAll [IncludeDocs true] client
 
             Expect.equal "List offset is not 0." viewResult.Offset 0
             Expect.isTrue "Total rows should be greater than 0" (viewResult.TotalRows > 0)
@@ -493,7 +493,7 @@ let tests =
             // Create at least one doc to list
             do! create defaultInsert client |> Async.Ignore
 
-            let! viewResult = listAll WithoutDocs [] client
+            let! viewResult = listAll [IncludeDocs false] client
 
             Expect.equal "List offset should be 0." viewResult.Offset 0
             Expect.isTrue "Total rows should be greater than 0" (viewResult.TotalRows > 0)
@@ -655,7 +655,7 @@ let tests =
                 Map.empty
                 |> Map.add viewName ("function (doc) { if (doc.Baz > 10) { emit(doc._id, doc.Baz) }}", None) 
                 |> DesignDoc.doc docName
-                |> createOrUpdateDesignDoc
+                |> createOrUpdateDesignDoc None
                 <| client
                 |> Async.Catch 
 

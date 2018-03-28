@@ -11,8 +11,8 @@ if ($couchOutput.StatusCode -ne 200) {
 }
 
 $fsTestProj = "Davenport.Fsharp.Tests/Davenport.Fsharp.Tests.fsproj"
-$csTestProj = "Davenport.Tests/Davenport.Tests.csproj";
-$csTests = "Parser", "Config", "Client";
+$csTestProj = "Davenport.Csharp.Tests/Davenport.Csharp.Tests.csproj";
+$csTests = "Parser", "Client";
 
 # Execute all C# tests, throwing when one fails.
 $csTests | % {

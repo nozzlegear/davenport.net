@@ -48,20 +48,16 @@ type PostPutCopyResult =
 
 type ViewValue = Document
 
-type KeyValue = 
+type ViewKey = 
     | String of string 
     | Int of int 
     | Long of int64
     | Float of float 
     | Date of System.DateTime
     | Bool of bool 
-    | List of KeyValue list
+    | List of ViewKey list
     | Null 
     | JToken of JToken
-
-type ViewKey = 
-    | Key of KeyValue
-    | KeyList of KeyValue list    
 
 type ViewDoc = 
     { Id: Id
@@ -125,6 +121,7 @@ type ListOption =
     | Reduce of bool
     | Group of bool
     | GroupLevel of int
+    | IncludeDocs of bool
 
 type IndexName = string 
 
@@ -165,10 +162,6 @@ type FindOption =
 type FindResult = Warning option * Document list
 
 type FindSelector = Map<string, FindOperator list>        
-
-type IncludeDocs = 
-    | WithDocs
-    | WithoutDocs
 
 type BulkMode = 
     | AllowNewEdits
