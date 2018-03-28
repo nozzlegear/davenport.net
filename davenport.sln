@@ -2,7 +2,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.27130.2036
 MinimumVisualStudioVersion = 15.0.26124.0
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "davenport", "Davenport\davenport.fsproj", "{EAA11241-A52D-4D1D-9599-8C85447AC06F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "davenport", "Davenport\Davenport.fsproj", "{EAA11241-A52D-4D1D-9599-8C85447AC06F}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Davenport.Csharp.Tests", "Davenport.Csharp.Tests\Davenport.Csharp.Tests.csproj", "{80508D26-7BDE-4251-AEE6-5F0E36F9D269}"
 EndProject
