@@ -121,9 +121,9 @@ namespace Davenport.Tests
             Assert.Equal(0, list.Offset);
             Assert.True(list.Rows.Count() > 0);
             Assert.True(list.DesignDocs.Count() > 0);
-            Assert.True(list.Rows.All(row => row.Doc.GetType() == typeof(MyTestClass)));
             Assert.True(list.Rows.All(row => !row.Id.StartsWith("_design")));
             Assert.True(list.Rows.All(row => row.Doc != null && row.Doc.Value != null), "All row docs should not be null.");
+            Assert.True(list.Rows.All(row => row.Doc.Value.GetType() == typeof(MyTestClass)));
             Assert.True(list.Rows.All(row => !string.IsNullOrEmpty(row.Doc.Value.Id)));
             Assert.True(list.Rows.All(row => !string.IsNullOrEmpty(row.Doc.Value.Rev)));
             Assert.True(list.DesignDocs.All(doc => doc.Id.StartsWith("_design")));
@@ -144,7 +144,8 @@ namespace Davenport.Tests
             Assert.True(list.Rows.All(row => row.Value.Value.GetType() == typeof(Revision)), "All row values should be of type Revision.");
             Assert.True(list.Rows.All(row => !row.Id.StartsWith("_design")), "All row ids should not start with _design.");
             Assert.True(list.DesignDocs.All(doc => doc.Id.StartsWith("_design")), "All design doc ids should start with _design.");
-            Assert.True(list.DesignDocs.All(doc => doc.Doc != null), "All design doc documents should not be null."); ;
+            Assert.True(list.DesignDocs.All(doc => doc.Value != null), "All design doc values should not be null.");
+            Assert.True(list.DesignDocs.All(row => row.Value.Value.GetType() == typeof(Revision)), "All design doc values should be of type Revision.");
         }
 
         [Fact(DisplayName = "Client FindByExpressionAsync"), Trait("Category", "Client")]
@@ -271,7 +272,13 @@ namespace Davenport.Tests
         public async Task CreateAndDeleteDatabaseAsync()
         {
             string name = "davenport_net_delete_me";
-            var newDb = new Davenport.Csharp.Client<MyTestClass>("http://localhost:5984", name);
+            var config = new Configuration("http://localhost:5984", name)
+            {
+                Username = Fixture.Username,
+                Password = Fixture.Password
+            };
+            var newDb = new Davenport.Csharp.Client<MyTestClass>(config);
+
             await newDb.CreateDatabaseAsync();
 
             // Create the database again to ensure .AlreadyExisted works.
