@@ -39,18 +39,26 @@ namespace Davenport.Tests
 
             // Make sure the database exists
             await Client.CreateDatabaseAsync();
-            await Client.CreateOrUpdateDesignDocAsync("list", new List<ViewConfig>()
+
+            try 
             {
-                new ViewConfig()
+                await Client.CreateOrUpdateDesignDocAsync("list", new List<ViewConfig>()
                 {
-                    Name = "only-bazs-greater-than-10",
-                    MapFunction = @"function (doc) {
-                        if (doc.Baz > 10) {
-                            emit(doc._id, doc);
-                        }
-                    }"
-                }
-            });
+                    new ViewConfig()
+                    {
+                        Name = "only-bazs-greater-than-10",
+                        MapFunction = @"function (doc) {
+                            if (doc.Baz > 10) {
+                                emit(doc._id, doc);
+                            }
+                        }"
+                    }
+                });
+            }
+            catch (Types.DavenportException ex) when (ex.Conflict) 
+            {
+                // Ignore, design doc already exists.
+            }
         }
     }
 }

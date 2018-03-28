@@ -242,9 +242,15 @@ type DefaultConverter (defaultSerializer: JsonSerializer, defaultSerializerSetti
             |> List.map (fun (token, givenFieldName, canonFieldName, readableFieldName) ->
                 match isNull token with 
                 | true -> 
-                    sprintf "%s field '%s' was not found on type %s. If you want to map it to a custom field on your type, use Davenport's `converterSettings` function to pass a list of field mappings." readableFieldName givenFieldName docValueType.FullName
-                    |> System.ArgumentException
-                    |> raise
+                    // Previously we'd throw an error here if the Id or Rev fields weren't found. However, this introduced a bug with the C# wrapper: 
+                    // the Id and Rev fields of C# classes can be null, and our default serializer settings is configured to ignore null values. Therefore,
+                    // the Id and Rev JTokens would be null and make that error throw whenever the Id and Rev values were themselves null. 
+                    // Instead we just skip of them and continue serializing.
+                    None
+
+                    // sprintf "%s field '%s' was not found on type %s. If you want to map it to a custom field on your type, use Davenport's `converterSettings` function to pass a list of field mappings." readableFieldName givenFieldName docValueType.FullName
+                    // |> System.ArgumentException
+                    // |> raise
                 | false ->
                     let value = j.[givenFieldName].Value<string>()
 
