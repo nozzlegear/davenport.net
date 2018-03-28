@@ -596,11 +596,11 @@ namespace Davenport.Csharp
         /// <summary>
         /// Creates the given design docs. This is a dumb function and will overwrite the data of any design doc that shares its id.
         /// </summary>
-        member __.CreateOrUpdateDesignDocAsync (name: string, views: IEnumerable<ViewConfig>): Task<unit> = 
+        member __.CreateOrUpdateDesignDocAsync (name: string, views: IEnumerable<ViewConfig>, [<Optional; DefaultParameterValue(null)>] ?rev: string): Task<unit> = 
             views 
             |> Seq.fold (fun views view -> views |> Map.add view.Name (view.MapFunction, Option.ofString view.ReduceFunction)) Map.empty
             |> DesignDoc.doc name
-            |> createOrUpdateDesignDoc
+            |> createOrUpdateDesignDoc rev
             <| client 
             |> task
 

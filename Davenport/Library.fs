@@ -243,9 +243,15 @@ let deleteDatabase =
 /// <summary>
 /// Creates the given design docs. This is a dumb function and will overwrite the data of any design doc that shares its id.
 /// </summary>
-let createOrUpdateDesignDoc ((id, views): DesignDoc) props =
+let createOrUpdateDesignDoc (rev: string option) ((id, views): DesignDoc) props =
+    let qs = 
+        rev 
+        |> Option.map props.converter.ConvertRevToMap
+        |> Option.defaultValue Map.empty
+
     request (sprintf "_design/%s" id) props
     |> body (props.converter.WriteDesignDoc views)
+    |> querystring qs
     |> send Put
     |> Async.Ignore
 

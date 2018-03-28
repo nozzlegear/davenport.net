@@ -22,7 +22,6 @@ namespace Davenport.Tests
 
         public ClientTests(TestConfiguration fixture)
         {
-            
             this.Fixture = fixture;
         }
 

@@ -655,7 +655,7 @@ let tests =
                 Map.empty
                 |> Map.add viewName ("function (doc) { if (doc.Baz > 10) { emit(doc._id, doc.Baz) }}", None) 
                 |> DesignDoc.doc docName
-                |> createOrUpdateDesignDoc
+                |> createOrUpdateDesignDoc None
                 <| client
                 |> Async.Catch 
 
