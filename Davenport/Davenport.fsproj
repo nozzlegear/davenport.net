@@ -2,7 +2,7 @@
   <PropertyGroup>
     <AssemblyName>Davenport</AssemblyName>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <Version>3.0.1</Version>
+    <Version>3.0.2-beta1</Version>
   </PropertyGroup>
   <PropertyGroup>
     <Description>Davenport is a CouchDB client for simplifying common tasks like get, list, create, update and delete. This package implements all of the functions from the original C# package, making it much more friendly to the functional programming style of F#.</Description>
