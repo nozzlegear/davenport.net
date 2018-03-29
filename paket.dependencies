@@ -8,7 +8,6 @@ nuget microsoft.net.test.sdk = 15.3.0-preview-20170628-02
 nuget xunit.runner.visualstudio
 nuget fsharp.core
 nuget newtonsoft.json
-nuget fable.jsonconverter
 nuget Expecto
 nuget Expecto.BenchmarkDotNet
 nuget Expecto.FsCheck
