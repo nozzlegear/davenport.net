@@ -1,6 +1,6 @@
 dotnet restore;
 dotnet build -c Release;
-dotnet pack --no-build -c Release Davenport/Davenport.fsproj;
+# dotnet pack --no-build -c Release Davenport/Davenport.fsproj;
 ./.paket/paket.exe pack --lock-dependencies "nuget"
 
 $nupkg = (gci "nuget/*.nupkg")[0];
