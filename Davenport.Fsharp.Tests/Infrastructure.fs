@@ -3,7 +3,7 @@ module Tests.Infrastructure
 open Utils
 open Expecto
 open Expecto.Flip
-open Davenport.Infrastructure
+open Davenport.Utils
 
 [<Tests>]
 let tests =

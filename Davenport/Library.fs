@@ -3,6 +3,7 @@ module Davenport.Fsharp
 open Davenport.Infrastructure
 open Davenport.Converters
 open Davenport.Types
+open Davenport.Utils
 
 let private defaultProps =  
     { username = None 

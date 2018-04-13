@@ -3,7 +3,7 @@ module Davenport.Converters
 open Newtonsoft.Json
 open Newtonsoft.Json.Linq
 open Types
-open Infrastructure
+open Utils
 
 type JsonObjectBuilder() = 
     member __.Yield(x: JsonValue) = [x]

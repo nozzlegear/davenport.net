@@ -1,7 +1,7 @@
 namespace Davenport.Csharp.Types
 
     open Davenport.Types 
-    open Davenport.Infrastructure
+    open Davenport.Utils
     open System
     open System.Collections.Generic
     open System.Linq.Expressions
@@ -138,7 +138,7 @@ namespace Davenport.Csharp.Types
 namespace Davenport.Csharp
     open Davenport.Fsharp 
     open Davenport.Types 
-    open Davenport.Infrastructure
+    open Davenport.Utils
     open System
     open System.Threading.Tasks
     open System.Collections.Generic
