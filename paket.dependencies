@@ -9,4 +9,6 @@ nuget Expecto.BenchmarkDotNet
 nuget Expecto.FsCheck
 nuget fsharp.core >= 4.2.3
 nuget newtonsoft.json >= 10.0.3
+# Pin to 0.10.3 as there's a bug when using Paket + FSharpLu.Json 0.10.4+ and installing Davenport as a dependency that makes dotnet build throw errors:
+# https://github.com/fsprojects/Paket/issues/3139
 nuget microsoft.fsharplu.json = 0.10.3
