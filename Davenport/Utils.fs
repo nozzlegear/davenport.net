@@ -111,3 +111,31 @@ let makeUrl pathSegments (querystring: Map<string, string>) =
         |> fun s -> String.Join("&", s)
 
     ub.ToString()
+
+open System.Text.RegularExpressions
+
+/// <summary>
+/// Removes the `org.couchdb.user:` prefix from a user id string.
+/// </summary>
+let removeUserIdPrefix userId = 
+    let rgx = Regex("^org\.couchdb\.user:", RegexOptions.IgnoreCase)
+    rgx.Replace(userId, "")
+
+/// <summary>
+/// Takes a user id and returns their database name when CouchDB is set to `couch_peruser` mode. It does this by removing the `org.couchdb.user:` prefix (if applicable), converting the rest to hex, and prefixing with `userdb-`. This is the same scheme that CouchDB itself uses when creating user-specific databases in `couch_peruser` mode.
+/// NOTE: this is case sensitive!
+/// </summary>
+let toUserDatabaseName userId = 
+    userId 
+    |> removeUserIdPrefix 
+    |> String.ToHex 
+    |> sprintf "userdb-%s"
+
+/// <summary>
+/// Takes a username and formats it to CouchDB's `org.couchdb.user:username` scheme.
+/// </summary>
+let toUserId userName = 
+    userName 
+    |> removeUserIdPrefix 
+    |> sprintf "org.couchdb.user:%s"
+    |> String.Lowercase

@@ -51,4 +51,41 @@ let tests =
             | _ -> false
             |> Expect.isTrue "Fifth failed"
         }
+
+        testCaseAsync "Removes user id prefix" <| async {
+            "org.couchdb.user:hello_world"
+            |> removeUserIdPrefix 
+            |> Expect.equal "" "hello_world"
+
+            "org.COUCHDB.user:hello_world"
+            |> removeUserIdPrefix
+            |> Expect.equal "Should ignore case" "hello_world"
+
+            "hello_world_org.couchdb.user:hello_world"
+            |> removeUserIdPrefix
+            |> Expect.equal "Should only remove from start of string" "hello_world_org.couchdb.user:hello_world"
+        }
+
+        testCaseAsync "Formats user ids" <| async {
+            "hello_world"
+            |> toUserId
+            |> Expect.equal "" "org.couchdb.user:hello_world"
+
+            "org.couchdb.user:hello_world"
+            |> toUserId 
+            |> Expect.equal "Should not have two prefixes" "org.couchdb.user:hello_world"
+        }
+
+        testCaseAsync "Formats user database names" <| async {
+            // 'hello_world' in hex
+            let hex = "userdb-68656c6c6f5f776f726c64"
+
+            "hello_world"
+            |> toUserDatabaseName
+            |> Expect.equal "" hex
+
+            "org.couchdb.user:hello_world"
+            |> toUserDatabaseName 
+            |> Expect.equal "Should strip id prefix" hex
+        }
     ]
