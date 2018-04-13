@@ -1,14 +1,12 @@
 source https://www.nuget.org/api/v2
 framework: auto-detect
 
-nuget flurl
-nuget flurl.http
 nuget xunit
 nuget microsoft.net.test.sdk = 15.3.0-preview-20170628-02
 nuget xunit.runner.visualstudio
-nuget fsharp.core
-nuget newtonsoft.json
 nuget Expecto
 nuget Expecto.BenchmarkDotNet
 nuget Expecto.FsCheck
+nuget fsharp.core >= 4.2.3
+nuget newtonsoft.json >= 10.0.3
 nuget microsoft.fsharplu.json = 0.10.3
