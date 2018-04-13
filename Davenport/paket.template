@@ -1,0 +1,16 @@
+type 
+    project
+version
+    3.0.2-beta2
+authors 
+    nozzlegear
+description 
+    Davenport is a CouchDB client for simplifying common tasks like get, list, create, update and delet    e. This package implements all of the functions from the original C# package, making it much more friendly to the fu    nctional programming style of F#.
+copyright 
+    Nozzlegear Software
+licenseUrl 
+    https://raw.githubusercontent.com/nozzlegear/davenport.net/master/LICENSE
+projectUrl 
+    https://github.com/nozzlegear/davenport.net
+tags
+    couchdb,couch,davenport,database,fsharp,functional,f#

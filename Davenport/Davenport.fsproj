@@ -2,17 +2,7 @@
   <PropertyGroup>
     <AssemblyName>Davenport</AssemblyName>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <Version>3.0.2-beta1</Version>
   </PropertyGroup>
-  <PropertyGroup>
-    <Description>Davenport is a CouchDB client for simplifying common tasks like get, list, create, update and delete. This package implements all of the functions from the original C# package, making it much more friendly to the functional programming style of F#.</Description>
-    <Authors>Nozzlegear</Authors>
-    <Copyright>Nozzlegear Software</Copyright>
-    <PackageLicenseUrl>https://raw.githubusercontent.com/nozzlegear/davenport.net/master/LICENSE</PackageLicenseUrl>
-    <PackageProjectUrl>https://github.com/nozzlegear/davenport.net</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/nozzlegear/davenport.net</RepositoryUrl>
-    <PackageTags>couchdb,couch,davenport,database,fsharp,functional,f#</PackageTags>
-  </PropertyGroup>  
   <ItemGroup>
     <Compile Include="Types.fs" />
     <Compile Include="Infrastructure.fs" />
