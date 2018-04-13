@@ -6,7 +6,7 @@ nuget flurl.http
 nuget xunit
 nuget microsoft.net.test.sdk = 15.3.0-preview-20170628-02
 nuget xunit.runner.visualstudio
-nuget fsharp.core = 4.2.3
+nuget fsharp.core
 nuget newtonsoft.json
 nuget Expecto
 nuget Expecto.BenchmarkDotNet
