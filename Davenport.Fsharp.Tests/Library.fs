@@ -5,7 +5,7 @@ open Davenport.Fsharp
 open Davenport.Types
 open Expecto
 open Expecto.Flip
-open Utils
+open Extensions
 
 type MyUnion =
     | Case1 of string
